@@ -53,7 +53,7 @@
             pointer-events: auto;
         }
 
-        .slide img {
+        .slide img:not(.cropped) {
             width: 100vw;
             height: 100vh;
             object-fit: cover;
@@ -62,10 +62,13 @@
             /* This maximizes screen usage for your 2560x2880 portrait display */
         }
 
-        /* Cropped images use custom positioning */
+        /* Cropped images use custom positioning - JavaScript controls everything */
         .slide img.cropped {
-            /* Don't set width/height here - let JavaScript inline styles control size */
+            /* Remove all default img styles for cropped images */
+            width: initial;
+            height: initial;
             object-fit: none !important;
+            object-position: initial;
             max-width: none !important;
             max-height: none !important;
         }
@@ -387,6 +390,18 @@
 
                 // Verify what was actually applied
                 debugLog(`  Applied CSS: width=${img.style.width}, height=${img.style.height}, left=${img.style.left}, top=${img.style.top}`, 'info');
+
+                // Check actual rendered size
+                setTimeout(() => {
+                    const renderedW = img.offsetWidth;
+                    const renderedH = img.offsetHeight;
+                    const computedStyle = window.getComputedStyle(img);
+                    debugLog(`  ACTUAL RENDERED: ${renderedW}x${renderedH}`, 'info');
+                    debugLog(`  COMPUTED STYLE: width=${computedStyle.width}, height=${computedStyle.height}`, 'info');
+                    if (renderedW !== Math.round(scaledImgW) || renderedH !== Math.round(scaledImgH)) {
+                        debugLog(`  ERROR: Rendered size doesn't match! Expected ${Math.round(scaledImgW)}x${Math.round(scaledImgH)}`, 'error');
+                    }
+                }, 100);
 
                 // Check if crop overflows or has black bars
                 if (scaledCropW > viewportW) {
