@@ -1484,21 +1484,39 @@
                     badge.className = 'theme-badge';
 
                     // Build HTML with conditional delete button
-                    let badgeHTML = `
+                    badge.innerHTML = `
                         <span style="font-weight: 500;">${themeName}</span>
                         <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;">
-                            <label style="font-size: 12px;">Interval (min):</label>
-                            <input type="number" id="interval-${themeName}" value="${intervalMinutes}" min="1" max="1440" step="0.5" style="width: 70px; padding: 4px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px;">
-                            <button onclick="saveThemeInterval('${themeName}')" style="padding: 4px 8px; font-size: 11px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">Save</button>
+                            <button class="interval-display-btn" data-theme="${themeName}" style="padding: 6px 12px; font-size: 12px; background: #f5f5f5; color: #333; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                                ${intervalMinutes} min
+                            </button>
+                            <input type="number" class="interval-input" data-theme="${themeName}" value="${intervalMinutes}" min="1" max="1440" step="0.5" style="width: 80px; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; display: none;">
+                            ${!isAllImages ? `<button onclick="deleteTheme('${themeName}')" style="padding: 6px 12px; font-size: 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">Delete</button>` : ''}
                         </div>
                     `;
 
-                    // Only show delete button for non-All Images themes
-                    if (!isAllImages) {
-                        badgeHTML += `<button onclick="deleteTheme('${themeName}')" style="margin-top: 5px;">Delete</button>`;
-                    }
+                    // Add click handler for interval button
+                    const intervalBtn = badge.querySelector('.interval-display-btn');
+                    const intervalInput = badge.querySelector('.interval-input');
 
-                    badge.innerHTML = badgeHTML;
+                    intervalBtn.addEventListener('click', () => {
+                        intervalBtn.style.display = 'none';
+                        intervalInput.style.display = 'block';
+                        intervalInput.focus();
+                        intervalInput.select();
+                    });
+
+                    // Save on blur or enter key
+                    intervalInput.addEventListener('blur', () => {
+                        saveThemeIntervalFromInput(themeName, intervalInput, intervalBtn);
+                    });
+
+                    intervalInput.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            intervalInput.blur();
+                        }
+                    });
+
                     themesList.appendChild(badge);
                 }
 
@@ -1578,6 +1596,45 @@
                 console.error('Error updating theme interval:', error);
                 showMessage('Error updating theme interval', 'error');
             }
+        }
+
+        async function saveThemeIntervalFromInput(themeName, inputElement, buttonElement) {
+            const intervalMinutes = parseFloat(inputElement.value);
+
+            if (!intervalMinutes || intervalMinutes < 1) {
+                showMessage('Invalid interval value', 'error');
+                inputElement.value = (availableThemes[themeName].interval || 3600) / 60;
+                inputElement.style.display = 'none';
+                buttonElement.style.display = 'block';
+                return;
+            }
+
+            const intervalSeconds = Math.round(intervalMinutes * 60);
+
+            try {
+                const response = await fetch(`/api/themes/${encodeURIComponent(themeName)}/interval`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ interval: intervalSeconds })
+                });
+
+                if (response.ok) {
+                    availableThemes[themeName].interval = intervalSeconds;
+                    buttonElement.textContent = `${intervalMinutes} min`;
+                    showMessage(`Interval updated for theme "${themeName}"`, 'success');
+                } else {
+                    showMessage('Error updating theme interval', 'error');
+                    inputElement.value = (availableThemes[themeName].interval || 3600) / 60;
+                }
+            } catch (error) {
+                console.error('Error updating theme interval:', error);
+                showMessage('Error updating theme interval', 'error');
+                inputElement.value = (availableThemes[themeName].interval || 3600) / 60;
+            }
+
+            // Switch back to button display
+            inputElement.style.display = 'none';
+            buttonElement.style.display = 'block';
         }
 
         async function deleteTheme(themeName) {
