@@ -388,6 +388,19 @@
 
                 // Verify what was actually applied
                 debugLog(`  Applied CSS: width=${img.style.width}, height=${img.style.height}, left=${img.style.left}, top=${img.style.top}`, 'info');
+
+                // Check if crop overflows or has black bars
+                if (scaledCropW > viewportW) {
+                    debugLog(`  Width overflow: ${(scaledCropW - viewportW).toFixed(0)}px (${((scaledCropW - viewportW) / 2).toFixed(0)}px on each side)`, 'info');
+                } else if (scaledCropW < viewportW) {
+                    debugLog(`  Width black bars: ${(viewportW - scaledCropW).toFixed(0)}px total (${((viewportW - scaledCropW) / 2).toFixed(0)}px on each side)`, 'info');
+                }
+
+                if (scaledCropH > viewportH) {
+                    debugLog(`  Height overflow: ${(scaledCropH - viewportH).toFixed(0)}px (${((scaledCropH - viewportH) / 2).toFixed(0)}px on top/bottom)`, 'info');
+                } else if (scaledCropH < viewportH) {
+                    debugLog(`  Height black bars: ${(viewportH - scaledCropH).toFixed(0)}px total (${((viewportH - scaledCropH) / 2).toFixed(0)}px on top/bottom)`, 'info');
+                }
             };
 
             // Apply immediately if already loaded, otherwise wait
