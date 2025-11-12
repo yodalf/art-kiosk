@@ -160,16 +160,17 @@
         }
 
         .image-card.disabled {
-            opacity: 0.5;
             border: 1px solid #ccc;
         }
 
         .image-card.disabled img {
             filter: grayscale(100%);
+            opacity: 0.5;
         }
 
-        .image-card.disabled .action-menu-button {
-            opacity: 1;
+        .image-card.disabled .card-info,
+        .image-card.disabled .image-tags {
+            opacity: 0.5;
         }
 
         .image-card img {
