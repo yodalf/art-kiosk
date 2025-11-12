@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kiosk Image Management</title>
+
+    <!-- Cropper.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+
     <style>
         * {
             margin: 0;
@@ -517,6 +521,102 @@
             font-size: 12px;
             width: 100%;
         }
+
+        /* Crop Modal */
+        .crop-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        .crop-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .crop-modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 90vw;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .crop-container {
+            max-width: 800px;
+            max-height: 600px;
+            margin: 20px 0;
+        }
+
+        .crop-container img {
+            max-width: 100%;
+        }
+
+        .crop-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 15px;
+        }
+
+        .crop-button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .crop-button.primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .crop-button.primary:hover {
+            background: #45a049;
+        }
+
+        .crop-button.secondary {
+            background: #f44336;
+            color: white;
+        }
+
+        .crop-button.secondary:hover {
+            background: #da190b;
+        }
+
+        .crop-button.tertiary {
+            background: #757575;
+            color: white;
+        }
+
+        .crop-button.tertiary:hover {
+            background: #616161;
+        }
+
+        .crop-image-button {
+            background: #2196F3;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-right: 8px;
+        }
+
+        .crop-image-button:hover {
+            background: #1976D2;
+        }
     </style>
 </head>
 <body>
@@ -916,12 +1016,18 @@
                 info.appendChild(themeSelector);
             }
 
+            const cropBtn = document.createElement('button');
+            cropBtn.className = 'crop-image-button';
+            cropBtn.textContent = 'Crop';
+            cropBtn.onclick = () => openCropModal(image.name, image.url);
+
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-button';
             deleteBtn.textContent = 'Delete';
             deleteBtn.onclick = () => deleteImage(image.name);
 
             info.appendChild(themesDiv);
+            info.appendChild(cropBtn);
             info.appendChild(deleteBtn);
 
             card.appendChild(checkboxContainer);
@@ -1244,10 +1350,186 @@
             }
         }
 
+        // Crop functionality
+        let currentCropper = null;
+        let currentCropImage = null;
+
+        async function openCropModal(imageName, imageUrl) {
+            currentCropImage = imageName;
+            const modal = document.getElementById('crop-modal');
+            const image = document.getElementById('crop-image');
+
+            // Set image source
+            image.src = imageUrl;
+
+            // Show modal
+            modal.classList.add('active');
+
+            // Wait for image to load
+            await new Promise(resolve => {
+                if (image.complete) {
+                    resolve();
+                } else {
+                    image.onload = resolve;
+                }
+            });
+
+            // Destroy existing cropper if any
+            if (currentCropper) {
+                currentCropper.destroy();
+            }
+
+            // Get existing crop data if any
+            const settings = await fetch('/api/settings').then(r => r.json());
+            const imageCrops = settings.image_crops || {};
+            const cropData = imageCrops[imageName];
+
+            // Initialize cropper
+            currentCropper = new Cropper(image, {
+                viewMode: 1,
+                dragMode: 'move',
+                aspectRatio: NaN, // Free aspect ratio
+                autoCropArea: 1,
+                restore: false,
+                guides: true,
+                center: true,
+                highlight: true,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                toggleDragModeOnDblclick: false,
+                ready: function() {
+                    // If crop data exists, set it
+                    if (cropData) {
+                        currentCropper.setData({
+                            x: cropData.x,
+                            y: cropData.y,
+                            width: cropData.width,
+                            height: cropData.height
+                        });
+                    }
+                }
+            });
+        }
+
+        function closeCropModal() {
+            const modal = document.getElementById('crop-modal');
+            modal.classList.remove('active');
+
+            if (currentCropper) {
+                currentCropper.destroy();
+                currentCropper = null;
+            }
+
+            currentCropImage = null;
+        }
+
+        async function saveCrop() {
+            if (!currentCropper || !currentCropImage) {
+                return;
+            }
+
+            // Get crop data
+            const cropData = currentCropper.getData();
+            const imageData = currentCropper.getImageData();
+
+            // Save crop data (as percentages for responsiveness)
+            const cropInfo = {
+                x: cropData.x,
+                y: cropData.y,
+                width: cropData.width,
+                height: cropData.height,
+                imageWidth: imageData.naturalWidth,
+                imageHeight: imageData.naturalHeight
+            };
+
+            try {
+                // Get current settings
+                const settings = await fetch('/api/settings').then(r => r.json());
+
+                // Update image_crops
+                if (!settings.image_crops) {
+                    settings.image_crops = {};
+                }
+                settings.image_crops[currentCropImage] = cropInfo;
+
+                // Save settings
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(settings)
+                });
+
+                if (response.ok) {
+                    showMessage('Crop saved successfully!', 'success');
+                    closeCropModal();
+                } else {
+                    showMessage('Failed to save crop', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving crop:', error);
+                showMessage('Error saving crop', 'error');
+            }
+        }
+
+        async function clearCrop() {
+            if (!currentCropImage) {
+                return;
+            }
+
+            try {
+                // Get current settings
+                const settings = await fetch('/api/settings').then(r => r.json());
+
+                // Remove crop data
+                if (settings.image_crops && settings.image_crops[currentCropImage]) {
+                    delete settings.image_crops[currentCropImage];
+
+                    // Save settings
+                    const response = await fetch('/api/settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(settings)
+                    });
+
+                    if (response.ok) {
+                        showMessage('Crop cleared successfully!', 'success');
+                        closeCropModal();
+                    } else {
+                        showMessage('Failed to clear crop', 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('Error clearing crop:', error);
+                showMessage('Error clearing crop', 'error');
+            }
+        }
+
         // Load data on page load
         loadThemes();
         loadImages();
         updateLEDs(); // Initialize LED indicators
     </script>
+
+    <!-- Crop Modal -->
+    <div id="crop-modal" class="crop-modal">
+        <div class="crop-modal-content">
+            <h2>Crop Image</h2>
+            <div class="crop-container">
+                <img id="crop-image" src="" alt="Image to crop">
+            </div>
+            <div class="crop-buttons">
+                <button class="crop-button tertiary" onclick="closeCropModal()">Cancel</button>
+                <button class="crop-button secondary" onclick="clearCrop()">Clear Crop</button>
+                <button class="crop-button primary" onclick="saveCrop()">Save Crop</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cropper.js Script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 </body>
 </html>

@@ -53,7 +53,8 @@ def get_settings():
             }
         },  # Theme name -> theme info
         'image_themes': {},  # Image name -> list of theme names
-        'active_theme': 'All Images'  # Default to All Images theme
+        'active_theme': 'All Images',  # Default to All Images theme
+        'image_crops': {}  # Image name -> crop data
     }
 
     if SETTINGS_FILE.exists():
@@ -82,6 +83,8 @@ def get_settings():
                 settings['image_themes'] = {}
             if 'active_theme' not in settings:
                 settings['active_theme'] = 'All Images'
+            if 'image_crops' not in settings:
+                settings['image_crops'] = {}
             return settings
 
     return defaults

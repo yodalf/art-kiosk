@@ -124,6 +124,9 @@
             return false;
         }
 
+        // Store crop settings globally
+        let imageCrops = {};
+
         // Fetch images from API
         async function loadImages() {
             try {
@@ -138,6 +141,11 @@
 
                 images = newImages;
                 previousImageVector = getImageVector(images); // Store current vector as VP
+
+                // Load crop settings
+                const settingsResponse = await fetch('/api/settings');
+                const settings = await settingsResponse.json();
+                imageCrops = settings.image_crops || {};
 
                 // Hide loading message
                 document.getElementById('loading').style.display = 'none';
@@ -220,6 +228,12 @@
                 img.src = image.url;
                 img.alt = image.name;
 
+                // Apply crop if exists for this image
+                const cropData = imageCrops[image.name];
+                if (cropData) {
+                    applyCrop(img, cropData);
+                }
+
                 slide.appendChild(img);
                 container.appendChild(slide);
             });
@@ -229,6 +243,33 @@
 
             // Start automatic slideshow
             startSlideshow();
+        }
+
+        // Apply crop to an image element
+        function applyCrop(img, cropData) {
+            // Wait for image to load to get natural dimensions
+            img.onload = function() {
+                const naturalWidth = img.naturalWidth;
+                const naturalHeight = img.naturalHeight;
+
+                // Calculate crop percentages
+                const xPercent = (cropData.x / naturalWidth) * 100;
+                const yPercent = (cropData.y / naturalHeight) * 100;
+                const widthPercent = (cropData.width / naturalWidth) * 100;
+                const heightPercent = (cropData.height / naturalHeight) * 100;
+
+                // Apply clip-path using inset
+                // inset format: inset(top right bottom left)
+                const top = yPercent;
+                const right = 100 - (xPercent + widthPercent);
+                const bottom = 100 - (yPercent + heightPercent);
+                const left = xPercent;
+
+                img.style.clipPath = `inset(${top}% ${right}% ${bottom}% ${left}%)`;
+
+                // Adjust object-fit to maintain aspect ratio of cropped region
+                img.style.objectFit = 'cover';
+            };
         }
 
         // Show specific slide
