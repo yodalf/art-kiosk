@@ -1264,7 +1264,8 @@
 
                 if (response.ok) {
                     activeTheme = themeName;
-                    // No message shown - change takes effect automatically
+                    // Reload images to show filtered view
+                    await loadImages();
                 } else {
                     showMessage('Error setting active theme', 'error');
                 }
