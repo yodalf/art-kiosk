@@ -630,7 +630,7 @@
         <p class="subtitle">Upload and manage images for your kiosk display</p>
 
         <div class="links">
-            <a href="/view" target="_blank">View Kiosk Display</a>
+            <a href="#" id="view-kiosk-link" target="_blank">View Kiosk Display</a>
         </div>
 
         <div id="message" class="message"></div>
@@ -1589,6 +1589,30 @@
                 showMessage('Error clearing crop', 'error');
             }
         }
+
+        // Handle "View Kiosk Display" link to sync with current image
+        document.getElementById('view-kiosk-link').addEventListener('click', async function(e) {
+            e.preventDefault();
+
+            try {
+                // Fetch the current image being displayed on the kiosk
+                const response = await fetch('/api/kiosk/current-image');
+                const data = await response.json();
+
+                // Build URL with current image parameter if available
+                let url = '/view';
+                if (data.image_name) {
+                    url += '?image=' + encodeURIComponent(data.image_name);
+                }
+
+                // Open in new tab
+                window.open(url, '_blank');
+            } catch (error) {
+                console.error('Error fetching current image:', error);
+                // Fallback: just open /view without parameter
+                window.open('/view', '_blank');
+            }
+        });
 
         // Load data on page load
         loadThemes();

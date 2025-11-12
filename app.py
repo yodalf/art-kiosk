@@ -27,6 +27,9 @@ SETTINGS_FILE = Path(__file__).parent / 'settings.json'
 current_command = None
 command_timestamp = 0
 
+# Current image being displayed on kiosk
+current_kiosk_image = None
+
 # Debug message queue (stores last 100 messages)
 from collections import deque
 debug_messages = deque(maxlen=100)
@@ -304,6 +307,27 @@ def clear_debug_messages():
     global debug_messages
     debug_messages.clear()
     return jsonify({'success': True})
+
+
+@app.route('/api/kiosk/current-image', methods=['POST'])
+def set_current_image():
+    """Set the current image being displayed on kiosk."""
+    global current_kiosk_image
+
+    data = request.json
+    image_name = data.get('image_name')
+
+    if image_name:
+        current_kiosk_image = image_name
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/kiosk/current-image', methods=['GET'])
+def get_current_image():
+    """Get the current image being displayed on kiosk."""
+    global current_kiosk_image
+    return jsonify({'image_name': current_kiosk_image})
 
 
 @app.route('/api/themes', methods=['GET'])

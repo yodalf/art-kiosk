@@ -142,7 +142,7 @@
         let imageCrops = {};
 
         // Fetch images from API
-        async function loadImages(startIndex = 0) {
+        async function loadImages(startIndex = 0, startImageName = null) {
             try {
                 // Only fetch enabled images for the kiosk display
                 const response = await fetch('/api/images?enabled_only=true');
@@ -151,6 +151,15 @@
                 if (newImages.length === 0) {
                     document.getElementById('loading').textContent = 'No images enabled. Visit /manage to enable images.';
                     return;
+                }
+
+                // If a starting image name was provided, find its index
+                if (startImageName && newImages.length > 0) {
+                    const foundIndex = newImages.findIndex(img => img.name === startImageName);
+                    if (foundIndex !== -1) {
+                        startIndex = foundIndex;
+                        debugLog(`Starting from requested image: ${startImageName} at index ${startIndex}`, 'info');
+                    }
                 }
 
                 images = newImages;
@@ -539,6 +548,21 @@
             }
         }
 
+        // Report current image to server
+        async function reportCurrentImage(imageName) {
+            try {
+                await fetch('/api/kiosk/current-image', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ image_name: imageName })
+                });
+            } catch (error) {
+                // Silently fail - not critical
+            }
+        }
+
         // Show specific slide
         function showSlide(index) {
             const slides = document.querySelectorAll('.slide');
@@ -552,6 +576,11 @@
             if (slides[index]) {
                 slides[index].classList.add('active');
                 currentIndex = index;
+
+                // Report current image to server
+                if (images[index]) {
+                    reportCurrentImage(images[index].name);
+                }
 
                 // Check if this slide has a cropped image and reapply crop
                 const cropContainer = slides[index].querySelector('div[style*="overflow: hidden"]');
@@ -711,8 +740,17 @@
         // Check for enabled image changes every C seconds
         setInterval(checkForImageChanges, checkInterval);
 
+        // Parse URL parameters for starting image
+        const urlParams = new URLSearchParams(window.location.search);
+        const startImage = urlParams.get('image');
+
         // Load images on page load
-        loadImages();
+        if (startImage) {
+            debugLog(`URL parameter: starting with image ${startImage}`, 'info');
+            loadImages(0, startImage);
+        } else {
+            loadImages();
+        }
     </script>
 </body>
 </html>
