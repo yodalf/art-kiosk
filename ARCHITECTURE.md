@@ -2,13 +2,13 @@
 
 ## Overview
 
-The Art Kiosk is a web-based image display system designed for Raspberry Pi 5 with a portrait monitor (2560x2880). It consists of a Flask backend server, two HTML frontends (management and display), and system integration components for autostart.
+The Art Kiosk is a web-based image display system designed for Raspberry Pi with a portrait monitor (2560x2880). It consists of a Flask backend server, two HTML frontends (management and display), and system integration components for autostart.
 
 ## System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Raspberry Pi 5                          │
+│                      Raspberry Pi                           │
 │                                                             │
 │  ┌──────────────┐         ┌─────────────────┐               │
 │  │   Flask      │◄────────┤  Firefox        │               │

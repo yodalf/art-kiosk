@@ -1,6 +1,6 @@
 # Kiosk Image Display System
 
-A web-based kiosk system for displaying images in slideshow mode, optimized for Raspberry Pi 5 with a 2560x2880 portrait monitor.
+A web-based kiosk system for displaying images in slideshow mode, optimized for Raspberry Pi with a 2560x2880 portrait monitor.
 
 ## Features
 
@@ -20,7 +20,7 @@ A web-based kiosk system for displaying images in slideshow mode, optimized for 
 
 ## Requirements
 
-- Raspberry Pi 5 running Raspberry Pi OS
+- Raspberry Pi running Raspberry Pi OS
 - Python 3.7 or higher
 - Firefox browser
 - unclutter (optional, for hiding mouse cursor system-wide)

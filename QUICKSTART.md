@@ -1,4 +1,4 @@
-# Quick Start Guide - Raspberry Pi 5
+# Quick Start Guide - Raspberry Pi
 
 Follow these steps to get your kiosk display running on Raspberry Pi OS.
 
