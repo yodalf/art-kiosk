@@ -44,12 +44,17 @@
             transition: opacity 0.8s ease-in-out;
         }
 
+        /* Cropped slides don't need flexbox centering */
+        .slide.has-crop {
+            display: block;
+        }
+
         .slide.no-transition {
             transition: none;
         }
 
         .slide.active {
-            opacity: 1;
+            opacity: 1 !important;
             pointer-events: auto;
         }
 
@@ -272,6 +277,8 @@
 
                 if (cropData) {
                     debugLog(`Creating cropped slide for ${image.name}`, 'info');
+                    // Mark slide as having a crop
+                    slide.classList.add('has-crop');
                     // Create cropped image using a container
                     const cropContainer = document.createElement('div');
                     cropContainer.style.width = '100%';
