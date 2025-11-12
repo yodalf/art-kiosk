@@ -416,6 +416,23 @@
                     const containerStyle = window.getComputedStyle(container);
                     debugLog(`  CONTAINER overflow=${containerStyle.overflow}, position=${containerStyle.position}`, 'info');
 
+                    // Check the slide parent
+                    const slide = container.parentElement;
+                    if (slide) {
+                        const slideRect = slide.getBoundingClientRect();
+                        const slideStyle = window.getComputedStyle(slide);
+                        debugLog(`  SLIDE RECT: x=${slideRect.x.toFixed(0)}, y=${slideRect.y.toFixed(0)}, width=${slideRect.width.toFixed(0)}, height=${slideRect.height.toFixed(0)}`, 'info');
+                        debugLog(`  SLIDE position=${slideStyle.position}, display=${slideStyle.display}, opacity=${slideStyle.opacity}`, 'info');
+                        debugLog(`  SLIDE has class 'active': ${slide.classList.contains('active')}`, 'info');
+                    }
+
+                    // Check slideshow container
+                    const slideshowContainer = document.getElementById('slideshow-container');
+                    if (slideshowContainer) {
+                        const scRect = slideshowContainer.getBoundingClientRect();
+                        debugLog(`  SLIDESHOW-CONTAINER RECT: x=${scRect.x.toFixed(0)}, y=${scRect.y.toFixed(0)}, width=${scRect.width.toFixed(0)}, height=${scRect.height.toFixed(0)}`, 'info');
+                    }
+
                     if (renderedW !== Math.round(scaledImgW) || renderedH !== Math.round(scaledImgH)) {
                         debugLog(`  ERROR: Rendered size doesn't match! Expected ${Math.round(scaledImgW)}x${Math.round(scaledImgH)}`, 'error');
                     }
