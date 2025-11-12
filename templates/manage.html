@@ -175,6 +175,11 @@
             filter: brightness(1.1);
         }
 
+        /* Hover effect for crop containers */
+        .image-card > div[style*="overflow: hidden"]:hover img {
+            filter: brightness(1.1);
+        }
+
         .image-checkbox-container {
             position: absolute;
             top: 10px;
@@ -906,6 +911,11 @@
                 const response = await fetch('/api/images');
                 const images = await response.json();
 
+                // Load crop settings
+                const settingsResponse = await fetch('/api/settings');
+                const settings = await settingsResponse.json();
+                const imageCrops = settings.image_crops || {};
+
                 const grid = document.getElementById('image-grid');
                 grid.innerHTML = '';
 
@@ -928,7 +938,8 @@
                 }
 
                 filteredImages.forEach(image => {
-                    const card = createImageCard(image);
+                    const cropData = imageCrops[image.name];
+                    const card = createImageCard(image, cropData);
                     grid.appendChild(card);
                 });
             } catch (error) {
@@ -937,20 +948,90 @@
             }
         }
 
+        // Apply crop to thumbnail image
+        function applyCropToThumbnail(img, container, cropData) {
+            const containerW = container.clientWidth;
+            const containerH = container.clientHeight; // 200px
+
+            const cropX = cropData.x;
+            const cropY = cropData.y;
+            const cropW = cropData.width;
+            const cropH = cropData.height;
+            const imgW = cropData.imageWidth;
+            const imgH = cropData.imageHeight;
+
+            // Calculate scale to make crop region fill container (cover behavior)
+            const scaleX = containerW / cropW;
+            const scaleY = containerH / cropH;
+            const scale = Math.max(scaleX, scaleY);
+
+            // Calculate scaled image dimensions
+            const scaledImgW = imgW * scale;
+            const scaledImgH = imgH * scale;
+
+            // Calculate scaled crop dimensions
+            const scaledCropW = cropW * scale;
+            const scaledCropH = cropH * scale;
+
+            // Calculate position to place crop region
+            const offsetX = -cropX * scale;
+            const offsetY = -cropY * scale;
+
+            // Center the crop region in container
+            const centerX = (containerW - scaledCropW) / 2;
+            const centerY = (containerH - scaledCropH) / 2;
+
+            // Apply styles
+            img.style.position = 'absolute';
+            img.style.width = `${scaledImgW}px`;
+            img.style.height = `${scaledImgH}px`;
+            img.style.left = `${offsetX + centerX}px`;
+            img.style.top = `${offsetY + centerY}px`;
+            img.style.objectFit = 'fill';
+            img.style.maxWidth = 'none';
+            img.style.maxHeight = 'none';
+        }
+
         // Create image card element
-        function createImageCard(image) {
+        function createImageCard(image, cropData) {
             const card = document.createElement('div');
             card.className = 'image-card';
             if (!image.enabled) {
                 card.classList.add('disabled');
             }
 
-            const img = document.createElement('img');
-            img.src = image.url;
-            img.alt = image.name;
-            img.style.cursor = 'pointer';
-            img.onclick = () => jumpToImage(image.name);
-            img.title = 'Click to jump to this image in the kiosk display';
+            // If crop exists, create a container for the cropped image
+            if (cropData) {
+                const cropContainer = document.createElement('div');
+                cropContainer.style.width = '100%';
+                cropContainer.style.height = '200px';
+                cropContainer.style.overflow = 'hidden';
+                cropContainer.style.position = 'relative';
+                cropContainer.style.background = '#f0f0f0';
+                cropContainer.style.cursor = 'pointer';
+                cropContainer.onclick = () => jumpToImage(image.name);
+                cropContainer.title = 'Click to jump to this image in the kiosk display';
+
+                const img = document.createElement('img');
+                img.src = image.url;
+                img.alt = image.name;
+                img.style.cursor = 'pointer';
+
+                // Apply crop when image loads
+                img.onload = () => applyCropToThumbnail(img, cropContainer, cropData);
+
+                cropContainer.appendChild(img);
+                card.appendChild(cropContainer);
+            } else {
+                // No crop - show normal image
+                const img = document.createElement('img');
+                img.src = image.url;
+                img.alt = image.name;
+                img.style.cursor = 'pointer';
+                img.onclick = () => jumpToImage(image.name);
+                img.title = 'Click to jump to this image in the kiosk display';
+                card.appendChild(img);
+            }
 
             // Create checkbox container
             const checkboxContainer = document.createElement('div');
@@ -1031,7 +1112,7 @@
             info.appendChild(deleteBtn);
 
             card.appendChild(checkboxContainer);
-            card.appendChild(img);
+            // Image or crop container already appended above
             card.appendChild(info);
 
             return card;
