@@ -64,8 +64,7 @@
 
         /* Cropped images use custom positioning */
         .slide img.cropped {
-            width: auto !important;
-            height: auto !important;
+            /* Don't set width/height here - let JavaScript inline styles control size */
             object-fit: none !important;
             max-width: none !important;
             max-height: none !important;
@@ -360,17 +359,17 @@
                 const centerX = (viewportW - scaledCropW) / 2;
                 const centerY = (viewportH - scaledCropH) / 2;
 
-                // Apply styles
-                img.style.position = 'absolute';
-                img.style.width = `${scaledImgW}px`;
-                img.style.height = `${scaledImgH}px`;
-                img.style.left = `${offsetX + centerX}px`;
-                img.style.top = `${offsetY + centerY}px`;
-                img.style.objectFit = 'none';
-                img.style.maxWidth = 'none';
-                img.style.maxHeight = 'none';
-                img.style.margin = '0';
-                img.style.padding = '0';
+                // Apply styles with !important to override any CSS
+                img.style.setProperty('position', 'absolute', 'important');
+                img.style.setProperty('width', `${scaledImgW}px`, 'important');
+                img.style.setProperty('height', `${scaledImgH}px`, 'important');
+                img.style.setProperty('left', `${offsetX + centerX}px`, 'important');
+                img.style.setProperty('top', `${offsetY + centerY}px`, 'important');
+                img.style.setProperty('object-fit', 'none', 'important');
+                img.style.setProperty('max-width', 'none', 'important');
+                img.style.setProperty('max-height', 'none', 'important');
+                img.style.setProperty('margin', '0', 'important');
+                img.style.setProperty('padding', '0', 'important');
 
                 // Debug log - send to management interface
                 debugLog(`Crop applied to ${img.alt}:`, 'info');
