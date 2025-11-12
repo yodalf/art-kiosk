@@ -5,6 +5,7 @@ A web-based kiosk system for displaying images in slideshow mode, optimized for 
 ## Features
 
 - Web-based image upload and management
+- **Image cropping** - Crop images to select specific regions that fill the entire kiosk display
 - **Enable/disable individual images** - Control which images appear in the slideshow with checkboxes
 - **Themes** - Organize images into multiple themes with per-theme intervals; images can belong to multiple themes
 - **Remote control** - Control the kiosk from any device on your network
@@ -85,11 +86,12 @@ The server will start on `http://0.0.0.0:80` (accessible from any device on your
 
 1. **Management Interface**: `http://<raspberry-pi-ip>/`
    - Upload images
+   - **Crop images** - Click the "Crop" button to select a region that will fill the entire kiosk display
    - **Enable/disable images** - Use the "Show" checkbox on each image card
    - Configure slideshow interval
    - Remote control the kiosk display
    - Delete images
-   - View current images
+   - View current images (shows cropped thumbnails)
 
 2. **Kiosk Display**: `http://<raspberry-pi-ip>/view`
    - Main slideshow display
@@ -213,7 +215,17 @@ Configure settings through the management interface at `/`, or edit `settings.js
     "photo2.jpg": ["Nature", "Urban"],
     "photo3.jpg": ["Urban"]
   },
-  "active_theme": "All Images"
+  "active_theme": "All Images",
+  "image_crops": {
+    "photo1.jpg": {
+      "x": 0,
+      "y": 0,
+      "width": 1690,
+      "height": 1885,
+      "imageWidth": 1690,
+      "imageHeight": 3000
+    }
+  }
 }
 ```
 
@@ -224,6 +236,7 @@ Configure settings through the management interface at `/`, or edit `settings.js
   - **"All Images"**: Permanent default theme (cannot be deleted), shows all enabled images
 - **image_themes**: Mapping of image names to their theme lists
 - **active_theme**: Currently active theme (defaults to "All Images")
+- **image_crops**: Mapping of image names to crop regions (x, y, width, height in original image coordinates)
 
 ### Themes
 
@@ -242,6 +255,25 @@ When a theme is active:
 - **Other themes**: Only enabled images belonging to that theme will appear in the slideshow
 - The slideshow uses the active theme's interval setting
 
+### Image Cropping
+
+Crop images to display specific regions on the kiosk:
+
+1. **Open crop editor** - Click the "Crop" button on any image card
+2. **Select region** - Use the interactive cropper to select the desired area
+   - Drag corners to resize the crop region
+   - Drag inside the box to move it
+   - Free aspect ratio - crop any shape
+3. **Save crop** - Click "Save Crop" to apply (or "Clear Crop" to remove)
+4. **Automatic scaling** - The cropped region automatically scales to fill the entire 2560x2880 display
+5. **Preview** - The management interface shows cropped thumbnails matching what appears on the kiosk
+
+Crop behavior:
+- The selected region is scaled to fill the screen completely (cover mode)
+- Black bars appear on only one dimension (either top/bottom OR left/right, never both)
+- Changes apply automatically within 2 seconds via the smart reload system
+- Crops are stored per-image and persist across restarts
+
 ### Smart Reload Algorithm
 
 The kiosk uses an intelligent reload system:
@@ -249,16 +281,19 @@ The kiosk uses an intelligent reload system:
 1. Every **C seconds** (check_interval = 2), the kiosk checks:
    - The list of enabled images (vector **V**)
    - The slideshow interval setting
+   - Image crop data
 2. It compares the current vector **V** with the previous vector **VP**
 3. It compares the current interval with the previous interval
-4. If either changed, the slideshow reloads from the beginning with the new settings
-5. If nothing changed, the slideshow continues uninterrupted
+4. It compares the current crop data with the previous crop data
+5. If anything changed, the slideshow reloads from the beginning with the new settings
+6. If nothing changed, the slideshow continues uninterrupted
 
 This means:
 - No unnecessary reloads when nothing changes
 - Smooth playback continues as long as settings are stable
 - Automatic updates when you enable/disable images in the management interface
 - Automatic updates when you change the slideshow interval
+- Automatic updates when you crop or modify image crops
 - Changes apply within 2 seconds
 
 ### Image Scaling

@@ -39,6 +39,7 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 
 **Key Responsibilities**:
 - Image management (upload, delete, list)
+- Image crop data storage and retrieval
 - Settings persistence (JSON file storage)
 - Theme management
 - Remote control command queue
@@ -49,6 +50,7 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 - Python 3.7+
 - Flask 3.0.0
 - Werkzeug 3.0.1
+- Cropper.js 1.6.1 (JavaScript image cropping library)
 
 ### 2. Frontend - Display (kiosk.html)
 
@@ -56,6 +58,7 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 
 **Key Features**:
 - Automatic slideshow with configurable interval
+- Image cropping with automatic scaling to fill display
 - Dissolve transitions (optional)
 - Smart reload algorithm
 - Remote control command polling
@@ -103,10 +106,12 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 
 **Interactive Features**:
 - Click image thumbnail to jump to that image
+- Crop images using Cropper.js modal interface
 - Enable/disable images with checkboxes
 - Assign images to themes via dropdown
 - Remove images from themes by clicking theme tags
 - LED indicators show play/pause state
+- Cropped thumbnails preview actual kiosk display
 
 ## Data Model
 
@@ -143,7 +148,17 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
     "photo2.jpg": ["Nature", "Urban"],
     "photo3.jpg": ["Urban"]
   },
-  "active_theme": "All Images"
+  "active_theme": "All Images",
+  "image_crops": {
+    "photo1.jpg": {
+      "x": 0,
+      "y": 0,
+      "width": 1690,
+      "height": 1885,
+      "imageWidth": 1690,
+      "imageHeight": 3000
+    }
+  }
 }
 ```
 
@@ -156,6 +171,7 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
   - **"All Images"**: Permanent theme that cannot be deleted, shows all enabled images regardless of theme assignments
 - `image_themes`: Image-to-theme mappings (many-to-many)
 - `active_theme`: Currently selected theme (always set, defaults to "All Images"). Active theme's interval is used for slideshow.
+- `image_crops`: Per-image crop data containing x, y, width, height coordinates in original image space, plus original imageWidth and imageHeight for scaling calculations
 
 ### Image Model
 
@@ -213,14 +229,15 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 ```javascript
 // Every C seconds (2 seconds):
 1. Fetch current enabled images → V (new vector)
-2. Fetch current settings (interval, dissolve)
+2. Fetch current settings (interval, dissolve, crops)
 3. Compare V with VP (previous vector)
 4. Compare interval with previous interval
-5. If anything changed:
+5. Compare crop data with previous crop data
+6. If anything changed:
    - Log change
    - Reload slideshow
    - Update VP = V
-6. Else:
+7. Else:
    - Continue playing
 ```
 
@@ -285,6 +302,47 @@ def list_images(enabled_only=False):
 - **Other themes**: Only show images assigned to that theme
 - Images without themes are only shown in "All Images" theme
 - Images can belong to multiple themes
+
+### 4. Crop Scaling Algorithm
+
+**Purpose**: Scale cropped image regions to fill the entire kiosk display (2560x2880).
+
+**Implementation**:
+```javascript
+// Given: crop region (x, y, width, height) in original image coordinates
+// Goal: Display only the crop region, scaled to fill the viewport
+
+1. Calculate scale to make crop fill viewport (cover behavior):
+   scaleX = viewportWidth / cropWidth
+   scaleY = viewportHeight / cropHeight
+   scale = Math.max(scaleX, scaleY)  // Ensures crop fills entire screen
+
+2. Calculate scaled image dimensions:
+   scaledImageWidth = originalImageWidth * scale
+   scaledImageHeight = originalImageHeight * scale
+
+3. Calculate position to show crop region:
+   offsetX = -(cropX * scale)  // Shift image left to show crop
+   offsetY = -(cropY * scale)  // Shift image up to show crop
+
+4. Center any overflow:
+   centerX = (viewportWidth - (cropWidth * scale)) / 2
+   centerY = (viewportHeight - (cropHeight * scale)) / 2
+
+5. Apply to image element:
+   img.style.width = scaledImageWidth + 'px'
+   img.style.height = scaledImageHeight + 'px'
+   img.style.left = (offsetX + centerX) + 'px'
+   img.style.top = (offsetY + centerY) + 'px'
+   img.style.objectFit = 'fill'  // Critical: allows scaling
+```
+
+**Key Points**:
+- Uses `Math.max(scaleX, scaleY)` to ensure crop region fills entire screen
+- `object-fit: fill` is essential - `none` would prevent scaling
+- Black bars appear on only one dimension (top/bottom OR left/right)
+- Container uses `overflow: hidden` to clip to viewport
+- Same algorithm used for both kiosk display and management thumbnails (different viewport sizes)
 
 ## File Structure
 
