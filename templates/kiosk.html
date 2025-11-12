@@ -62,6 +62,15 @@
             /* This maximizes screen usage for your 2560x2880 portrait display */
         }
 
+        /* Cropped images use custom positioning */
+        .slide img.cropped {
+            width: auto !important;
+            height: auto !important;
+            object-fit: none !important;
+            max-width: none !important;
+            max-height: none !important;
+        }
+
         /* Alternative: contain mode shows full image with possible black bars */
         .slide.contain-mode img {
             max-width: 100vw;
@@ -274,6 +283,7 @@
                     img.src = image.url;
                     img.alt = image.name;
                     img.dataset.imageName = image.name;
+                    img.className = 'cropped'; // Mark as cropped for CSS
 
                     cropContainer.appendChild(img);
                     slide.appendChild(cropContainer);
@@ -368,10 +378,16 @@
                 debugLog(`  Viewport: ${viewportW}x${viewportH} (aspect ${viewportAspect.toFixed(2)})`, 'info');
                 debugLog(`  Original Image: ${imgW}x${imgH}`, 'info');
                 debugLog(`  Crop Region: ${cropW.toFixed(0)}x${cropH.toFixed(0)} (aspect ${cropAspect.toFixed(2)})`, 'info');
+                debugLog(`  Crop Position in Original: x=${cropX.toFixed(0)}, y=${cropY.toFixed(0)}`, 'info');
                 debugLog(`  Scale X: ${scaleX.toFixed(2)}, Scale Y: ${scaleY.toFixed(2)} -> Using: ${scale.toFixed(2)}`, 'info');
                 debugLog(`  Scaled Image: ${scaledImgW.toFixed(0)}x${scaledImgH.toFixed(0)}`, 'info');
                 debugLog(`  Scaled Crop: ${scaledCropW.toFixed(0)}x${scaledCropH.toFixed(0)}`, 'info');
-                debugLog(`  Position: left=${(offsetX + centerX).toFixed(0)}px, top=${(offsetY + centerY).toFixed(0)}px`, 'info');
+                debugLog(`  Offset (from crop position): x=${offsetX.toFixed(0)}, y=${offsetY.toFixed(0)}`, 'info');
+                debugLog(`  Center adjustment: x=${centerX.toFixed(0)}, y=${centerY.toFixed(0)}`, 'info');
+                debugLog(`  Final Position: left=${(offsetX + centerX).toFixed(0)}px, top=${(offsetY + centerY).toFixed(0)}px`, 'info');
+
+                // Verify what was actually applied
+                debugLog(`  Applied CSS: width=${img.style.width}, height=${img.style.height}, left=${img.style.left}, top=${img.style.top}`, 'info');
             };
 
             // Apply immediately if already loaded, otherwise wait
