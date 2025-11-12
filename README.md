@@ -216,7 +216,7 @@ Configure settings through the management interface at `/`, or edit `settings.js
 }
 ```
 
-- **interval** (I): Time in seconds between image transitions in the slideshow
+- **interval** (I): Time between image transitions in the slideshow (stored in seconds, displayed in minutes in UI)
 - **check_interval** (C): Time in seconds between checks for changes (default: 2)
 - **dissolve_enabled**: Enable/disable smooth dissolve transition between images (default: true)
 - **themes**: Dictionary of defined themes

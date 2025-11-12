@@ -48,7 +48,7 @@ Keep this terminal open and continue to Step 4 in a new terminal or browser.
 3. Go to: `http://<your-pi-ip>/`
 4. Drag and drop some images or click "Choose Files"
 5. **Enable/disable images** using the "Show" checkbox on each image card (enabled by default)
-6. Adjust the slideshow interval if desired (default: 10 seconds)
+6. Adjust the slideshow interval if desired (default: 10 minutes)
 
 ## Step 5: Test the Kiosk Display
 

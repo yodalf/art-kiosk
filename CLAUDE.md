@@ -123,7 +123,7 @@ sudo setcap 'cap_net_bind_service=+ep' "$PYTHON_BIN"
 
 ```json
 {
-  "interval": 10,              // Slideshow interval (I) in seconds
+  "interval": 600,             // Slideshow interval (I) in seconds (10 minutes)
   "check_interval": 2,          // Always 2 (C)
   "enabled_images": {           // Per-image enabled state
     "photo.jpg": true

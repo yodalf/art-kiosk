@@ -15,7 +15,7 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'images'
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}
-app.config['SLIDESHOW_INTERVAL'] = 10  # seconds
+app.config['SLIDESHOW_INTERVAL'] = 600  # seconds (10 minutes)
 
 # Create upload folder if it doesn't exist
 app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
@@ -107,7 +107,7 @@ def kiosk():
     """Main kiosk display page."""
     settings = get_settings()
     return render_template('kiosk.html',
-                         interval=settings.get('interval', 10),
+                         interval=settings.get('interval', 600),
                          check_interval=settings.get('check_interval', 2),
                          dissolve_enabled=settings.get('dissolve_enabled', True),
                          active_theme=settings.get('active_theme'))

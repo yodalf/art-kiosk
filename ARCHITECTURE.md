@@ -143,7 +143,7 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 ```
 
 **Fields**:
-- `interval` (I): Slideshow transition interval in seconds
+- `interval` (I): Slideshow transition interval (stored in seconds, displayed in minutes in UI)
 - `check_interval` (C): How often to check for changes (always 2)
 - `enabled_images`: Per-image enabled/disabled state
 - `dissolve_enabled`: Enable smooth fade transitions
