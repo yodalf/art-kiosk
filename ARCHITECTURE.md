@@ -95,13 +95,11 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 **Role**: Web interface for configuring and controlling the kiosk.
 
 **Sections**:
-1. **Stats** - Total images and size
-2. **Remote Control** - Control buttons with LED indicators
-3. **Settings** - Interval, dissolve transition
-4. **Themes** - Create, delete, select active theme
-5. **Current Images** - Grid of thumbnails with controls
-6. **Upload Images** - Drag-and-drop upload area
-7. **Debug Console** - Live logs from kiosk display
+1. **Remote Control** - Control buttons with LED indicators
+2. **Themes** - Create, delete, select active theme (includes permanent "All Images" theme)
+3. **Upload Images** - Drag-and-drop upload area
+4. **Current Images** - Grid of thumbnails with controls (filtered by active theme)
+5. **Debug Console** - Live logs from kiosk display (toggle with DEBUG button)
 
 **Interactive Features**:
 - Click image thumbnail to jump to that image
@@ -116,7 +114,7 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 
 ```json
 {
-  "interval": 10,
+  "interval": 3600,
   "check_interval": 2,
   "enabled_images": {
     "photo1.jpg": true,
@@ -124,14 +122,19 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
   },
   "dissolve_enabled": true,
   "themes": {
+    "All Images": {
+      "name": "All Images",
+      "created": 1699752000,
+      "interval": 3600
+    },
     "Nature": {
       "name": "Nature",
-      "created": 1699752000,
+      "created": 1699752100,
       "interval": 3600
     },
     "Urban": {
       "name": "Urban",
-      "created": 1699752100,
+      "created": 1699752200,
       "interval": 1800
     }
   },
@@ -140,18 +143,19 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
     "photo2.jpg": ["Nature", "Urban"],
     "photo3.jpg": ["Urban"]
   },
-  "active_theme": "Nature"
+  "active_theme": "All Images"
 }
 ```
 
 **Fields**:
-- `interval` (I): Default slideshow transition interval in seconds (used when no theme is active, displayed in minutes in UI)
+- `interval` (I): Current slideshow transition interval in seconds (synced with active theme's interval)
 - `check_interval` (C): How often to check for changes (always 2)
 - `enabled_images`: Per-image enabled/disabled state
-- `dissolve_enabled`: Enable smooth fade transitions
+- `dissolve_enabled`: Enable smooth fade transitions (always true)
 - `themes`: Dictionary of theme definitions, each theme has its own `interval` in seconds (default: 3600 = 60 minutes)
+  - **"All Images"**: Permanent theme that cannot be deleted, shows all enabled images regardless of theme assignments
 - `image_themes`: Image-to-theme mappings (many-to-many)
-- `active_theme`: Currently selected theme (null = all images). When a theme is active, its interval is used.
+- `active_theme`: Currently selected theme (always set, defaults to "All Images"). Active theme's interval is used for slideshow.
 
 ### Image Model
 
@@ -265,19 +269,21 @@ def list_images(enabled_only=False):
         # Skip disabled images if filtering
         if enabled_only and not image.enabled:
             continue
-        
+
         # Skip images not in active theme if filtering
-        if enabled_only and active_theme:
+        # "All Images" theme shows all enabled images
+        if enabled_only and active_theme and active_theme != 'All Images':
             if active_theme not in image.themes:
                 continue
-        
+
         yield image
 ```
 
 **Key Points**:
 - Theme filtering only applies when `enabled_only=true`
-- Images without themes are excluded when a theme is active
-- `active_theme=null` shows all enabled images
+- **"All Images" theme**: Shows all enabled images (no theme filtering)
+- **Other themes**: Only show images assigned to that theme
+- Images without themes are only shown in "All Images" theme
 - Images can belong to multiple themes
 
 ## File Structure

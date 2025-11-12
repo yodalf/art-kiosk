@@ -199,46 +199,48 @@ Configure settings through the management interface at `/`, or edit `settings.js
 
 ```json
 {
-  "interval": 10,
+  "interval": 3600,
   "check_interval": 2,
   "enabled_images": {},
   "dissolve_enabled": true,
   "themes": {
-    "Nature": {"name": "Nature", "created": 1234567890},
-    "Urban": {"name": "Urban", "created": 1234567891}
+    "All Images": {"name": "All Images", "created": 1234567890, "interval": 3600},
+    "Nature": {"name": "Nature", "created": 1234567891, "interval": 3600},
+    "Urban": {"name": "Urban", "created": 1234567892, "interval": 1800}
   },
   "image_themes": {
     "photo1.jpg": ["Nature"],
     "photo2.jpg": ["Nature", "Urban"],
     "photo3.jpg": ["Urban"]
   },
-  "active_theme": "Nature"
+  "active_theme": "All Images"
 }
 ```
 
-- **interval** (I): Time between image transitions in the slideshow (stored in seconds, displayed in minutes in UI)
+- **interval** (I): Current slideshow interval in seconds (synced with active theme's interval)
 - **check_interval** (C): Time in seconds between checks for changes (default: 2)
-- **dissolve_enabled**: Enable/disable smooth dissolve transition between images (default: true)
-- **themes**: Dictionary of defined themes
+- **dissolve_enabled**: Smooth dissolve transition between images (always true)
+- **themes**: Dictionary of defined themes, each with its own interval in seconds
+  - **"All Images"**: Permanent default theme (cannot be deleted), shows all enabled images
 - **image_themes**: Mapping of image names to their theme lists
-- **active_theme**: Currently active theme (null = show all enabled images)
+- **active_theme**: Currently active theme (defaults to "All Images")
 
 ### Themes
 
 Organize your images into themes for different occasions or categories:
 
-1. **Create themes** - Enter a theme name and click "Create Theme" (default interval: 60 minutes)
-2. **Set theme interval** - Each theme has its own slideshow interval. Edit it in the theme's settings and click "Save"
-3. **Assign images** - Use the dropdown on each image card to add it to themes
-4. **Multiple themes** - Images can belong to multiple themes
-5. **Remove from theme** - Click the "✕" on a theme tag to remove the image from that theme
-6. **Select active theme** - Use the "Active Theme" dropdown to choose which theme to display
-7. **All Images** - Select "All Images" to show all enabled images regardless of theme
+1. **Default theme** - "All Images" is a permanent theme that shows all enabled images (cannot be deleted)
+2. **Create themes** - Enter a theme name and click "Create Theme" (default interval: 60 minutes)
+3. **Set theme interval** - Each theme has its own slideshow interval. Edit it in the theme's settings and click "Save"
+4. **Assign images** - Use the dropdown on each image card to add it to themes
+5. **Multiple themes** - Images can belong to multiple themes
+6. **Remove from theme** - Click the "✕" on a theme tag to remove the image from that theme
+7. **Select active theme** - Use the "Active Theme" dropdown to choose which theme to display
 
 When a theme is active:
-- Only enabled images belonging to that theme will appear in the slideshow
-- The slideshow uses that theme's interval setting
-- When "All Images" is selected, the default interval from Settings is used
+- **"All Images" theme**: Shows all enabled images regardless of theme assignments
+- **Other themes**: Only enabled images belonging to that theme will appear in the slideshow
+- The slideshow uses the active theme's interval setting
 
 ### Smart Reload Algorithm
 

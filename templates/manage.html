@@ -557,18 +557,8 @@
         </div>
 
         <div class="section">
-            <h2>Settings</h2>
-            <div class="settings-form">
-                <label for="interval">Default Slideshow Interval (minutes):</label>
-                <input type="number" id="interval" min="1" max="1440" step="0.5" value="10">
-                <button onclick="saveSettings()">Save Settings</button>
-                <span style="font-size: 12px; color: #666; margin-left: 10px;">Used when "All Images" is selected. Each theme has its own interval.</span>
-            </div>
-        </div>
-
-        <div class="section">
             <h2>Themes</h2>
-            <p style="color: #666; margin-bottom: 15px;">Organize your images into themes. Select a theme to display only those images.</p>
+            <p style="color: #666; margin-bottom: 15px;">Organize your images into themes. Each theme has its own slideshow interval. The "All Images" theme shows all enabled images.</p>
 
             <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
                 <input type="text" id="new-theme-name" placeholder="Theme name" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; flex: 1;">
@@ -578,7 +568,6 @@
             <div style="margin-bottom: 15px;">
                 <strong>Active Theme:</strong>
                 <select id="active-theme-select" onchange="setActiveTheme()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; margin-left: 10px;">
-                    <option value="">All Images</option>
                 </select>
             </div>
 
@@ -719,50 +708,6 @@
                 console.innerHTML = '<div class="debug-console-line">Console cleared.</div>';
             } catch (error) {
                 console.error('Error clearing debug console:', error);
-            }
-        }
-
-        // Load current settings
-        async function loadSettings() {
-            try {
-                const response = await fetch('/api/settings');
-                const settings = await response.json();
-                // Convert seconds to minutes for display
-                const intervalMinutes = (settings.interval || 600) / 60;
-                document.getElementById('interval').value = intervalMinutes;
-            } catch (error) {
-                console.error('Error loading settings:', error);
-            }
-        }
-
-        // Save settings
-        async function saveSettings() {
-            const intervalMinutes = parseFloat(document.getElementById('interval').value);
-
-            try {
-                // First, fetch current settings to preserve enabled_images
-                const getResponse = await fetch('/api/settings');
-                const currentSettings = await getResponse.json();
-
-                // Update settings - convert minutes to seconds
-                currentSettings.interval = Math.round(intervalMinutes * 60);
-
-                // Save back the complete settings
-                const response = await fetch('/api/settings', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(currentSettings)
-                });
-
-                if (!response.ok) {
-                    showMessage('Error saving settings', 'error');
-                }
-                // Success - no message shown
-            } catch (error) {
-                console.error('Error saving settings:', error);
-                showMessage('Error saving settings', 'error');
             }
         }
 
@@ -1127,24 +1072,33 @@
                 for (const themeName in availableThemes) {
                     const theme = availableThemes[themeName];
                     const intervalMinutes = (theme.interval || 3600) / 60;
+                    const isAllImages = themeName === 'All Images';
 
                     const badge = document.createElement('div');
                     badge.className = 'theme-badge';
-                    badge.innerHTML = `
+
+                    // Build HTML with conditional delete button
+                    let badgeHTML = `
                         <span style="font-weight: 500;">${themeName}</span>
                         <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;">
                             <label style="font-size: 12px;">Interval (min):</label>
                             <input type="number" id="interval-${themeName}" value="${intervalMinutes}" min="1" max="1440" step="0.5" style="width: 70px; padding: 4px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px;">
                             <button onclick="saveThemeInterval('${themeName}')" style="padding: 4px 8px; font-size: 11px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">Save</button>
                         </div>
-                        <button onclick="deleteTheme('${themeName}')" style="margin-top: 5px;">Delete</button>
                     `;
+
+                    // Only show delete button for non-All Images themes
+                    if (!isAllImages) {
+                        badgeHTML += `<button onclick="deleteTheme('${themeName}')" style="margin-top: 5px;">Delete</button>`;
+                    }
+
+                    badge.innerHTML = badgeHTML;
                     themesList.appendChild(badge);
                 }
 
                 // Update active theme dropdown
                 const select = document.getElementById('active-theme-select');
-                select.innerHTML = '<option value="">All Images</option>';
+                select.innerHTML = '';
                 for (const themeName in availableThemes) {
                     const option = document.createElement('option');
                     option.value = themeName;
@@ -1211,11 +1165,6 @@
                 if (response.ok) {
                     availableThemes[themeName].interval = intervalSeconds;
                     showMessage(`Interval updated for theme "${themeName}"`, 'success');
-
-                    // If this is the active theme, reload settings to reflect the change
-                    if (activeTheme === themeName) {
-                        await loadSettings();
-                    }
                 } else {
                     showMessage('Error updating theme interval', 'error');
                 }
@@ -1250,7 +1199,12 @@
 
         async function setActiveTheme() {
             const select = document.getElementById('active-theme-select');
-            const themeName = select.value || null;
+            const themeName = select.value;
+
+            if (!themeName) {
+                showMessage('Please select a theme', 'error');
+                return;
+            }
 
             try {
                 const response = await fetch('/api/themes/active', {
@@ -1260,14 +1214,7 @@
                 });
 
                 if (response.ok) {
-                    const data = await response.json();
                     activeTheme = themeName;
-
-                    // Update interval display with theme's interval
-                    if (data.interval) {
-                        const intervalMinutes = data.interval / 60;
-                        document.getElementById('interval').value = intervalMinutes;
-                    }
 
                     // Reload images to show filtered view
                     await loadImages();
@@ -1298,7 +1245,6 @@
         }
 
         // Load data on page load
-        loadSettings();
         loadThemes();
         loadImages();
         updateLEDs(); // Initialize LED indicators

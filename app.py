@@ -45,9 +45,15 @@ def get_settings():
         'check_interval': 2,  # Check for changes every 2 seconds (C)
         'enabled_images': {},
         'dissolve_enabled': True,  # Dissolve transition enabled by default
-        'themes': {},  # Theme name -> theme info
+        'themes': {
+            'All Images': {
+                'name': 'All Images',
+                'created': time.time(),
+                'interval': 3600  # 60 minutes
+            }
+        },  # Theme name -> theme info
         'image_themes': {},  # Image name -> list of theme names
-        'active_theme': None  # Currently active theme (None = all enabled images)
+        'active_theme': 'All Images'  # Default to All Images theme
     }
 
     if SETTINGS_FILE.exists():
@@ -65,10 +71,17 @@ def get_settings():
             # Ensure themes exist
             if 'themes' not in settings:
                 settings['themes'] = {}
+            # Ensure "All Images" theme always exists
+            if 'All Images' not in settings['themes']:
+                settings['themes']['All Images'] = {
+                    'name': 'All Images',
+                    'created': time.time(),
+                    'interval': 3600
+                }
             if 'image_themes' not in settings:
                 settings['image_themes'] = {}
             if 'active_theme' not in settings:
-                settings['active_theme'] = None
+                settings['active_theme'] = 'All Images'
             return settings
 
     return defaults
@@ -132,7 +145,8 @@ def list_images():
                 continue
 
             # Skip images not in active theme if filtering and theme is set
-            if enabled_only and active_theme:
+            # "All Images" theme shows all images, so skip theme filtering for it
+            if enabled_only and active_theme and active_theme != 'All Images':
                 image_theme_list = image_themes.get(file.name, [])
                 if active_theme not in image_theme_list:
                     continue
@@ -327,6 +341,10 @@ def create_theme():
 @app.route('/api/themes/<theme_name>', methods=['DELETE'])
 def delete_theme(theme_name):
     """Delete a theme."""
+    # Prevent deletion of "All Images" theme
+    if theme_name == 'All Images':
+        return jsonify({'error': 'Cannot delete the "All Images" theme'}), 400
+
     settings = get_settings()
     themes = settings.get('themes', {})
 
@@ -390,22 +408,21 @@ def update_theme_interval(theme_name):
 def set_active_theme():
     """Set the active theme."""
     data = request.json
-    theme_name = data.get('theme_name')  # None means show all images
+    theme_name = data.get('theme_name')
+
+    if not theme_name:
+        return jsonify({'error': 'Theme name is required'}), 400
 
     settings = get_settings()
+    themes = settings.get('themes', {})
 
-    # Validate theme exists if not None
-    if theme_name is not None:
-        themes = settings.get('themes', {})
-        if theme_name not in themes:
-            return jsonify({'error': 'Theme not found'}), 404
+    # Validate theme exists
+    if theme_name not in themes:
+        return jsonify({'error': 'Theme not found'}), 404
 
-        # Update interval to theme's interval
-        theme_interval = themes[theme_name].get('interval', 3600)
-        settings['interval'] = theme_interval
-    else:
-        # When no theme is active, use default interval
-        settings['interval'] = app.config['SLIDESHOW_INTERVAL']
+    # Update interval to theme's interval
+    theme_interval = themes[theme_name].get('interval', 3600)
+    settings['interval'] = theme_interval
 
     settings['active_theme'] = theme_name
     save_settings(settings)

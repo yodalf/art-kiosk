@@ -93,24 +93,26 @@ sudo setcap 'cap_net_bind_service=+ep' "$PYTHON_BIN"
    - Image upload (drag-and-drop, 50MB limit)
    - Enable/disable individual images
    - Theme creation and assignment (many-to-many)
+   - Per-theme interval configuration
    - Remote control buttons with LED indicators
-   - Debug console (optional, polls every 1s)
+   - Debug console (toggle with DEBUG button, polls every 1s)
    - Click thumbnails to jump kiosk display to that image
+   - Current Images filtered by active theme
 
 ### Key Algorithms
 
 **Smart Reload (kiosk.html)**
 - Every 2 seconds: fetch enabled images → vector V
 - Compare V with previous vector VP
-- Check if interval or dissolve settings changed
+- Check if interval changed (theme switching changes interval)
 - Only reload if something changed
 - Prevents unnecessary disruption during playback
 
 **Theme Filtering (app.py)**
-- When `enabled_only=true` and `active_theme` is set:
-  - Only return images assigned to active theme
-  - Images not in any theme are excluded when theme is active
-  - `active_theme=null` shows all enabled images
+- **"All Images" theme**: Permanent default theme, shows all enabled images regardless of theme assignments
+- **Other themes**: When `enabled_only=true` and active theme is set, only return images assigned to that theme
+- Images not assigned to any theme are only shown in "All Images" theme
+- "All Images" theme cannot be deleted
 
 **Remote Control Polling**
 - Management sends command to server via POST
@@ -123,19 +125,20 @@ sudo setcap 'cap_net_bind_service=+ep' "$PYTHON_BIN"
 
 ```json
 {
-  "interval": 600,             // Slideshow interval (I) in seconds (10 minutes)
+  "interval": 3600,             // Slideshow interval (I) in seconds (synced with active theme)
   "check_interval": 2,          // Always 2 (C)
   "enabled_images": {           // Per-image enabled state
     "photo.jpg": true
   },
-  "dissolve_enabled": true,     // Fade transitions
+  "dissolve_enabled": true,     // Fade transitions (always true)
   "themes": {                   // Theme definitions with per-theme intervals
-    "Nature": {"name": "Nature", "created": 1234567890, "interval": 3600}
+    "All Images": {"name": "All Images", "created": 1234567890, "interval": 3600},  // Permanent, cannot be deleted
+    "Nature": {"name": "Nature", "created": 1234567891, "interval": 3600}
   },
   "image_themes": {             // Many-to-many image→themes
     "photo.jpg": ["Nature", "Urban"]
   },
-  "active_theme": "Nature"      // Currently active theme (null = all)
+  "active_theme": "All Images"  // Currently active theme (defaults to "All Images")
 }
 ```
 
@@ -150,6 +153,7 @@ sudo setcap 'cap_net_bind_service=+ep' "$PYTHON_BIN"
 - `GET /api/control/poll` - Poll for commands (kiosk)
 - `POST /api/themes/active` - Set active theme (updates interval to theme's interval)
 - `POST /api/themes/<name>/interval` - Update theme interval (seconds)
+- `DELETE /api/themes/<name>` - Delete theme (cannot delete "All Images")
 - `POST /api/debug/log` - Log from kiosk
 - `GET /api/debug/messages` - Get debug logs
 
