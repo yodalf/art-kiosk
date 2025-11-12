@@ -69,10 +69,8 @@
 
         /* Cropped images use custom positioning - JavaScript controls everything */
         .slide img.cropped {
-            /* Remove all default img styles for cropped images */
-            width: initial;
-            height: initial;
-            object-fit: none !important;
+            /* JavaScript will set width/height/position via inline styles */
+            /* object-fit will be set by JavaScript to 'fill' to allow scaling */
             object-position: initial;
             max-width: none !important;
             max-height: none !important;
@@ -320,6 +318,7 @@
         // Apply crop to an image element
         function applyCrop(img, container, cropData) {
             debugLog(`applyCrop called for ${img.alt}`, 'info');
+            debugLog(`Raw crop data: x=${cropData.x}, y=${cropData.y}, w=${cropData.width}, h=${cropData.height}, imgW=${cropData.imageWidth}, imgH=${cropData.imageHeight}`, 'info');
 
             const applyStyles = () => {
                 debugLog(`applyStyles running for ${img.alt}`, 'info');
@@ -370,16 +369,27 @@
                 const centerY = (viewportH - scaledCropH) / 2;
 
                 // Apply styles with !important to override any CSS
+                // First, explicitly remove any problematic CSS properties
+                img.style.removeProperty('width');
+                img.style.removeProperty('height');
+
+                // Now set our exact values
                 img.style.setProperty('position', 'absolute', 'important');
                 img.style.setProperty('width', `${scaledImgW}px`, 'important');
                 img.style.setProperty('height', `${scaledImgH}px`, 'important');
+                img.style.setProperty('min-width', `${scaledImgW}px`, 'important');
+                img.style.setProperty('min-height', `${scaledImgH}px`, 'important');
                 img.style.setProperty('left', `${offsetX + centerX}px`, 'important');
                 img.style.setProperty('top', `${offsetY + centerY}px`, 'important');
-                img.style.setProperty('object-fit', 'none', 'important');
+                // DO NOT set object-fit to 'none' - it prevents scaling!
+                // We want the image to scale to our width/height, so use default or 'fill'
+                img.style.setProperty('object-fit', 'fill', 'important');
                 img.style.setProperty('max-width', 'none', 'important');
                 img.style.setProperty('max-height', 'none', 'important');
                 img.style.setProperty('margin', '0', 'important');
                 img.style.setProperty('padding', '0', 'important');
+                img.style.setProperty('transform', 'none', 'important');
+                img.style.setProperty('display', 'block', 'important');
 
                 // Debug log - send to management interface
                 debugLog(`Crop applied to ${img.alt}:`, 'info');
@@ -467,6 +477,56 @@
                                          scaledCropW >= viewportW ? 'Top/Bottom only' :
                                          scaledCropH >= viewportH ? 'Left/Right only' : 'ERROR: Black bars on all sides!';
                 debugLog(`  EXPECTED: ${expectedBlackBars}`, 'info');
+
+                // Calculate what part of the scaled image is visible through the viewport
+                // When an image is positioned at top=-1704, pixels 1704 onwards are visible
+                const imgTopPos = offsetY + centerY;  // Actual top position of image
+                const imgLeftPos = offsetX + centerX;  // Actual left position of image
+
+                // Calculate visible region in scaled image coordinates
+                const visibleTop = imgTopPos < 0 ? -imgTopPos : 0;  // If image is shifted up, we see that many pixels down
+                const visibleBottom = visibleTop + viewportH;
+                const visibleLeft = imgLeftPos < 0 ? -imgLeftPos : 0;
+                const visibleRight = visibleLeft + viewportW;
+
+                debugLog(`  ===== DETAILED CROP ANALYSIS =====`, 'info');
+                debugLog(`  Image Position: left=${imgLeftPos.toFixed(0)}px, top=${imgTopPos.toFixed(0)}px`, 'info');
+                debugLog(`  Visible Region of ${scaledImgW.toFixed(0)}x${scaledImgH.toFixed(0)} scaled image:`, 'info');
+                debugLog(`    X: ${visibleLeft.toFixed(0)} to ${visibleRight.toFixed(0)} (width: ${(visibleRight - visibleLeft).toFixed(0)}px)`, 'info');
+                debugLog(`    Y: ${visibleTop.toFixed(0)} to ${visibleBottom.toFixed(0)} (height: ${(visibleBottom - visibleTop).toFixed(0)}px)`, 'info');
+
+                // Show expected crop region in scaled coordinates
+                const expectedCropTop = cropY * scale;
+                const expectedCropBottom = expectedCropTop + (cropH * scale);
+                const expectedCropLeft = cropX * scale;
+                const expectedCropRight = expectedCropLeft + (cropW * scale);
+
+                debugLog(`  Expected Crop Region in scaled image:`, 'info');
+                debugLog(`    X: ${expectedCropLeft.toFixed(0)} to ${expectedCropRight.toFixed(0)} (width: ${(expectedCropRight - expectedCropLeft).toFixed(0)}px)`, 'info');
+                debugLog(`    Y: ${expectedCropTop.toFixed(0)} to ${expectedCropBottom.toFixed(0)} (height: ${(expectedCropBottom - expectedCropTop).toFixed(0)}px)`, 'info');
+
+                // Check if visible matches expected
+                const topDiff = Math.abs(visibleTop - expectedCropTop);
+                const bottomDiff = Math.abs(visibleBottom - expectedCropBottom);
+                const leftDiff = Math.abs(visibleLeft - expectedCropLeft);
+                const rightDiff = Math.abs(visibleRight - expectedCropRight);
+
+                if (topDiff > 1 || bottomDiff > 1 || leftDiff > 1 || rightDiff > 1) {
+                    debugLog(`  ❌ MISMATCH DETECTED:`, 'error');
+                    if (topDiff > 1) debugLog(`    Top: visible ${visibleTop.toFixed(0)} vs expected ${expectedCropTop.toFixed(0)} (diff: ${topDiff.toFixed(0)}px)`, 'error');
+                    if (bottomDiff > 1) debugLog(`    Bottom: visible ${visibleBottom.toFixed(0)} vs expected ${expectedCropBottom.toFixed(0)} (diff: ${bottomDiff.toFixed(0)}px)`, 'error');
+                    if (leftDiff > 1) debugLog(`    Left: visible ${visibleLeft.toFixed(0)} vs expected ${expectedCropLeft.toFixed(0)} (diff: ${leftDiff.toFixed(0)}px)`, 'error');
+                    if (rightDiff > 1) debugLog(`    Right: visible ${visibleRight.toFixed(0)} vs expected ${expectedCropRight.toFixed(0)} (diff: ${rightDiff.toFixed(0)}px)`, 'error');
+
+                    debugLog(`  🔍 DIAGNOSIS: We are showing the WRONG part of the image!`, 'error');
+                    if (visibleTop > expectedCropTop) {
+                        debugLog(`    The image needs to be shifted DOWN by ${(visibleTop - expectedCropTop).toFixed(0)}px`, 'error');
+                    } else if (visibleTop < expectedCropTop) {
+                        debugLog(`    The image needs to be shifted UP by ${(expectedCropTop - visibleTop).toFixed(0)}px`, 'error');
+                    }
+                } else {
+                    debugLog(`  ✅ MATCH: Visible region matches expected crop region!`, 'info');
+                }
             };
 
             // Apply immediately if already loaded, otherwise wait
