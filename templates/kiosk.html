@@ -606,6 +606,10 @@
 
         // Send initial debug message
         debugLog('Kiosk display starting... (I=' + (interval/1000) + 's, C=' + (checkInterval/1000) + 's)', 'info');
+        debugLog(`Screen resolution: ${window.screen.width}x${window.screen.height}`, 'info');
+        debugLog(`Window inner size: ${window.innerWidth}x${window.innerHeight}`, 'info');
+        debugLog(`Window outer size: ${window.outerWidth}x${window.outerHeight}`, 'info');
+        debugLog(`Device pixel ratio: ${window.devicePixelRatio}`, 'info');
 
         // Poll for commands every 500ms
         setInterval(pollRemoteControl, 500);
