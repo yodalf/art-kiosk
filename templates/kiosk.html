@@ -398,6 +398,24 @@
                     const computedStyle = window.getComputedStyle(img);
                     debugLog(`  ACTUAL RENDERED: ${renderedW}x${renderedH}`, 'info');
                     debugLog(`  COMPUTED STYLE: width=${computedStyle.width}, height=${computedStyle.height}`, 'info');
+
+                    // Check computed position
+                    const computedLeft = computedStyle.left;
+                    const computedTop = computedStyle.top;
+                    debugLog(`  COMPUTED POSITION: left=${computedLeft}, top=${computedTop}`, 'info');
+
+                    // Check bounding rect (actual position on screen)
+                    const rect = img.getBoundingClientRect();
+                    debugLog(`  BOUNDING RECT: x=${rect.x.toFixed(0)}, y=${rect.y.toFixed(0)}, width=${rect.width.toFixed(0)}, height=${rect.height.toFixed(0)}`, 'info');
+
+                    // Check container
+                    const containerRect = container.getBoundingClientRect();
+                    debugLog(`  CONTAINER RECT: x=${containerRect.x.toFixed(0)}, y=${containerRect.y.toFixed(0)}, width=${containerRect.width.toFixed(0)}, height=${containerRect.height.toFixed(0)}`, 'info');
+
+                    // Check if image is visible
+                    const containerStyle = window.getComputedStyle(container);
+                    debugLog(`  CONTAINER overflow=${containerStyle.overflow}, position=${containerStyle.position}`, 'info');
+
                     if (renderedW !== Math.round(scaledImgW) || renderedH !== Math.round(scaledImgH)) {
                         debugLog(`  ERROR: Rendered size doesn't match! Expected ${Math.round(scaledImgW)}x${Math.round(scaledImgH)}`, 'error');
                     }
