@@ -109,7 +109,6 @@ def kiosk():
     return render_template('kiosk.html',
                          interval=settings.get('interval', 600),
                          check_interval=settings.get('check_interval', 2),
-                         dissolve_enabled=settings.get('dissolve_enabled', True),
                          active_theme=settings.get('active_theme'))
 
 

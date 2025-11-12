@@ -92,7 +92,6 @@
         let slideTimer = null;
         let fillMode = false; // false = cover mode (fills screen), true = contain mode (shows full image)
         let previousImageVector = []; // VP - previous vector of enabled image names
-        let dissolveEnabled = {{ 'true' if dissolve_enabled else 'false' }}; // Dissolve transition enabled
 
         // Debug logging function - sends to both console and server
         async function debugLog(message, level = 'info') {
@@ -163,7 +162,6 @@
                 const settingsResponse = await fetch('/api/settings');
                 const settings = await settingsResponse.json();
                 const newInterval = settings.interval * 1000;
-                const newDissolveEnabled = settings.dissolve_enabled !== false; // Default to true
 
                 let needsReload = false;
 
@@ -180,13 +178,6 @@
                     await debugLog(`Interval changed! ${interval / 1000}s -> ${newInterval / 1000}s`);
                     interval = newInterval;
                     needsReload = true;
-                }
-
-                // Check if dissolve setting changed
-                if (newDissolveEnabled !== dissolveEnabled) {
-                    await debugLog(`Dissolve effect ${newDissolveEnabled ? 'enabled' : 'disabled'}`);
-                    dissolveEnabled = newDissolveEnabled;
-                    updateDissolveEffect();
                 }
 
                 if (needsReload) {
@@ -215,18 +206,6 @@
             await loadImages();
         }
 
-        // Update dissolve effect on all slides
-        function updateDissolveEffect() {
-            const slides = document.querySelectorAll('.slide');
-            slides.forEach(slide => {
-                if (dissolveEnabled) {
-                    slide.classList.remove('no-transition');
-                } else {
-                    slide.classList.add('no-transition');
-                }
-            });
-        }
-
         // Initialize slideshow
         function initSlideshow() {
             const container = document.getElementById('slideshow-container');
@@ -247,9 +226,6 @@
 
             // Show first image
             showSlide(0);
-
-            // Apply dissolve effect setting
-            updateDissolveEffect();
 
             // Start automatic slideshow
             startSlideshow();
