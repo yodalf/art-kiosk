@@ -129,8 +129,8 @@ sudo setcap 'cap_net_bind_service=+ep' "$PYTHON_BIN"
     "photo.jpg": true
   },
   "dissolve_enabled": true,     // Fade transitions
-  "themes": {                   // Theme definitions
-    "Nature": {"name": "Nature", "created": 1234567890}
+  "themes": {                   // Theme definitions with per-theme intervals
+    "Nature": {"name": "Nature", "created": 1234567890, "interval": 3600}
   },
   "image_themes": {             // Many-to-many image→themes
     "photo.jpg": ["Nature", "Urban"]
@@ -148,7 +148,8 @@ sudo setcap 'cap_net_bind_service=+ep' "$PYTHON_BIN"
 - `POST /api/images/<filename>/themes` - Update theme assignments
 - `POST /api/control/send` - Send command (next/prev/pause/play/reload/jump)
 - `GET /api/control/poll` - Poll for commands (kiosk)
-- `POST /api/themes/active` - Set active theme
+- `POST /api/themes/active` - Set active theme (updates interval to theme's interval)
+- `POST /api/themes/<name>/interval` - Update theme interval (seconds)
 - `POST /api/debug/log` - Log from kiosk
 - `GET /api/debug/messages` - Get debug logs
 

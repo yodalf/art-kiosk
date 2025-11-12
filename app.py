@@ -316,7 +316,8 @@ def create_theme():
 
     themes[theme_name] = {
         'name': theme_name,
-        'created': time.time()
+        'created': time.time(),
+        'interval': 3600  # Default: 60 minutes in seconds
     }
     settings['themes'] = themes
     save_settings(settings)
@@ -352,6 +353,40 @@ def delete_theme(theme_name):
     return jsonify({'success': True})
 
 
+@app.route('/api/themes/<theme_name>/interval', methods=['POST'])
+def update_theme_interval(theme_name):
+    """Update a theme's interval."""
+    data = request.json
+    interval = data.get('interval')
+
+    if interval is None:
+        return jsonify({'error': 'Interval is required'}), 400
+
+    try:
+        interval = int(interval)
+        if interval < 1:
+            return jsonify({'error': 'Interval must be positive'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid interval value'}), 400
+
+    settings = get_settings()
+    themes = settings.get('themes', {})
+
+    if theme_name not in themes:
+        return jsonify({'error': 'Theme not found'}), 404
+
+    # Update theme interval
+    themes[theme_name]['interval'] = interval
+    settings['themes'] = themes
+
+    # If this is the active theme, also update the global interval
+    if settings.get('active_theme') == theme_name:
+        settings['interval'] = interval
+
+    save_settings(settings)
+    return jsonify({'success': True, 'theme': themes[theme_name]})
+
+
 @app.route('/api/themes/active', methods=['POST'])
 def set_active_theme():
     """Set the active theme."""
@@ -366,10 +401,17 @@ def set_active_theme():
         if theme_name not in themes:
             return jsonify({'error': 'Theme not found'}), 404
 
+        # Update interval to theme's interval
+        theme_interval = themes[theme_name].get('interval', 3600)
+        settings['interval'] = theme_interval
+    else:
+        # When no theme is active, use default interval
+        settings['interval'] = app.config['SLIDESHOW_INTERVAL']
+
     settings['active_theme'] = theme_name
     save_settings(settings)
 
-    return jsonify({'success': True, 'active_theme': theme_name})
+    return jsonify({'success': True, 'active_theme': theme_name, 'interval': settings['interval']})
 
 
 @app.route('/api/images/<filename>/themes', methods=['POST'])

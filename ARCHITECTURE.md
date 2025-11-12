@@ -126,11 +126,13 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
   "themes": {
     "Nature": {
       "name": "Nature",
-      "created": 1699752000
+      "created": 1699752000,
+      "interval": 3600
     },
     "Urban": {
       "name": "Urban",
-      "created": 1699752100
+      "created": 1699752100,
+      "interval": 1800
     }
   },
   "image_themes": {
@@ -143,13 +145,13 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 ```
 
 **Fields**:
-- `interval` (I): Slideshow transition interval (stored in seconds, displayed in minutes in UI)
+- `interval` (I): Default slideshow transition interval in seconds (used when no theme is active, displayed in minutes in UI)
 - `check_interval` (C): How often to check for changes (always 2)
 - `enabled_images`: Per-image enabled/disabled state
 - `dissolve_enabled`: Enable smooth fade transitions
-- `themes`: Dictionary of theme definitions
+- `themes`: Dictionary of theme definitions, each theme has its own `interval` in seconds (default: 3600 = 60 minutes)
 - `image_themes`: Image-to-theme mappings (many-to-many)
-- `active_theme`: Currently selected theme (null = all images)
+- `active_theme`: Currently selected theme (null = all images). When a theme is active, its interval is used.
 
 ### Image Model
 
@@ -181,9 +183,10 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 
 ### Themes
 - `GET /api/themes` - List themes and active theme
-- `POST /api/themes` - Create theme
+- `POST /api/themes` - Create theme (default interval: 3600 seconds = 60 minutes)
 - `DELETE /api/themes/<name>` - Delete theme
-- `POST /api/themes/active` - Set active theme
+- `POST /api/themes/<name>/interval` - Update theme interval
+- `POST /api/themes/active` - Set active theme (also updates global interval to theme's interval)
 
 ### Remote Control
 - `POST /api/control/send` - Send command to kiosk

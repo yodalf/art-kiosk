@@ -559,9 +559,10 @@
         <div class="section">
             <h2>Settings</h2>
             <div class="settings-form">
-                <label for="interval">Slideshow Interval (minutes):</label>
-                <input type="number" id="interval" min="1" max="60" step="0.5" value="1">
+                <label for="interval">Default Slideshow Interval (minutes):</label>
+                <input type="number" id="interval" min="1" max="1440" step="0.5" value="10">
                 <button onclick="saveSettings()">Save Settings</button>
+                <span style="font-size: 12px; color: #666; margin-left: 10px;">Used when "All Images" is selected. Each theme has its own interval.</span>
             </div>
             <div class="settings-form">
                 <input type="checkbox" id="dissolve-enabled" checked>
@@ -1131,11 +1132,19 @@
                 themesList.innerHTML = '';
 
                 for (const themeName in availableThemes) {
+                    const theme = availableThemes[themeName];
+                    const intervalMinutes = (theme.interval || 3600) / 60;
+
                     const badge = document.createElement('div');
                     badge.className = 'theme-badge';
                     badge.innerHTML = `
-                        <span>${themeName}</span>
-                        <button onclick="deleteTheme('${themeName}')">Delete</button>
+                        <span style="font-weight: 500;">${themeName}</span>
+                        <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;">
+                            <label style="font-size: 12px;">Interval (min):</label>
+                            <input type="number" id="interval-${themeName}" value="${intervalMinutes}" min="1" max="1440" step="0.5" style="width: 70px; padding: 4px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px;">
+                            <button onclick="saveThemeInterval('${themeName}')" style="padding: 4px 8px; font-size: 11px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">Save</button>
+                        </div>
+                        <button onclick="deleteTheme('${themeName}')" style="margin-top: 5px;">Delete</button>
                     `;
                     themesList.appendChild(badge);
                 }
@@ -1188,6 +1197,41 @@
             }
         }
 
+        async function saveThemeInterval(themeName) {
+            const inputElement = document.getElementById(`interval-${themeName}`);
+            const intervalMinutes = parseFloat(inputElement.value);
+
+            if (!intervalMinutes || intervalMinutes < 1) {
+                showMessage('Invalid interval value', 'error');
+                return;
+            }
+
+            const intervalSeconds = Math.round(intervalMinutes * 60);
+
+            try {
+                const response = await fetch(`/api/themes/${encodeURIComponent(themeName)}/interval`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ interval: intervalSeconds })
+                });
+
+                if (response.ok) {
+                    availableThemes[themeName].interval = intervalSeconds;
+                    showMessage(`Interval updated for theme "${themeName}"`, 'success');
+
+                    // If this is the active theme, reload settings to reflect the change
+                    if (activeTheme === themeName) {
+                        await loadSettings();
+                    }
+                } else {
+                    showMessage('Error updating theme interval', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating theme interval:', error);
+                showMessage('Error updating theme interval', 'error');
+            }
+        }
+
         async function deleteTheme(themeName) {
             if (!confirm(`Delete theme "${themeName}"? This will remove it from all images.`)) {
                 return;
@@ -1223,7 +1267,15 @@
                 });
 
                 if (response.ok) {
+                    const data = await response.json();
                     activeTheme = themeName;
+
+                    // Update interval display with theme's interval
+                    if (data.interval) {
+                        const intervalMinutes = data.interval / 60;
+                        document.getElementById('interval').value = intervalMinutes;
+                    }
+
                     // Reload images to show filtered view
                     await loadImages();
                 } else {

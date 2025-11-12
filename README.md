@@ -6,7 +6,7 @@ A web-based kiosk system for displaying images in slideshow mode, optimized for 
 
 - Web-based image upload and management
 - **Enable/disable individual images** - Control which images appear in the slideshow with checkboxes
-- **Themes** - Organize images into multiple themes; images can belong to multiple themes
+- **Themes** - Organize images into multiple themes with per-theme intervals; images can belong to multiple themes
 - **Remote control** - Control the kiosk from any device on your network
 - **Click-to-jump** - Click any image thumbnail to immediately display it on the kiosk
 - **Smooth dissolve transitions** - Optional fade effect between images
@@ -227,14 +227,18 @@ Configure settings through the management interface at `/`, or edit `settings.js
 
 Organize your images into themes for different occasions or categories:
 
-1. **Create themes** - Enter a theme name and click "Create Theme"
-2. **Assign images** - Use the dropdown on each image card to add it to themes
-3. **Multiple themes** - Images can belong to multiple themes
-4. **Remove from theme** - Click the "✕" on a theme tag to remove the image from that theme
-5. **Select active theme** - Use the "Active Theme" dropdown to choose which theme to display
-6. **All Images** - Select "All Images" to show all enabled images regardless of theme
+1. **Create themes** - Enter a theme name and click "Create Theme" (default interval: 60 minutes)
+2. **Set theme interval** - Each theme has its own slideshow interval. Edit it in the theme's settings and click "Save"
+3. **Assign images** - Use the dropdown on each image card to add it to themes
+4. **Multiple themes** - Images can belong to multiple themes
+5. **Remove from theme** - Click the "✕" on a theme tag to remove the image from that theme
+6. **Select active theme** - Use the "Active Theme" dropdown to choose which theme to display
+7. **All Images** - Select "All Images" to show all enabled images regardless of theme
 
-When a theme is active, only enabled images belonging to that theme will appear in the slideshow.
+When a theme is active:
+- Only enabled images belonging to that theme will appear in the slideshow
+- The slideshow uses that theme's interval setting
+- When "All Images" is selected, the default interval from Settings is used
 
 ### Smart Reload Algorithm
 
