@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upload Images</title>
 
+    <!-- Cropper.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+
     <style>
         * {
             margin: 0;
@@ -219,6 +222,144 @@
         .menu-item-danger:hover {
             background: #ffebee;
         }
+
+        .menu-item.has-submenu {
+            position: relative;
+        }
+
+        .submenu-arrow {
+            float: right;
+            margin-left: 10px;
+        }
+
+        .submenu {
+            position: absolute;
+            left: 100%;
+            bottom: 0;
+            margin-left: 4px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            min-width: 150px;
+            display: none;
+            z-index: 1001;
+        }
+
+        .submenu.show {
+            display: block;
+        }
+
+        .submenu-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .submenu-item:last-child {
+            border-bottom: none;
+        }
+
+        .submenu-item:hover {
+            background: #f5f5f5;
+        }
+
+        /* Crop modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+        }
+
+        .close-button {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .crop-container {
+            max-width: 800px;
+            max-height: 600px;
+            margin-bottom: 20px;
+        }
+
+        .crop-container img {
+            max-width: 100%;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .modal-button.primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .modal-button.primary:hover {
+            background: #45a049;
+        }
+
+        .modal-button.secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .modal-button.secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .modal-button.danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .modal-button.danger:hover {
+            background: #d32f2f;
+        }
     </style>
 </head>
 <body>
@@ -251,6 +392,27 @@
             </div>
         </div>
     </div>
+
+    <!-- Crop Modal -->
+    <div id="crop-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Crop Image</h2>
+                <button class="close-button" onclick="closeCropModal()">&times;</button>
+            </div>
+            <div class="crop-container">
+                <img id="crop-image" src="" alt="Image to crop">
+            </div>
+            <div class="modal-actions">
+                <button class="modal-button danger" onclick="clearCrop()">Clear Crop</button>
+                <button class="modal-button secondary" onclick="closeCropModal()">Cancel</button>
+                <button class="modal-button primary" onclick="saveCrop()">Save Crop</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cropper.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
     <script>
         // Menu handling functions
@@ -369,11 +531,25 @@
                     const card = document.createElement('div');
                     card.className = 'image-card';
 
+                    // Build theme submenu
+                    let themeSubmenuHTML = '';
+                    if (Object.keys(availableThemes).length > 0) {
+                        themeSubmenuHTML = '<div class="menu-item has-submenu">Add to theme <span class="submenu-arrow">▸</span><div class="submenu">';
+                        for (const themeName in availableThemes) {
+                            if (!(image.themes || []).includes(themeName)) {
+                                themeSubmenuHTML += `<div class="submenu-item" data-theme="${themeName}" data-image="${image.name}">${themeName}</div>`;
+                            }
+                        }
+                        themeSubmenuHTML += '</div></div>';
+                    }
+
                     card.innerHTML = `
                         <div class="action-menu-container">
                             <button class="action-menu-button">⋮</button>
                             <div class="action-menu-dropdown">
-                                <div class="menu-item menu-item-danger">Delete</div>
+                                ${themeSubmenuHTML}
+                                <div class="menu-item" data-action="crop" data-image="${image.name}" data-url="${image.url}">Crop</div>
+                                <div class="menu-item menu-item-danger" data-action="delete" data-image="${image.name}">Delete</div>
                             </div>
                         </div>
                         <img src="${image.url}" alt="${image.name}" loading="lazy">
@@ -391,13 +567,56 @@
                         toggleMenu(menuContainer);
                     });
 
-                    // Add delete menu item handler
-                    const deleteMenuItem = card.querySelector('.menu-item-danger');
-                    deleteMenuItem.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        closeAllMenus();
-                        deleteImage(image.name);
+                    // Add menu item handlers
+                    const menuItems = card.querySelectorAll('.menu-item[data-action]');
+                    menuItems.forEach(item => {
+                        item.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const action = item.getAttribute('data-action');
+                            const imageName = item.getAttribute('data-image');
+                            closeAllMenus();
+
+                            if (action === 'crop') {
+                                const imageUrl = item.getAttribute('data-url');
+                                openCropModal(imageName, imageUrl);
+                            } else if (action === 'delete') {
+                                deleteImage(imageName);
+                            }
+                        });
                     });
+
+                    // Add theme submenu handlers
+                    const themeMenuItem = card.querySelector('.menu-item.has-submenu');
+                    if (themeMenuItem) {
+                        const themeSubmenu = themeMenuItem.querySelector('.submenu');
+
+                        themeMenuItem.addEventListener('mouseenter', () => {
+                            themeSubmenu.classList.add('show');
+                        });
+
+                        themeMenuItem.addEventListener('mouseleave', () => {
+                            setTimeout(() => {
+                                if (!themeSubmenu.matches(':hover')) {
+                                    themeSubmenu.classList.remove('show');
+                                }
+                            }, 100);
+                        });
+
+                        themeSubmenu.addEventListener('mouseleave', () => {
+                            themeSubmenu.classList.remove('show');
+                        });
+
+                        const submenuItems = themeSubmenu.querySelectorAll('.submenu-item');
+                        submenuItems.forEach(item => {
+                            item.addEventListener('click', async (e) => {
+                                e.stopPropagation();
+                                const themeName = item.getAttribute('data-theme');
+                                const imageName = item.getAttribute('data-image');
+                                closeAllMenus();
+                                await addImageToTheme(imageName, themeName);
+                            });
+                        });
+                    }
 
                     grid.appendChild(card);
                 });
@@ -437,8 +656,196 @@
             return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
         }
 
-        // Load images on page load
-        loadImages();
+        // Theme management
+        let availableThemes = {};
+
+        async function loadThemes() {
+            try {
+                const response = await fetch('/api/themes');
+                const data = await response.json();
+                availableThemes = data.themes;
+            } catch (error) {
+                console.error('Error loading themes:', error);
+            }
+        }
+
+        async function addImageToTheme(imageName, themeName) {
+            try {
+                const response = await fetch('/api/images');
+                const images = await response.json();
+                const image = images.find(img => img.name === imageName);
+
+                if (!image) return;
+
+                const newThemes = [...(image.themes || []), themeName];
+
+                const updateResponse = await fetch(`/api/images/${encodeURIComponent(imageName)}/themes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ themes: newThemes })
+                });
+
+                if (updateResponse.ok) {
+                    showMessage(`Added to theme "${themeName}"`, 'success');
+                    await loadImages();
+                } else {
+                    showMessage('Error adding to theme', 'error');
+                }
+            } catch (error) {
+                console.error('Error adding to theme:', error);
+                showMessage('Error adding to theme', 'error');
+            }
+        }
+
+        // Crop functionality
+        let cropper = null;
+        let currentCropImageName = null;
+
+        function openCropModal(imageName, imageUrl) {
+            currentCropImageName = imageName;
+            const modal = document.getElementById('crop-modal');
+            const img = document.getElementById('crop-image');
+
+            img.src = imageUrl;
+            modal.classList.add('show');
+
+            // Initialize cropper when image loads
+            img.onload = function() {
+                if (cropper) {
+                    cropper.destroy();
+                }
+
+                cropper = new Cropper(img, {
+                    viewMode: 1,
+                    dragMode: 'move',
+                    aspectRatio: NaN,
+                    autoCropArea: 1,
+                    restore: false,
+                    guides: true,
+                    center: true,
+                    highlight: false,
+                    cropBoxMovable: true,
+                    cropBoxResizable: true,
+                    toggleDragModeOnDblclick: false,
+                });
+
+                // Load existing crop if available
+                loadExistingCrop(imageName);
+            };
+        }
+
+        function closeCropModal() {
+            const modal = document.getElementById('crop-modal');
+            modal.classList.remove('show');
+            if (cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+            currentCropImageName = null;
+        }
+
+        async function loadExistingCrop(imageName) {
+            try {
+                const response = await fetch('/api/settings');
+                const settings = await response.json();
+                const cropData = settings.image_crops?.[imageName];
+
+                if (cropData && cropper) {
+                    const imageData = cropper.getImageData();
+                    const scaleX = imageData.naturalWidth / cropData.imageWidth;
+                    const scaleY = imageData.naturalHeight / cropData.imageHeight;
+
+                    cropper.setData({
+                        x: cropData.x * scaleX,
+                        y: cropData.y * scaleY,
+                        width: cropData.width * scaleX,
+                        height: cropData.height * scaleY
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading existing crop:', error);
+            }
+        }
+
+        async function saveCrop() {
+            if (!cropper || !currentCropImageName) return;
+
+            const cropData = cropper.getData();
+            const imageData = cropper.getImageData();
+
+            const cropInfo = {
+                x: Math.round(cropData.x),
+                y: Math.round(cropData.y),
+                width: Math.round(cropData.width),
+                height: Math.round(cropData.height),
+                imageWidth: imageData.naturalWidth,
+                imageHeight: imageData.naturalHeight
+            };
+
+            try {
+                const response = await fetch('/api/settings');
+                const settings = await response.json();
+
+                if (!settings.image_crops) {
+                    settings.image_crops = {};
+                }
+                settings.image_crops[currentCropImageName] = cropInfo;
+
+                const saveResponse = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+
+                if (saveResponse.ok) {
+                    showMessage('Crop saved', 'success');
+                    closeCropModal();
+                    await loadImages();
+                } else {
+                    showMessage('Error saving crop', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving crop:', error);
+                showMessage('Error saving crop', 'error');
+            }
+        }
+
+        async function clearCrop() {
+            if (!currentCropImageName) return;
+
+            if (!confirm('Clear crop for this image?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/settings');
+                const settings = await response.json();
+
+                if (settings.image_crops && settings.image_crops[currentCropImageName]) {
+                    delete settings.image_crops[currentCropImageName];
+
+                    const saveResponse = await fetch('/api/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(settings)
+                    });
+
+                    if (saveResponse.ok) {
+                        showMessage('Crop cleared', 'success');
+                        closeCropModal();
+                        await loadImages();
+                    } else {
+                        showMessage('Error clearing crop', 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('Error clearing crop:', error);
+                showMessage('Error clearing crop', 'error');
+            }
+        }
+
+        // Load themes and images on page load
+        loadThemes().then(() => loadImages());
     </script>
 </body>
 </html>
