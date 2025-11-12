@@ -721,7 +721,7 @@
             z-index: 1001;
         }
 
-        .menu-item.has-submenu:hover .submenu {
+        .submenu.show {
             display: block;
         }
 
@@ -1275,6 +1275,25 @@
                 }
 
                 themeMenuItem.appendChild(themeSubmenu);
+
+                // Handle submenu hover interaction
+                themeMenuItem.addEventListener('mouseenter', () => {
+                    themeSubmenu.classList.add('show');
+                });
+
+                themeMenuItem.addEventListener('mouseleave', (e) => {
+                    // Delay hiding to allow mouse movement to submenu
+                    setTimeout(() => {
+                        if (!themeSubmenu.matches(':hover')) {
+                            themeSubmenu.classList.remove('show');
+                        }
+                    }, 100);
+                });
+
+                themeSubmenu.addEventListener('mouseleave', () => {
+                    themeSubmenu.classList.remove('show');
+                });
+
                 menuDropdown.appendChild(themeMenuItem);
             }
 
