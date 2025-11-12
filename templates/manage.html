@@ -367,6 +367,30 @@
             box-shadow: 0 0 8px #2196F3;
         }
 
+        .debug-toggle-button {
+            background: #9e9e9e;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .debug-toggle-button:hover {
+            background: #757575;
+        }
+
+        .debug-toggle-button.active {
+            background: #4CAF50;
+        }
+
+        .debug-toggle-button.active:hover {
+            background: #45a049;
+        }
+
         .debug-panel {
             background: #f5f5f5;
             border: 2px solid #9e9e9e;
@@ -588,13 +612,6 @@
         </div>
 
         <div class="section">
-            <h2>Current Images</h2>
-            <div class="image-grid" id="image-grid">
-                <p style="color: #999;">Loading images...</p>
-            </div>
-        </div>
-
-        <div class="section">
             <h2>Upload Images</h2>
             <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
                 <p style="font-size: 18px; color: #666; margin-bottom: 10px;">
@@ -610,7 +627,18 @@
             </div>
         </div>
 
-        <div class="debug-panel" id="debug-panel">
+        <div class="section">
+            <h2>Current Images</h2>
+            <div class="image-grid" id="image-grid">
+                <p style="color: #999;">Loading images...</p>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <button class="debug-toggle-button" onclick="toggleDebugPanel()">🐛 DEBUG</button>
+        </div>
+
+        <div class="debug-panel" id="debug-panel" style="display: none;">
             <h3>
                 🐛 Debug Console - Kiosk Display Logs
                 <div class="debug-toggle">
@@ -632,6 +660,22 @@
         // Debug console state
         let debugEnabled = false;
         let debugPollInterval = null;
+        let debugPanelVisible = false;
+
+        // Toggle debug panel visibility
+        function toggleDebugPanel() {
+            const panel = document.getElementById('debug-panel');
+            const button = document.querySelector('.debug-toggle-button');
+            debugPanelVisible = !debugPanelVisible;
+
+            if (debugPanelVisible) {
+                panel.style.display = 'block';
+                button.classList.add('active');
+            } else {
+                panel.style.display = 'none';
+                button.classList.remove('active');
+            }
+        }
 
         // Toggle debug console
         function toggleDebug() {
@@ -851,14 +895,28 @@
                     return;
                 }
 
+                // Filter images by active theme
+                let filteredImages = images;
+                if (activeTheme) {
+                    filteredImages = images.filter(image => {
+                        return image.themes && image.themes.includes(activeTheme);
+                    });
+                }
+
+                if (filteredImages.length === 0 && activeTheme) {
+                    grid.innerHTML = '<p style="color: #999;">No images in the selected theme</p>';
+                    updateStats(0, 0);
+                    return;
+                }
+
                 let totalSize = 0;
-                images.forEach(image => {
+                filteredImages.forEach(image => {
                     totalSize += image.size;
                     const card = createImageCard(image);
                     grid.appendChild(card);
                 });
 
-                updateStats(images.length, totalSize);
+                updateStats(filteredImages.length, totalSize);
             } catch (error) {
                 console.error('Error loading images:', error);
                 showMessage('Error loading images', 'error');
