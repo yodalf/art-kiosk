@@ -270,22 +270,6 @@
             text-decoration: underline;
         }
 
-        .stats {
-            background: #e3f2fd;
-            padding: 15px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-        }
-
-        .stats-item {
-            display: inline-block;
-            margin-right: 30px;
-            color: #1565c0;
-        }
-
-        .stats-item strong {
-            color: #0d47a1;
-        }
 
         .remote-control {
             background: #fff3e0;
@@ -545,11 +529,6 @@
         </div>
 
         <div id="message" class="message"></div>
-
-        <div class="stats">
-            <span class="stats-item"><strong>Total Images:</strong> <span id="total-count">0</span></span>
-            <span class="stats-item"><strong>Total Size:</strong> <span id="total-size">0 KB</span></span>
-        </div>
 
         <div class="remote-control">
             <h3>🎮 Remote Control - Control the Kiosk Display</h3>
@@ -893,7 +872,6 @@
 
                 if (images.length === 0) {
                     grid.innerHTML = '<p style="color: #999;">No images uploaded yet</p>';
-                    updateStats(0, 0);
                     return;
                 }
 
@@ -907,18 +885,13 @@
 
                 if (filteredImages.length === 0 && activeTheme) {
                     grid.innerHTML = '<p style="color: #999;">No images in the selected theme</p>';
-                    updateStats(0, 0);
                     return;
                 }
 
-                let totalSize = 0;
                 filteredImages.forEach(image => {
-                    totalSize += image.size;
                     const card = createImageCard(image);
                     grid.appendChild(card);
                 });
-
-                updateStats(filteredImages.length, totalSize);
             } catch (error) {
                 console.error('Error loading images:', error);
                 showMessage('Error loading images', 'error');
@@ -1105,21 +1078,6 @@
             setTimeout(() => {
                 message.classList.remove('visible');
             }, 3000);
-        }
-
-        // Format bytes
-        function formatBytes(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-        }
-
-        // Update stats
-        function updateStats(count, size) {
-            document.getElementById('total-count').textContent = count;
-            document.getElementById('total-size').textContent = formatBytes(size);
         }
 
         // File input change handler
