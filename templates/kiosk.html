@@ -170,6 +170,7 @@
                 const settingsResponse = await fetch('/api/settings');
                 const settings = await settingsResponse.json();
                 const newInterval = settings.interval * 1000;
+                const newImageCrops = settings.image_crops || {};
 
                 let needsReload = false;
 
@@ -185,6 +186,13 @@
                 if (newInterval !== interval) {
                     await debugLog(`Interval changed! ${interval / 1000}s -> ${newInterval / 1000}s`);
                     interval = newInterval;
+                    needsReload = true;
+                }
+
+                // Check if crops changed
+                if (JSON.stringify(newImageCrops) !== JSON.stringify(imageCrops)) {
+                    await debugLog(`Image crops changed!`, 'info');
+                    imageCrops = newImageCrops;
                     needsReload = true;
                 }
 
