@@ -146,6 +146,10 @@
                 const settingsResponse = await fetch('/api/settings');
                 const settings = await settingsResponse.json();
                 imageCrops = settings.image_crops || {};
+                debugLog(`Loaded ${Object.keys(imageCrops).length} image crops from settings`, 'info');
+                if (Object.keys(imageCrops).length > 0) {
+                    debugLog(`Crops for: ${Object.keys(imageCrops).join(', ')}`, 'info');
+                }
 
                 // Hide loading message
                 document.getElementById('loading').style.display = 'none';
@@ -256,6 +260,7 @@
                 const cropData = imageCrops[image.name];
 
                 if (cropData) {
+                    debugLog(`Creating cropped slide for ${image.name}`, 'info');
                     // Create cropped image using a container
                     const cropContainer = document.createElement('div');
                     cropContainer.style.width = '100%';
@@ -295,7 +300,11 @@
 
         // Apply crop to an image element
         function applyCrop(img, container, cropData) {
+            debugLog(`applyCrop called for ${img.alt}`, 'info');
+
             const applyStyles = () => {
+                debugLog(`applyStyles running for ${img.alt}`, 'info');
+
                 // Get viewport dimensions (use container dimensions since it should be 100vw x 100vh)
                 const viewportW = container.clientWidth;
                 const viewportH = container.clientHeight;
@@ -346,30 +355,24 @@
                 img.style.margin = '0';
                 img.style.padding = '0';
 
-                // Debug log
-                console.log('Crop applied:', {
-                    imageName: img.alt,
-                    container: `${container.clientWidth}x${container.clientHeight}`,
-                    viewport: `${viewportW}x${viewportH}`,
-                    viewportAspect: viewportAspect.toFixed(2),
-                    originalImg: `${imgW}x${imgH}`,
-                    crop: `${cropW.toFixed(0)}x${cropH.toFixed(0)}`,
-                    cropAspect: cropAspect.toFixed(2),
-                    scaleX: scaleX.toFixed(2),
-                    scaleY: scaleY.toFixed(2),
-                    chosenScale: scale.toFixed(2),
-                    scaledImg: `${scaledImgW.toFixed(0)}x${scaledImgH.toFixed(0)}`,
-                    scaledCrop: `${scaledCropW.toFixed(0)}x${scaledCropH.toFixed(0)}`,
-                    offset: `${offsetX.toFixed(0)}, ${offsetY.toFixed(0)}`,
-                    center: `${centerX.toFixed(0)}, ${centerY.toFixed(0)}`,
-                    finalPosition: `${(offsetX + centerX).toFixed(0)}, ${(offsetY + centerY).toFixed(0)}`
-                });
+                // Debug log - send to management interface
+                debugLog(`Crop applied to ${img.alt}:`, 'info');
+                debugLog(`  Container: ${container.clientWidth}x${container.clientHeight}`, 'info');
+                debugLog(`  Viewport: ${viewportW}x${viewportH} (aspect ${viewportAspect.toFixed(2)})`, 'info');
+                debugLog(`  Original Image: ${imgW}x${imgH}`, 'info');
+                debugLog(`  Crop Region: ${cropW.toFixed(0)}x${cropH.toFixed(0)} (aspect ${cropAspect.toFixed(2)})`, 'info');
+                debugLog(`  Scale X: ${scaleX.toFixed(2)}, Scale Y: ${scaleY.toFixed(2)} -> Using: ${scale.toFixed(2)}`, 'info');
+                debugLog(`  Scaled Image: ${scaledImgW.toFixed(0)}x${scaledImgH.toFixed(0)}`, 'info');
+                debugLog(`  Scaled Crop: ${scaledCropW.toFixed(0)}x${scaledCropH.toFixed(0)}`, 'info');
+                debugLog(`  Position: left=${(offsetX + centerX).toFixed(0)}px, top=${(offsetY + centerY).toFixed(0)}px`, 'info');
             };
 
             // Apply immediately if already loaded, otherwise wait
             if (img.complete && img.naturalWidth > 0) {
+                debugLog(`Image ${img.alt} already loaded, applying styles immediately`, 'info');
                 applyStyles();
             } else {
+                debugLog(`Image ${img.alt} not loaded yet, waiting for onload`, 'info');
                 img.onload = applyStyles;
             }
         }
