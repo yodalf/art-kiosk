@@ -925,14 +925,15 @@
                 }
 
                 // Filter images by active theme
+                // "All Images" is a special theme that shows all images without filtering
                 let filteredImages = images;
-                if (activeTheme) {
+                if (activeTheme && activeTheme !== 'All Images') {
                     filteredImages = images.filter(image => {
                         return image.themes && image.themes.includes(activeTheme);
                     });
                 }
 
-                if (filteredImages.length === 0 && activeTheme) {
+                if (filteredImages.length === 0 && activeTheme && activeTheme !== 'All Images') {
                     grid.innerHTML = '<p style="color: #999;">No images in the selected theme</p>';
                     return;
                 }
