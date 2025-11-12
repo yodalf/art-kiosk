@@ -128,7 +128,7 @@
         let imageCrops = {};
 
         // Fetch images from API
-        async function loadImages() {
+        async function loadImages(startIndex = 0) {
             try {
                 // Only fetch enabled images for the kiosk display
                 const response = await fetch('/api/images?enabled_only=true');
@@ -150,8 +150,8 @@
                 // Hide loading message
                 document.getElementById('loading').style.display = 'none';
 
-                // Create slides
-                initSlideshow();
+                // Create slides with specified start index
+                initSlideshow(startIndex);
             } catch (error) {
                 console.error('Error loading images:', error);
                 document.getElementById('loading').textContent = 'Error loading images. Please refresh.';
@@ -208,6 +208,9 @@
 
         // Reload slideshow with new images
         async function reloadSlideshow() {
+            // Save current image name to restore position after reload
+            const currentImageName = images[currentIndex]?.name;
+
             // Stop current slideshow
             if (slideTimer) {
                 clearInterval(slideTimer);
@@ -218,12 +221,29 @@
             const slides = container.querySelectorAll('.slide');
             slides.forEach(slide => slide.remove());
 
-            // Reload images
-            await loadImages();
+            // Temporarily store old images list to find the index
+            const oldImages = images;
+            const oldIndex = currentIndex;
+
+            // Reload images first to get new image list
+            const response = await fetch('/api/images?enabled_only=true');
+            const newImages = await response.json();
+
+            // Find where the current image is in the new list
+            let startIndex = 0;
+            if (currentImageName && newImages.length > 0) {
+                const foundIndex = newImages.findIndex(img => img.name === currentImageName);
+                if (foundIndex !== -1) {
+                    startIndex = foundIndex;
+                }
+            }
+
+            // Now reload with the correct start index
+            await loadImages(startIndex);
         }
 
         // Initialize slideshow
-        function initSlideshow() {
+        function initSlideshow(startIndex = 0) {
             const container = document.getElementById('slideshow-container');
 
             // Create slide elements
@@ -232,52 +252,92 @@
                 slide.className = 'slide';
                 slide.dataset.index = index;
 
-                const img = document.createElement('img');
-                img.src = image.url;
-                img.alt = image.name;
-
-                // Apply crop if exists for this image
+                // Check if crop exists for this image
                 const cropData = imageCrops[image.name];
+
                 if (cropData) {
-                    applyCrop(img, cropData);
+                    // Create cropped image using a container
+                    const cropContainer = document.createElement('div');
+                    cropContainer.style.width = '100vw';
+                    cropContainer.style.height = '100vh';
+                    cropContainer.style.overflow = 'hidden';
+                    cropContainer.style.position = 'relative';
+
+                    const img = document.createElement('img');
+                    img.src = image.url;
+                    img.alt = image.name;
+                    img.dataset.imageName = image.name;
+
+                    cropContainer.appendChild(img);
+                    slide.appendChild(cropContainer);
+
+                    // Apply crop styling when image loads
+                    applyCrop(img, cropContainer, cropData);
+                } else {
+                    // No crop - use normal full image
+                    const img = document.createElement('img');
+                    img.src = image.url;
+                    img.alt = image.name;
+                    slide.appendChild(img);
                 }
 
-                slide.appendChild(img);
                 container.appendChild(slide);
             });
 
-            // Show first image
-            showSlide(0);
+            // Show specified image
+            showSlide(startIndex);
 
             // Start automatic slideshow
             startSlideshow();
         }
 
         // Apply crop to an image element
-        function applyCrop(img, cropData) {
-            // Wait for image to load to get natural dimensions
-            img.onload = function() {
-                const naturalWidth = img.naturalWidth;
-                const naturalHeight = img.naturalHeight;
+        function applyCrop(img, container, cropData) {
+            const applyStyles = () => {
+                // Get viewport dimensions
+                const viewportW = window.innerWidth;
+                const viewportH = window.innerHeight;
 
-                // Calculate crop percentages
-                const xPercent = (cropData.x / naturalWidth) * 100;
-                const yPercent = (cropData.y / naturalHeight) * 100;
-                const widthPercent = (cropData.width / naturalWidth) * 100;
-                const heightPercent = (cropData.height / naturalHeight) * 100;
+                // Get crop dimensions from saved data
+                const cropX = cropData.x;
+                const cropY = cropData.y;
+                const cropW = cropData.width;
+                const cropH = cropData.height;
+                const imgW = cropData.imageWidth;
+                const imgH = cropData.imageHeight;
 
-                // Apply clip-path using inset
-                // inset format: inset(top right bottom left)
-                const top = yPercent;
-                const right = 100 - (xPercent + widthPercent);
-                const bottom = 100 - (yPercent + heightPercent);
-                const left = xPercent;
+                // Calculate scale to make crop region fill viewport (cover behavior)
+                const scaleX = viewportW / cropW;
+                const scaleY = viewportH / cropH;
+                const scale = Math.max(scaleX, scaleY);
 
-                img.style.clipPath = `inset(${top}% ${right}% ${bottom}% ${left}%)`;
+                // Calculate image dimensions after scaling
+                const scaledImgW = imgW * scale;
+                const scaledImgH = imgH * scale;
 
-                // Adjust object-fit to maintain aspect ratio of cropped region
-                img.style.objectFit = 'cover';
+                // Calculate position to move crop region to top-left of viewport
+                const offsetX = -cropX * scale;
+                const offsetY = -cropY * scale;
+
+                // Center the scaled crop region
+                const centerX = (viewportW - (cropW * scale)) / 2;
+                const centerY = (viewportH - (cropH * scale)) / 2;
+
+                // Apply styles
+                img.style.position = 'absolute';
+                img.style.width = `${scaledImgW}px`;
+                img.style.height = `${scaledImgH}px`;
+                img.style.left = `${offsetX + centerX}px`;
+                img.style.top = `${offsetY + centerY}px`;
+                img.style.objectFit = 'none';
             };
+
+            // Apply immediately if already loaded, otherwise wait
+            if (img.complete && img.naturalWidth > 0) {
+                applyStyles();
+            } else {
+                img.onload = applyStyles;
+            }
         }
 
         // Show specific slide
