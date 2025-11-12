@@ -258,10 +258,12 @@
                 if (cropData) {
                     // Create cropped image using a container
                     const cropContainer = document.createElement('div');
-                    cropContainer.style.width = '100vw';
-                    cropContainer.style.height = '100vh';
+                    cropContainer.style.width = '100%';
+                    cropContainer.style.height = '100%';
                     cropContainer.style.overflow = 'hidden';
-                    cropContainer.style.position = 'relative';
+                    cropContainer.style.position = 'absolute';
+                    cropContainer.style.top = '0';
+                    cropContainer.style.left = '0';
 
                     const img = document.createElement('img');
                     img.src = image.url;
@@ -294,9 +296,9 @@
         // Apply crop to an image element
         function applyCrop(img, container, cropData) {
             const applyStyles = () => {
-                // Get viewport dimensions
-                const viewportW = window.innerWidth;
-                const viewportH = window.innerHeight;
+                // Get viewport dimensions (use container dimensions since it should be 100vw x 100vh)
+                const viewportW = container.clientWidth;
+                const viewportH = container.clientHeight;
                 const viewportAspect = viewportW / viewportH;
 
                 // Get crop dimensions from saved data
@@ -341,15 +343,26 @@
                 img.style.objectFit = 'none';
                 img.style.maxWidth = 'none';
                 img.style.maxHeight = 'none';
+                img.style.margin = '0';
+                img.style.padding = '0';
 
                 // Debug log
                 console.log('Crop applied:', {
+                    imageName: img.alt,
+                    container: `${container.clientWidth}x${container.clientHeight}`,
                     viewport: `${viewportW}x${viewportH}`,
-                    crop: `${cropW}x${cropH}`,
-                    scale: scale.toFixed(2),
+                    viewportAspect: viewportAspect.toFixed(2),
+                    originalImg: `${imgW}x${imgH}`,
+                    crop: `${cropW.toFixed(0)}x${cropH.toFixed(0)}`,
+                    cropAspect: cropAspect.toFixed(2),
+                    scaleX: scaleX.toFixed(2),
+                    scaleY: scaleY.toFixed(2),
+                    chosenScale: scale.toFixed(2),
                     scaledImg: `${scaledImgW.toFixed(0)}x${scaledImgH.toFixed(0)}`,
                     scaledCrop: `${scaledCropW.toFixed(0)}x${scaledCropH.toFixed(0)}`,
-                    position: `${(offsetX + centerX).toFixed(0)}, ${(offsetY + centerY).toFixed(0)}`
+                    offset: `${offsetX.toFixed(0)}, ${offsetY.toFixed(0)}`,
+                    center: `${centerX.toFixed(0)}, ${centerY.toFixed(0)}`,
+                    finalPosition: `${(offsetX + centerX).toFixed(0)}, ${(offsetY + centerY).toFixed(0)}`
                 });
             };
 
