@@ -52,45 +52,6 @@
             padding-bottom: 10px;
         }
 
-        .upload-area {
-            border: 2px dashed #ccc;
-            border-radius: 8px;
-            padding: 40px;
-            text-align: center;
-            background: #fafafa;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        .upload-area:hover {
-            border-color: #4CAF50;
-            background: #f0f8f0;
-        }
-
-        .upload-area.dragging {
-            border-color: #4CAF50;
-            background: #e8f5e9;
-        }
-
-        #file-input {
-            display: none;
-        }
-
-        .upload-button {
-            background: #4CAF50;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 10px;
-        }
-
-        .upload-button:hover {
-            background: #45a049;
-        }
-
         .settings-form {
             display: flex;
             gap: 15px;
@@ -821,19 +782,8 @@
         </div>
 
         <div class="section">
-            <h2>Upload Images</h2>
-            <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
-                <p style="font-size: 18px; color: #666; margin-bottom: 10px;">
-                    Drag and drop images here or click to select
-                </p>
-                <p style="font-size: 14px; color: #999;">
-                    Supported formats: PNG, JPG, JPEG, GIF, WebP, BMP
-                </p>
-                <input type="file" id="file-input" accept="image/*" multiple>
-                <button class="upload-button" onclick="event.stopPropagation(); document.getElementById('file-input').click()">
-                    Choose Files
-                </button>
-            </div>
+            <div style="border-bottom: 2px solid #e0e0e0; margin-bottom: 15px;"></div>
+            <a href="/upload" target="_blank" style="display: inline-block; background: #4CAF50; color: white; padding: 10px 20px; border-radius: 4px; text-decoration: none; font-weight: 500;">File Upload</a>
         </div>
 
         <div class="section">
@@ -1395,33 +1345,6 @@
             }
         }
 
-        // Upload images
-        async function uploadFiles(files) {
-            for (const file of files) {
-                const formData = new FormData();
-                formData.append('file', file);
-
-                try {
-                    const response = await fetch('/api/images', {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    if (response.ok) {
-                        showMessage(`${file.name} uploaded successfully`, 'success');
-                    } else {
-                        const error = await response.json();
-                        showMessage(`Error uploading ${file.name}: ${error.error}`, 'error');
-                    }
-                } catch (error) {
-                    console.error('Error uploading file:', error);
-                    showMessage(`Error uploading ${file.name}`, 'error');
-                }
-            }
-
-            loadImages();
-        }
-
         // Show message
         function showMessage(text, type) {
             const message = document.getElementById('message');
@@ -1432,41 +1355,6 @@
                 message.classList.remove('visible');
             }, 3000);
         }
-
-        // File input change handler
-        document.getElementById('file-input').addEventListener('change', (e) => {
-            const files = Array.from(e.target.files);
-            if (files.length > 0) {
-                uploadFiles(files);
-            }
-            e.target.value = ''; // Reset input
-        });
-
-        // Drag and drop handlers
-        const uploadArea = document.getElementById('upload-area');
-
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragging');
-        });
-
-        uploadArea.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragging');
-        });
-
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragging');
-
-            const files = Array.from(e.dataTransfer.files).filter(file =>
-                file.type.startsWith('image/')
-            );
-
-            if (files.length > 0) {
-                uploadFiles(files);
-            }
-        });
 
         // Theme management functions
         let availableThemes = {};

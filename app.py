@@ -131,6 +131,12 @@ def kiosk():
                          active_theme=settings.get('active_theme'))
 
 
+@app.route('/upload')
+def upload():
+    """Image upload page."""
+    return render_template('upload.html')
+
+
 @app.route('/api/images', methods=['GET'])
 def list_images():
     """Get list of all images."""
