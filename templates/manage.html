@@ -141,10 +141,17 @@
         .image-card {
             border: 1px solid #e0e0e0;
             border-radius: 8px;
-            overflow: hidden;
+            overflow: visible;
             background: white;
             transition: transform 0.2s, box-shadow 0.2s;
             position: relative;
+        }
+
+        /* Keep image area clipped to rounded corners */
+        .image-card > img,
+        .image-card > div[style*="overflow: hidden"] {
+            border-radius: 8px 8px 0 0;
+            overflow: hidden;
         }
 
         .image-card:hover {
@@ -847,24 +854,19 @@
     <script>
         // Menu handling functions (define early for use in createImageCard)
         function toggleMenu(menuContainer) {
-            console.log('toggleMenu called', menuContainer);
             const dropdown = menuContainer.querySelector('.action-menu-dropdown');
-            console.log('dropdown element:', dropdown);
             const isOpen = dropdown.classList.contains('show');
-            console.log('isOpen:', isOpen);
 
             // Close all other menus first
             closeAllMenus();
 
             // Toggle this menu
             if (!isOpen) {
-                console.log('Adding show class');
                 dropdown.classList.add('show');
             }
         }
 
         function closeAllMenus() {
-            console.log('closeAllMenus called');
             document.querySelectorAll('.action-menu-dropdown.show').forEach(dropdown => {
                 dropdown.classList.remove('show');
             });
@@ -1230,7 +1232,6 @@
             menuButton.innerHTML = '⋮';
             menuButton.title = 'Actions';
             menuButton.onclick = (e) => {
-                console.log('Menu button clicked');
                 e.stopPropagation();
                 toggleMenu(menuContainer);
             };
