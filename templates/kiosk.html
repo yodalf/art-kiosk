@@ -297,31 +297,40 @@
                 // Get viewport dimensions
                 const viewportW = window.innerWidth;
                 const viewportH = window.innerHeight;
+                const viewportAspect = viewportW / viewportH;
 
                 // Get crop dimensions from saved data
                 const cropX = cropData.x;
                 const cropY = cropData.y;
                 const cropW = cropData.width;
                 const cropH = cropData.height;
+                const cropAspect = cropW / cropH;
                 const imgW = cropData.imageWidth;
                 const imgH = cropData.imageHeight;
 
-                // Calculate scale to make crop region fill viewport (cover behavior)
+                // Calculate scale to make crop region fill viewport completely (cover behavior)
+                // Use Math.max to ensure the crop region fills the entire viewport
                 const scaleX = viewportW / cropW;
                 const scaleY = viewportH / cropH;
                 const scale = Math.max(scaleX, scaleY);
 
-                // Calculate image dimensions after scaling
+                // Calculate scaled image dimensions
                 const scaledImgW = imgW * scale;
                 const scaledImgH = imgH * scale;
 
-                // Calculate position to move crop region to top-left of viewport
+                // Calculate scaled crop dimensions
+                const scaledCropW = cropW * scale;
+                const scaledCropH = cropH * scale;
+
+                // Calculate position to place crop region
+                // Move image so crop region starts at correct position
                 const offsetX = -cropX * scale;
                 const offsetY = -cropY * scale;
 
-                // Center the scaled crop region
-                const centerX = (viewportW - (cropW * scale)) / 2;
-                const centerY = (viewportH - (cropH * scale)) / 2;
+                // Center the crop region in viewport
+                // If crop is larger than viewport in one dimension, center the overflow
+                const centerX = (viewportW - scaledCropW) / 2;
+                const centerY = (viewportH - scaledCropH) / 2;
 
                 // Apply styles
                 img.style.position = 'absolute';
@@ -330,6 +339,18 @@
                 img.style.left = `${offsetX + centerX}px`;
                 img.style.top = `${offsetY + centerY}px`;
                 img.style.objectFit = 'none';
+                img.style.maxWidth = 'none';
+                img.style.maxHeight = 'none';
+
+                // Debug log
+                console.log('Crop applied:', {
+                    viewport: `${viewportW}x${viewportH}`,
+                    crop: `${cropW}x${cropH}`,
+                    scale: scale.toFixed(2),
+                    scaledImg: `${scaledImgW.toFixed(0)}x${scaledImgH.toFixed(0)}`,
+                    scaledCrop: `${scaledCropW.toFixed(0)}x${scaledCropH.toFixed(0)}`,
+                    position: `${(offsetX + centerX).toFixed(0)}, ${(offsetY + centerY).toFixed(0)}`
+                });
             };
 
             // Apply immediately if already loaded, otherwise wait
