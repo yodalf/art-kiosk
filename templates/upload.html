@@ -135,6 +135,8 @@
             height: 200px;
             object-fit: cover;
             display: block;
+            border-radius: 8px 8px 0 0;
+            overflow: hidden;
         }
 
         .card-info {
@@ -153,19 +155,69 @@
             font-size: 12px;
         }
 
-        .action-button {
-            background: #f44336;
-            color: white;
-            padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-top: 8px;
+        /* Action menu styles */
+        .action-menu-container {
+            position: relative;
         }
 
-        .action-button:hover {
-            background: #d32f2f;
+        .action-menu-button {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            color: #666;
+            z-index: 10;
+        }
+
+        .action-menu-button:hover {
+            background: white;
+            color: #333;
+        }
+
+        .action-menu-dropdown {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            margin-bottom: 4px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            min-width: 180px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .action-menu-dropdown.show {
+            display: block;
+        }
+
+        .menu-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .menu-item:hover {
+            background: #f5f5f5;
+        }
+
+        .menu-item-danger {
+            color: #f44336;
+        }
+
+        .menu-item-danger:hover {
+            background: #ffebee;
         }
     </style>
 </head>
@@ -201,6 +253,38 @@
     </div>
 
     <script>
+        // Menu handling functions
+        function toggleMenu(menuContainer) {
+            const dropdown = menuContainer.querySelector('.action-menu-dropdown');
+            const isOpen = dropdown.classList.contains('show');
+
+            closeAllMenus();
+
+            if (!isOpen) {
+                dropdown.classList.add('show');
+                const card = menuContainer.closest('.image-card');
+                if (card) {
+                    card.style.zIndex = '1002';
+                }
+            }
+        }
+
+        function closeAllMenus() {
+            document.querySelectorAll('.action-menu-dropdown.show').forEach(dropdown => {
+                dropdown.classList.remove('show');
+                const card = dropdown.closest('.image-card');
+                if (card) {
+                    card.style.zIndex = '';
+                }
+            });
+        }
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.action-menu-container')) {
+                closeAllMenus();
+            }
+        });
+
         // Upload functionality
         const uploadArea = document.getElementById('upload-area');
         const fileInput = document.getElementById('file-input');
@@ -286,13 +370,34 @@
                     card.className = 'image-card';
 
                     card.innerHTML = `
+                        <div class="action-menu-container">
+                            <button class="action-menu-button">⋮</button>
+                            <div class="action-menu-dropdown">
+                                <div class="menu-item menu-item-danger">Delete</div>
+                            </div>
+                        </div>
                         <img src="${image.url}" alt="${image.name}" loading="lazy">
                         <div class="card-info">
                             <div class="image-name">${image.name}</div>
                             <div class="image-size">${formatFileSize(image.size)}</div>
-                            <button class="action-button" onclick="deleteImage('${image.name}')">Delete</button>
                         </div>
                     `;
+
+                    // Add menu button click handler
+                    const menuButton = card.querySelector('.action-menu-button');
+                    const menuContainer = card.querySelector('.action-menu-container');
+                    menuButton.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        toggleMenu(menuContainer);
+                    });
+
+                    // Add delete menu item handler
+                    const deleteMenuItem = card.querySelector('.menu-item-danger');
+                    deleteMenuItem.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        closeAllMenus();
+                        deleteImage(image.name);
+                    });
 
                     grid.appendChild(card);
                 });
