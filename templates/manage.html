@@ -797,8 +797,8 @@
             <p style="color: #666; margin-bottom: 15px;">Organize your images into themes. Each theme has its own slideshow interval. The "All Images" theme shows all enabled images.</p>
 
             <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
-                <input type="text" id="new-theme-name" placeholder="Theme name" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; flex: 1;">
-                <button onclick="createTheme()" style="background: #4CAF50; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Create Theme</button>
+                <button id="show-create-theme-btn" style="background: #4CAF50; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Create Theme</button>
+                <input type="text" id="new-theme-name" placeholder="Theme name" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; flex: 1; display: none;">
             </div>
 
             <div style="margin-bottom: 15px;">
@@ -1539,6 +1539,7 @@
 
         async function createTheme() {
             const nameInput = document.getElementById('new-theme-name');
+            const createBtn = document.getElementById('show-create-theme-btn');
             const name = nameInput.value.trim();
 
             if (!name) {
@@ -1555,6 +1556,8 @@
 
                 if (response.ok) {
                     nameInput.value = '';
+                    nameInput.style.display = 'none';
+                    createBtn.style.display = 'block';
                     await loadThemes();
                     await loadImages(); // Reload to show theme selectors
                     showMessage(`Theme "${name}" created`, 'success');
@@ -1566,6 +1569,14 @@
                 console.error('Error creating theme:', error);
                 showMessage('Error creating theme', 'error');
             }
+        }
+
+        function hideCreateThemeInput() {
+            const nameInput = document.getElementById('new-theme-name');
+            const createBtn = document.getElementById('show-create-theme-btn');
+            nameInput.value = '';
+            nameInput.style.display = 'none';
+            createBtn.style.display = 'block';
         }
 
         async function saveThemeInterval(themeName) {
@@ -1889,6 +1900,33 @@
                         // Fallback: just navigate to /view without parameter
                         window.location.href = '/view';
                     });
+            });
+        }
+
+        // Handle "Create Theme" button and input
+        const showCreateThemeBtn = document.getElementById('show-create-theme-btn');
+        const newThemeNameInput = document.getElementById('new-theme-name');
+
+        if (showCreateThemeBtn && newThemeNameInput) {
+            // Show input when button is clicked
+            showCreateThemeBtn.addEventListener('click', function() {
+                showCreateThemeBtn.style.display = 'none';
+                newThemeNameInput.style.display = 'block';
+                newThemeNameInput.focus();
+            });
+
+            // Create theme on Enter key
+            newThemeNameInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    createTheme();
+                }
+            });
+
+            // Hide input on blur if empty
+            newThemeNameInput.addEventListener('blur', function() {
+                if (!newThemeNameInput.value.trim()) {
+                    hideCreateThemeInput();
+                }
             });
         }
 
