@@ -1,0 +1,21 @@
+[Unit]
+Description=Kiosk Firefox Display
+After=kiosk-display.service graphical.target
+Requires=kiosk-display.service
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=realo
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=/home/realo/.Xauthority"
+ExecStartPre=/bin/sleep 5
+ExecStartPre=/usr/bin/xset s off
+ExecStartPre=/usr/bin/xset -dpms
+ExecStartPre=/usr/bin/xset s noblank
+ExecStart=/bin/bash -c 'unclutter -idle 0.1 -root & firefox --kiosk http://localhost/view'
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=graphical.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=Kiosk Image Display Server
+After=network.target
+
+[Service]
+Type=simple
+User=realo
+WorkingDirectory=/home/realo/kiosk_images
+Environment="DISPLAY=:0"
+# Allow binding to port 80 without root
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+ExecStart=/home/realo/kiosk_images/venv/bin/python /home/realo/kiosk_images/app.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

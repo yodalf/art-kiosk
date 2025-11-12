@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiosk Display</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            cursor: none; /* Hide mouse cursor */
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: none; /* Hide mouse cursor */
+        }
+
+        #slideshow-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.8s ease-in-out;
+        }
+
+        .slide.no-transition {
+            transition: none;
+        }
+
+        .slide.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .slide img {
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            object-position: center;
+            /* Default: cover mode fills the screen, may crop edges slightly */
+            /* This maximizes screen usage for your 2560x2880 portrait display */
+        }
+
+        /* Alternative: contain mode shows full image with possible black bars */
+        .slide.contain-mode img {
+            max-width: 100vw;
+            max-height: 100vh;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+
+        #loading {
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="slideshow-container">
+        <div id="loading">Loading images...</div>
+    </div>
+
+    <script>
+        let images = [];
+        let currentIndex = 0;
+        let interval = {{ interval }} * 1000; // Convert to milliseconds (I)
+        let checkInterval = {{ check_interval }} * 1000; // Convert to milliseconds (C)
+        let slideTimer = null;
+        let fillMode = false; // false = cover mode (fills screen), true = contain mode (shows full image)
+        let previousImageVector = []; // VP - previous vector of enabled image names
+        let dissolveEnabled = {{ 'true' if dissolve_enabled else 'false' }}; // Dissolve transition enabled
+
+        // Debug logging function - sends to both console and server
+        async function debugLog(message, level = 'info') {
+            console.log(message);
+
+            try {
+                await fetch('/api/debug/log', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message, level })
+                });
+            } catch (error) {
+                // Silently fail if debug logging fails
+            }
+        }
+
+        // Get vector of image names from image objects
+        function getImageVector(imageList) {
+            return imageList.map(img => img.name).sort();
+        }
+
+        // Compare two vectors to see if they're different
+        function vectorsAreDifferent(v1, v2) {
+            if (v1.length !== v2.length) return true;
+            for (let i = 0; i < v1.length; i++) {
+                if (v1[i] !== v2[i]) return true;
+            }
+            return false;
+        }
+
+        // Fetch images from API
+        async function loadImages() {
+            try {
+                // Only fetch enabled images for the kiosk display
+                const response = await fetch('/api/images?enabled_only=true');
+                const newImages = await response.json();
+
+                if (newImages.length === 0) {
+                    document.getElementById('loading').textContent = 'No images enabled. Visit /manage to enable images.';
+                    return;
+                }
+
+                images = newImages;
+                previousImageVector = getImageVector(images); // Store current vector as VP
+
+                // Hide loading message
+                document.getElementById('loading').style.display = 'none';
+
+                // Create slides
+                initSlideshow();
+            } catch (error) {
+                console.error('Error loading images:', error);
+                document.getElementById('loading').textContent = 'Error loading images. Please refresh.';
+            }
+        }
+
+        // Check if enabled images or settings have changed
+        async function checkForImageChanges() {
+            try {
+                // Check for image changes
+                const imagesResponse = await fetch('/api/images?enabled_only=true');
+                const newImages = await imagesResponse.json();
+                const newVector = getImageVector(newImages); // V - new vector
+
+                // Check for settings changes
+                const settingsResponse = await fetch('/api/settings');
+                const settings = await settingsResponse.json();
+                const newInterval = settings.interval * 1000;
+                const newDissolveEnabled = settings.dissolve_enabled !== false; // Default to true
+
+                let needsReload = false;
+
+                // Check if images changed
+                if (vectorsAreDifferent(newVector, previousImageVector)) {
+                    await debugLog(`Enabled images changed!`, 'info');
+                    await debugLog(`Old vector (VP): [${previousImageVector.join(', ')}]`);
+                    await debugLog(`New vector (V): [${newVector.join(', ')}]`);
+                    needsReload = true;
+                }
+
+                // Check if interval changed
+                if (newInterval !== interval) {
+                    await debugLog(`Interval changed! ${interval / 1000}s -> ${newInterval / 1000}s`);
+                    interval = newInterval;
+                    needsReload = true;
+                }
+
+                // Check if dissolve setting changed
+                if (newDissolveEnabled !== dissolveEnabled) {
+                    await debugLog(`Dissolve effect ${newDissolveEnabled ? 'enabled' : 'disabled'}`);
+                    dissolveEnabled = newDissolveEnabled;
+                    updateDissolveEffect();
+                }
+
+                if (needsReload) {
+                    await debugLog('Reloading slideshow...', 'info');
+                    await reloadSlideshow();
+                }
+            } catch (error) {
+                console.error('Error checking for changes:', error);
+                await debugLog(`Error checking for changes: ${error.message}`, 'error');
+            }
+        }
+
+        // Reload slideshow with new images
+        async function reloadSlideshow() {
+            // Stop current slideshow
+            if (slideTimer) {
+                clearInterval(slideTimer);
+            }
+
+            // Clear existing slides
+            const container = document.getElementById('slideshow-container');
+            const slides = container.querySelectorAll('.slide');
+            slides.forEach(slide => slide.remove());
+
+            // Reload images
+            await loadImages();
+        }
+
+        // Update dissolve effect on all slides
+        function updateDissolveEffect() {
+            const slides = document.querySelectorAll('.slide');
+            slides.forEach(slide => {
+                if (dissolveEnabled) {
+                    slide.classList.remove('no-transition');
+                } else {
+                    slide.classList.add('no-transition');
+                }
+            });
+        }
+
+        // Initialize slideshow
+        function initSlideshow() {
+            const container = document.getElementById('slideshow-container');
+
+            // Create slide elements
+            images.forEach((image, index) => {
+                const slide = document.createElement('div');
+                slide.className = 'slide';
+                slide.dataset.index = index;
+
+                const img = document.createElement('img');
+                img.src = image.url;
+                img.alt = image.name;
+
+                slide.appendChild(img);
+                container.appendChild(slide);
+            });
+
+            // Show first image
+            showSlide(0);
+
+            // Apply dissolve effect setting
+            updateDissolveEffect();
+
+            // Start automatic slideshow
+            startSlideshow();
+        }
+
+        // Show specific slide
+        function showSlide(index) {
+            const slides = document.querySelectorAll('.slide');
+
+            // Hide all slides
+            slides.forEach(slide => {
+                slide.classList.remove('active');
+            });
+
+            // Show current slide
+            if (slides[index]) {
+                slides[index].classList.add('active');
+                currentIndex = index;
+            }
+        }
+
+        // Next slide
+        function nextSlide() {
+            currentIndex = (currentIndex + 1) % images.length;
+            showSlide(currentIndex);
+        }
+
+        // Previous slide
+        function prevSlide() {
+            currentIndex = (currentIndex - 1 + images.length) % images.length;
+            showSlide(currentIndex);
+        }
+
+        // Start automatic slideshow
+        function startSlideshow() {
+            if (slideTimer) {
+                clearInterval(slideTimer);
+            }
+
+            slideTimer = setInterval(nextSlide, interval);
+        }
+
+        // Toggle between cover (default, fills screen) and contain (shows full image)
+        function toggleFillMode() {
+            fillMode = !fillMode;
+            const slides = document.querySelectorAll('.slide');
+            slides.forEach(slide => {
+                if (fillMode) {
+                    slide.classList.add('contain-mode');
+                } else {
+                    slide.classList.remove('contain-mode');
+                }
+            });
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowRight':
+                case ' ':
+                    nextSlide();
+                    // Only restart timer if not paused
+                    if (!isPaused) {
+                        startSlideshow();
+                    }
+                    break;
+                case 'ArrowLeft':
+                    prevSlide();
+                    // Only restart timer if not paused
+                    if (!isPaused) {
+                        startSlideshow();
+                    }
+                    break;
+                case 'f':
+                case 'F':
+                    toggleFillMode();
+                    break;
+                case 'r':
+                case 'R':
+                    location.reload();
+                    break;
+            }
+        });
+
+        // Poll for remote control commands
+        let isPaused = false;
+
+        async function pollRemoteControl() {
+            try {
+                const response = await fetch('/api/control/poll');
+                const data = await response.json();
+
+                if (data.command) {
+                    executeCommand(data.command);
+                }
+            } catch (error) {
+                console.error('Error polling for commands:', error);
+            }
+        }
+
+        // Execute remote command
+        async function executeCommand(command) {
+            // Handle jump command (object with command and image_name)
+            if (typeof command === 'object' && command.command === 'jump') {
+                const imageName = command.image_name;
+                const imageIndex = images.findIndex(img => img.name === imageName);
+                if (imageIndex !== -1) {
+                    showSlide(imageIndex);
+                    // Restart slideshow if not paused
+                    if (!isPaused) {
+                        startSlideshow();
+                    }
+                }
+                return;
+            }
+
+            // Handle string commands
+            switch(command) {
+                case 'next':
+                    nextSlide();
+                    // Only restart slideshow if not paused
+                    if (!isPaused) {
+                        startSlideshow();
+                    }
+                    break;
+                case 'prev':
+                    prevSlide();
+                    // Only restart slideshow if not paused
+                    if (!isPaused) {
+                        startSlideshow();
+                    }
+                    break;
+                case 'pause':
+                    if (slideTimer) {
+                        clearInterval(slideTimer);
+                        slideTimer = null;
+                        isPaused = true;
+                    }
+                    break;
+                case 'play':
+                    isPaused = false;
+                    startSlideshow();
+                    break;
+                case 'reload':
+                    isPaused = false; // Resume playback on reload
+                    await reloadSlideshow();
+                    break;
+            }
+        }
+
+        // Send initial debug message
+        debugLog('Kiosk display starting... (I=' + (interval/1000) + 's, C=' + (checkInterval/1000) + 's)', 'info');
+
+        // Poll for commands every 500ms
+        setInterval(pollRemoteControl, 500);
+
+        // Check for enabled image changes every C seconds
+        setInterval(checkForImageChanges, checkInterval);
+
+        // Load images on page load
+        loadImages();
+    </script>
+</body>
+</html>

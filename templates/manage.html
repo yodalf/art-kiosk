@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiosk Image Management</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            color: #444;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            background: #fafafa;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: #4CAF50;
+            background: #f0f8f0;
+        }
+
+        .upload-area.dragging {
+            border-color: #4CAF50;
+            background: #e8f5e9;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .upload-button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+
+        .upload-button:hover {
+            background: #45a049;
+        }
+
+        .settings-form {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .settings-form label {
+            font-weight: 500;
+            color: #555;
+        }
+
+        .settings-form input[type="number"] {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 100px;
+        }
+
+        .settings-form input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .settings-form button {
+            background: #2196F3;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .settings-form button:hover {
+            background: #1976D2;
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .image-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+
+        .image-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .image-card.disabled {
+            opacity: 0.5;
+            border: 1px solid #ccc;
+        }
+
+        .image-card.disabled img {
+            filter: grayscale(100%);
+        }
+
+        .image-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: #f0f0f0;
+            cursor: pointer;
+            transition: transform 0.2s, filter 0.2s;
+        }
+
+        .image-card img:hover {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+        }
+
+        .image-checkbox-container {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            z-index: 10;
+        }
+
+        .image-checkbox-container label {
+            font-size: 12px;
+            font-weight: 500;
+            color: #333;
+            cursor: pointer;
+            margin: 0;
+        }
+
+        .image-checkbox-container input[type="checkbox"] {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+
+        .image-card-info {
+            padding: 12px;
+        }
+
+        .image-card-name {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 8px;
+            word-break: break-all;
+        }
+
+        .image-card-size {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 12px;
+        }
+
+        .delete-button {
+            background: #f44336;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            width: 100%;
+        }
+
+        .delete-button:hover {
+            background: #d32f2f;
+        }
+
+        .message {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .message.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
+        }
+
+        .message.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+        }
+
+        .message.visible {
+            display: block;
+        }
+
+        .links {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .links a {
+            color: #2196F3;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .links a:hover {
+            text-decoration: underline;
+        }
+
+        .stats {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .stats-item {
+            display: inline-block;
+            margin-right: 30px;
+            color: #1565c0;
+        }
+
+        .stats-item strong {
+            color: #0d47a1;
+        }
+
+        .remote-control {
+            background: #fff3e0;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #ff9800;
+            margin-bottom: 20px;
+        }
+
+        .remote-control h3 {
+            color: #e65100;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .control-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .control-button {
+            background: #ff9800;
+            color: white;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .control-button:hover {
+            background: #f57c00;
+        }
+
+        .control-button:active {
+            transform: scale(0.95);
+        }
+
+        .control-button.danger {
+            background: #f44336;
+        }
+
+        .control-button.danger:hover {
+            background: #d32f2f;
+        }
+
+        .control-button.success {
+            background: #4CAF50;
+        }
+
+        .control-button.success:hover {
+            background: #45a049;
+        }
+
+        .control-button-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .led-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+            transition: background 0.3s;
+        }
+
+        .led-indicator.active {
+            background: #2196F3;
+            box-shadow: 0 0 8px #2196F3;
+        }
+
+        .debug-panel {
+            background: #f5f5f5;
+            border: 2px solid #9e9e9e;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .debug-panel h3 {
+            color: #424242;
+            margin-bottom: 15px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .debug-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .debug-toggle label {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .debug-toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .debug-console {
+            background: #263238;
+            color: #aed581;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 15px;
+            border-radius: 4px;
+            height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .debug-console-line {
+            margin-bottom: 4px;
+            word-wrap: break-word;
+        }
+
+        .debug-console-line.error {
+            color: #ef5350;
+        }
+
+        .debug-console-line.info {
+            color: #81c784;
+        }
+
+        .debug-timestamp {
+            color: #78909c;
+            margin-right: 8px;
+        }
+
+        .debug-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .debug-button {
+            background: #757575;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .debug-button:hover {
+            background: #616161;
+        }
+
+        .debug-panel.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .theme-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #e3f2fd;
+            border: 1px solid #2196F3;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #1565c0;
+        }
+
+        .theme-badge button {
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 2px 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .theme-badge button:hover {
+            background: #d32f2f;
+        }
+
+        .image-themes {
+            margin-top: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .image-theme-tag {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #e3f2fd;
+            color: #1565c0;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+
+        .theme-selector {
+            margin-top: 8px;
+        }
+
+        .theme-selector select {
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 12px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Kiosk Image Management</h1>
+        <p class="subtitle">Upload and manage images for your kiosk display</p>
+
+        <div class="links">
+            <a href="/" target="_blank">View Kiosk Display</a>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <div class="stats">
+            <span class="stats-item"><strong>Total Images:</strong> <span id="total-count">0</span></span>
+            <span class="stats-item"><strong>Total Size:</strong> <span id="total-size">0 KB</span></span>
+        </div>
+
+        <div class="remote-control">
+            <h3>🎮 Remote Control - Control the Kiosk Display</h3>
+            <div class="control-buttons">
+                <div class="control-button-wrapper">
+                    <button class="control-button success" onclick="sendCommand('play')">▶️ Play</button>
+                    <div class="led-indicator" id="led-play"></div>
+                </div>
+                <div class="control-button-wrapper">
+                    <button class="control-button danger" onclick="sendCommand('pause')">⏸️ Pause</button>
+                    <div class="led-indicator" id="led-pause"></div>
+                </div>
+                <div class="control-button-wrapper">
+                    <button class="control-button" onclick="sendCommand('reload')">🔃 Reload</button>
+                    <div class="led-indicator" id="led-reload"></div>
+                </div>
+                <div class="control-button-wrapper">
+                    <button class="control-button" onclick="sendCommand('prev')">⬅️ Previous</button>
+                    <div class="led-indicator" id="led-prev"></div>
+                </div>
+                <div class="control-button-wrapper">
+                    <button class="control-button" onclick="sendCommand('next')">➡️ Next</button>
+                    <div class="led-indicator" id="led-next"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Settings</h2>
+            <div class="settings-form">
+                <label for="interval">Slideshow Interval (seconds):</label>
+                <input type="number" id="interval" min="1" max="300" value="10">
+                <button onclick="saveSettings()">Save Settings</button>
+            </div>
+            <div class="settings-form">
+                <input type="checkbox" id="dissolve-enabled" checked>
+                <label for="dissolve-enabled">Enable dissolve transition between images</label>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Themes</h2>
+            <p style="color: #666; margin-bottom: 15px;">Organize your images into themes. Select a theme to display only those images.</p>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
+                <input type="text" id="new-theme-name" placeholder="Theme name" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; flex: 1;">
+                <button onclick="createTheme()" style="background: #4CAF50; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Create Theme</button>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <strong>Active Theme:</strong>
+                <select id="active-theme-select" onchange="setActiveTheme()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; margin-left: 10px;">
+                    <option value="">All Images</option>
+                </select>
+            </div>
+
+            <div id="themes-list" style="display: flex; flex-wrap: wrap; gap: 10px;">
+                <!-- Themes will be loaded here -->
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Current Images</h2>
+            <div class="image-grid" id="image-grid">
+                <p style="color: #999;">Loading images...</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Upload Images</h2>
+            <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+                <p style="font-size: 18px; color: #666; margin-bottom: 10px;">
+                    Drag and drop images here or click to select
+                </p>
+                <p style="font-size: 14px; color: #999;">
+                    Supported formats: PNG, JPG, JPEG, GIF, WebP, BMP
+                </p>
+                <input type="file" id="file-input" accept="image/*" multiple>
+                <button class="upload-button" onclick="event.stopPropagation(); document.getElementById('file-input').click()">
+                    Choose Files
+                </button>
+            </div>
+        </div>
+
+        <div class="debug-panel" id="debug-panel">
+            <h3>
+                🐛 Debug Console - Kiosk Display Logs
+                <div class="debug-toggle">
+                    <input type="checkbox" id="debug-enabled" onchange="toggleDebug()">
+                    <label for="debug-enabled">Enable</label>
+                </div>
+            </h3>
+            <div class="debug-console" id="debug-console">
+                <div class="debug-console-line">Debug console disabled. Enable to see live logs from the kiosk display.</div>
+            </div>
+            <div class="debug-controls">
+                <button class="debug-button" onclick="clearDebugConsole()">Clear Console</button>
+                <button class="debug-button" onclick="refreshDebugConsole()">Refresh Now</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Debug console state
+        let debugEnabled = false;
+        let debugPollInterval = null;
+
+        // Toggle debug console
+        function toggleDebug() {
+            debugEnabled = document.getElementById('debug-enabled').checked;
+
+            if (debugEnabled) {
+                // Start polling for debug messages
+                refreshDebugConsole();
+                debugPollInterval = setInterval(refreshDebugConsole, 1000); // Poll every second
+                document.getElementById('debug-panel').classList.remove('disabled');
+            } else {
+                // Stop polling
+                if (debugPollInterval) {
+                    clearInterval(debugPollInterval);
+                    debugPollInterval = null;
+                }
+                const console = document.getElementById('debug-console');
+                console.innerHTML = '<div class="debug-console-line">Debug console disabled. Enable to see live logs from the kiosk display.</div>';
+            }
+        }
+
+        // Refresh debug console with latest messages
+        async function refreshDebugConsole() {
+            if (!debugEnabled) return;
+
+            try {
+                const response = await fetch('/api/debug/messages');
+                const messages = await response.json();
+
+                const console = document.getElementById('debug-console');
+                console.innerHTML = '';
+
+                if (messages.length === 0) {
+                    console.innerHTML = '<div class="debug-console-line">No debug messages yet. Waiting for kiosk activity...</div>';
+                    return;
+                }
+
+                messages.forEach(msg => {
+                    const line = document.createElement('div');
+                    line.className = `debug-console-line ${msg.level}`;
+
+                    const timestamp = new Date(msg.timestamp * 1000).toLocaleTimeString();
+                    const timestampSpan = document.createElement('span');
+                    timestampSpan.className = 'debug-timestamp';
+                    timestampSpan.textContent = `[${timestamp}]`;
+
+                    line.appendChild(timestampSpan);
+                    line.appendChild(document.createTextNode(msg.message));
+
+                    console.appendChild(line);
+                });
+
+                // Auto-scroll to bottom
+                console.scrollTop = console.scrollHeight;
+            } catch (error) {
+                console.error('Error fetching debug messages:', error);
+            }
+        }
+
+        // Clear debug console
+        async function clearDebugConsole() {
+            try {
+                await fetch('/api/debug/clear', { method: 'POST' });
+                const console = document.getElementById('debug-console');
+                console.innerHTML = '<div class="debug-console-line">Console cleared.</div>';
+            } catch (error) {
+                console.error('Error clearing debug console:', error);
+            }
+        }
+
+        // Load current settings
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/settings');
+                const settings = await response.json();
+                document.getElementById('interval').value = settings.interval || 10;
+                document.getElementById('dissolve-enabled').checked = settings.dissolve_enabled !== false; // Default to true
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+
+        // Save settings
+        async function saveSettings() {
+            const interval = parseInt(document.getElementById('interval').value);
+            const dissolveEnabled = document.getElementById('dissolve-enabled').checked;
+
+            try {
+                // First, fetch current settings to preserve enabled_images
+                const getResponse = await fetch('/api/settings');
+                const currentSettings = await getResponse.json();
+
+                // Update settings
+                currentSettings.interval = interval;
+                currentSettings.dissolve_enabled = dissolveEnabled;
+
+                // Save back the complete settings
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(currentSettings)
+                });
+
+                if (!response.ok) {
+                    showMessage('Error saving settings', 'error');
+                }
+                // Success - no message shown
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                showMessage('Error saving settings', 'error');
+            }
+        }
+
+        // Track current playback state
+        let isPlaying = true; // Assume playing by default
+
+        // Update LED indicators
+        function updateLEDs() {
+            // Update play/pause LEDs
+            if (isPlaying) {
+                document.getElementById('led-play').classList.add('active');
+                document.getElementById('led-pause').classList.remove('active');
+            } else {
+                document.getElementById('led-play').classList.remove('active');
+                document.getElementById('led-pause').classList.add('active');
+            }
+        }
+
+        // Flash LED briefly for action buttons
+        function flashLED(ledId) {
+            const led = document.getElementById(ledId);
+            led.classList.add('active');
+            setTimeout(() => {
+                led.classList.remove('active');
+            }, 500);
+        }
+
+        // Send remote control command
+        async function sendCommand(command) {
+            try {
+                const response = await fetch('/api/control/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ command })
+                });
+
+                if (!response.ok) {
+                    showMessage('Error sending command', 'error');
+                    return;
+                }
+
+                // Update LED indicators based on command
+                switch(command) {
+                    case 'play':
+                        isPlaying = true;
+                        updateLEDs();
+                        break;
+                    case 'pause':
+                        isPlaying = false;
+                        updateLEDs();
+                        break;
+                    case 'prev':
+                        flashLED('led-prev');
+                        break;
+                    case 'next':
+                        flashLED('led-next');
+                        break;
+                    case 'reload':
+                        isPlaying = true; // Reload resumes playback
+                        updateLEDs();
+                        flashLED('led-reload');
+                        break;
+                }
+            } catch (error) {
+                console.error('Error sending command:', error);
+                showMessage('Error sending command', 'error');
+            }
+        }
+
+        // Jump to specific image in kiosk display
+        async function jumpToImage(imageName) {
+            try {
+                const response = await fetch('/api/control/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ command: 'jump', image_name: imageName })
+                });
+
+                if (!response.ok) {
+                    showMessage('Error jumping to image', 'error');
+                }
+                // Success - no message shown
+            } catch (error) {
+                console.error('Error jumping to image:', error);
+                showMessage('Error jumping to image', 'error');
+            }
+        }
+
+        // Load and display images
+        async function loadImages() {
+            try {
+                const response = await fetch('/api/images');
+                const images = await response.json();
+
+                const grid = document.getElementById('image-grid');
+                grid.innerHTML = '';
+
+                if (images.length === 0) {
+                    grid.innerHTML = '<p style="color: #999;">No images uploaded yet</p>';
+                    updateStats(0, 0);
+                    return;
+                }
+
+                let totalSize = 0;
+                images.forEach(image => {
+                    totalSize += image.size;
+                    const card = createImageCard(image);
+                    grid.appendChild(card);
+                });
+
+                updateStats(images.length, totalSize);
+            } catch (error) {
+                console.error('Error loading images:', error);
+                showMessage('Error loading images', 'error');
+            }
+        }
+
+        // Create image card element
+        function createImageCard(image) {
+            const card = document.createElement('div');
+            card.className = 'image-card';
+            if (!image.enabled) {
+                card.classList.add('disabled');
+            }
+
+            const img = document.createElement('img');
+            img.src = image.url;
+            img.alt = image.name;
+            img.style.cursor = 'pointer';
+            img.onclick = () => jumpToImage(image.name);
+            img.title = 'Click to jump to this image in the kiosk display';
+
+            // Create checkbox container
+            const checkboxContainer = document.createElement('div');
+            checkboxContainer.className = 'image-checkbox-container';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = image.enabled;
+            checkbox.id = `enable-${image.name}`;
+            checkbox.onchange = () => toggleImageEnabled(image.name, checkbox.checked, card);
+
+            const label = document.createElement('label');
+            label.htmlFor = `enable-${image.name}`;
+            label.textContent = 'Show';
+
+            checkboxContainer.appendChild(checkbox);
+            checkboxContainer.appendChild(label);
+
+            const info = document.createElement('div');
+            info.className = 'image-card-info';
+
+            // Theme tags
+            const themesDiv = document.createElement('div');
+            themesDiv.className = 'image-themes';
+            (image.themes || []).forEach(themeName => {
+                const tag = document.createElement('span');
+                tag.className = 'image-theme-tag';
+                tag.style.cursor = 'pointer';
+                tag.title = 'Click to remove from theme';
+                tag.textContent = themeName + ' ✕';
+                tag.onclick = async () => {
+                    const newThemes = (image.themes || []).filter(t => t !== themeName);
+                    await updateImageThemes(image.name, newThemes);
+                    await loadImages();
+                };
+                themesDiv.appendChild(tag);
+            });
+
+            // Theme selector
+            if (Object.keys(availableThemes).length > 0) {
+                const themeSelector = document.createElement('div');
+                themeSelector.className = 'theme-selector';
+
+                const select = document.createElement('select');
+                select.innerHTML = '<option value="">Add to theme...</option>';
+                for (const themeName in availableThemes) {
+                    if (!(image.themes || []).includes(themeName)) {
+                        const option = document.createElement('option');
+                        option.value = themeName;
+                        option.textContent = themeName;
+                        select.appendChild(option);
+                    }
+                }
+                select.onchange = async (e) => {
+                    const themeName = e.target.value;
+                    if (themeName) {
+                        const newThemes = [...(image.themes || []), themeName];
+                        await updateImageThemes(image.name, newThemes);
+                        await loadImages();
+                    }
+                };
+                themeSelector.appendChild(select);
+                info.appendChild(themeSelector);
+            }
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-button';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.onclick = () => deleteImage(image.name);
+
+            info.appendChild(themesDiv);
+            info.appendChild(deleteBtn);
+
+            card.appendChild(checkboxContainer);
+            card.appendChild(img);
+            card.appendChild(info);
+
+            return card;
+        }
+
+        // Delete image
+        async function deleteImage(filename) {
+            if (!confirm(`Delete ${filename}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/images/${encodeURIComponent(filename)}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showMessage('Image deleted successfully', 'success');
+                    loadImages();
+                } else {
+                    showMessage('Error deleting image', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting image:', error);
+                showMessage('Error deleting image', 'error');
+            }
+        }
+
+        // Toggle image enabled state
+        async function toggleImageEnabled(filename, enabled, cardElement) {
+            try {
+                const response = await fetch(`/api/images/${encodeURIComponent(filename)}/toggle`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ enabled })
+                });
+
+                if (response.ok) {
+                    // Update visual state immediately
+                    if (enabled) {
+                        cardElement.classList.remove('disabled');
+                    } else {
+                        cardElement.classList.add('disabled');
+                    }
+                } else {
+                    showMessage('Error updating image state', 'error');
+                }
+            } catch (error) {
+                console.error('Error toggling image:', error);
+                showMessage('Error updating image state', 'error');
+            }
+        }
+
+        // Upload images
+        async function uploadFiles(files) {
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetch('/api/images', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        showMessage(`${file.name} uploaded successfully`, 'success');
+                    } else {
+                        const error = await response.json();
+                        showMessage(`Error uploading ${file.name}: ${error.error}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error uploading file:', error);
+                    showMessage(`Error uploading ${file.name}`, 'error');
+                }
+            }
+
+            loadImages();
+        }
+
+        // Show message
+        function showMessage(text, type) {
+            const message = document.getElementById('message');
+            message.textContent = text;
+            message.className = `message ${type} visible`;
+
+            setTimeout(() => {
+                message.classList.remove('visible');
+            }, 3000);
+        }
+
+        // Format bytes
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // Update stats
+        function updateStats(count, size) {
+            document.getElementById('total-count').textContent = count;
+            document.getElementById('total-size').textContent = formatBytes(size);
+        }
+
+        // File input change handler
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                uploadFiles(files);
+            }
+            e.target.value = ''; // Reset input
+        });
+
+        // Drag and drop handlers
+        const uploadArea = document.getElementById('upload-area');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragging');
+        });
+
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragging');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragging');
+
+            const files = Array.from(e.dataTransfer.files).filter(file =>
+                file.type.startsWith('image/')
+            );
+
+            if (files.length > 0) {
+                uploadFiles(files);
+            }
+        });
+
+        // Theme management functions
+        let availableThemes = {};
+        let activeTheme = null;
+
+        async function loadThemes() {
+            try {
+                const response = await fetch('/api/themes');
+                const data = await response.json();
+                availableThemes = data.themes;
+                activeTheme = data.active_theme;
+
+                // Update themes list
+                const themesList = document.getElementById('themes-list');
+                themesList.innerHTML = '';
+
+                for (const themeName in availableThemes) {
+                    const badge = document.createElement('div');
+                    badge.className = 'theme-badge';
+                    badge.innerHTML = `
+                        <span>${themeName}</span>
+                        <button onclick="deleteTheme('${themeName}')">Delete</button>
+                    `;
+                    themesList.appendChild(badge);
+                }
+
+                // Update active theme dropdown
+                const select = document.getElementById('active-theme-select');
+                select.innerHTML = '<option value="">All Images</option>';
+                for (const themeName in availableThemes) {
+                    const option = document.createElement('option');
+                    option.value = themeName;
+                    option.textContent = themeName;
+                    if (themeName === activeTheme) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                }
+            } catch (error) {
+                console.error('Error loading themes:', error);
+            }
+        }
+
+        async function createTheme() {
+            const nameInput = document.getElementById('new-theme-name');
+            const name = nameInput.value.trim();
+
+            if (!name) {
+                showMessage('Please enter a theme name', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/themes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+
+                if (response.ok) {
+                    nameInput.value = '';
+                    await loadThemes();
+                    await loadImages(); // Reload to show theme selectors
+                    showMessage(`Theme "${name}" created`, 'success');
+                } else {
+                    const error = await response.json();
+                    showMessage(error.error || 'Error creating theme', 'error');
+                }
+            } catch (error) {
+                console.error('Error creating theme:', error);
+                showMessage('Error creating theme', 'error');
+            }
+        }
+
+        async function deleteTheme(themeName) {
+            if (!confirm(`Delete theme "${themeName}"? This will remove it from all images.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/themes/${encodeURIComponent(themeName)}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    await loadThemes();
+                    await loadImages(); // Reload to update image cards
+                    showMessage(`Theme "${themeName}" deleted`, 'success');
+                } else {
+                    showMessage('Error deleting theme', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting theme:', error);
+                showMessage('Error deleting theme', 'error');
+            }
+        }
+
+        async function setActiveTheme() {
+            const select = document.getElementById('active-theme-select');
+            const themeName = select.value || null;
+
+            try {
+                const response = await fetch('/api/themes/active', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ theme_name: themeName })
+                });
+
+                if (response.ok) {
+                    activeTheme = themeName;
+                    // No message shown - change takes effect automatically
+                } else {
+                    showMessage('Error setting active theme', 'error');
+                }
+            } catch (error) {
+                console.error('Error setting active theme:', error);
+                showMessage('Error setting active theme', 'error');
+            }
+        }
+
+        async function updateImageThemes(imageName, themes) {
+            try {
+                const response = await fetch(`/api/images/${encodeURIComponent(imageName)}/themes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ themes })
+                });
+
+                if (!response.ok) {
+                    showMessage('Error updating image themes', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating image themes:', error);
+                showMessage('Error updating image themes', 'error');
+            }
+        }
+
+        // Load data on page load
+        loadSettings();
+        loadThemes();
+        loadImages();
+        updateLEDs(); // Initialize LED indicators
+    </script>
+</body>
+</html>
