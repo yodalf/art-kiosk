@@ -308,6 +308,13 @@
                 // Get viewport dimensions (use container dimensions since it should be 100vw x 100vh)
                 const viewportW = container.clientWidth;
                 const viewportH = container.clientHeight;
+
+                // Check if container has valid dimensions
+                if (viewportW === 0 || viewportH === 0) {
+                    debugLog(`ERROR: Container has zero dimensions (${viewportW}x${viewportH}) - cannot apply crop`, 'error');
+                    return;
+                }
+
                 const viewportAspect = viewportW / viewportH;
 
                 // Get crop dimensions from saved data
@@ -390,6 +397,20 @@
             if (slides[index]) {
                 slides[index].classList.add('active');
                 currentIndex = index;
+
+                // Check if this slide has a cropped image and reapply crop
+                const cropContainer = slides[index].querySelector('div[style*="overflow: hidden"]');
+                if (cropContainer) {
+                    const img = cropContainer.querySelector('img');
+                    const imageName = img.alt;
+                    const cropData = imageCrops[imageName];
+
+                    if (cropData) {
+                        debugLog(`Reapplying crop for ${imageName} when showing slide`, 'info');
+                        // Reapply the crop now that the slide is active and has dimensions
+                        applyCrop(img, cropContainer, cropData);
+                    }
+                }
             }
         }
 
