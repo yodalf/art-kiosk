@@ -10,24 +10,24 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi 5 wi
 ┌─────────────────────────────────────────────────────────────┐
 │                     Raspberry Pi 5                          │
 │                                                             │
-│  ┌──────────────┐         ┌─────────────────┐             │
-│  │   Flask      │◄────────┤  Firefox        │             │
-│  │   Server     │         │  (Kiosk Mode)   │             │
-│  │  (Port 80)   │         │  /view          │             │
-│  │              │         └─────────────────┘             │
-│  │   app.py     │                                          │
-│  │              │         ┌─────────────────┐             │
-│  │   REST API   │◄────────┤  Management     │             │
-│  │              │         │  Interface      │             │
-│  │   Settings   │         │  (Any Browser)  │             │
-│  │   Storage    │         │  /              │             │
-│  └──────────────┘         └─────────────────┘             │
+│  ┌──────────────┐         ┌─────────────────┐               │
+│  │   Flask      │◄────────┤  Firefox        │               │
+│  │   Server     │         │  (Kiosk Mode)   │               │
+│  │  (Port 80)   │         │  /view          │               │
+│  │              │         └─────────────────┘               │
+│  │   app.py     │                                           │
+│  │              │         ┌─────────────────┐               │
+│  │   REST API   │◄────────┤  Management     │               │
+│  │              │         │  Interface      │               │
+│  │   Settings   │         │  (Any Browser)  │               │
+│  │   Storage    │         │  /              │               │
+│  └──────────────┘         └─────────────────┘               │
 │         ▲                                                   │
 │         │                                                   │
-│  ┌──────┴─────────┐                                        │
-│  │  settings.json  │                                       │
-│  │  images/        │                                       │
-│  └────────────────┘                                        │
+│  ┌──────┴─────────┐                                         │
+│  │  settings.json  │                                        │
+│  │  images/        │                                        │
+│  └────────────────┘                                         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -66,13 +66,13 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi 5 wi
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Kiosk Display (kiosk.html)                             │
-│                                                          │
+│                                                         │
 │  ┌────────────────────────────────────────────┐         │
 │  │  Poll Loop (every 500ms)                   │         │
 │  │  - Check for remote commands               │         │
 │  │  - Execute: next, prev, pause, play, jump  │         │
 │  └────────────────────────────────────────────┘         │
-│                                                          │
+│                                                         │
 │  ┌────────────────────────────────────────────┐         │
 │  │  Check Loop (every 2 seconds - C interval) │         │
 │  │  - Fetch enabled images (V)                │         │
@@ -81,7 +81,7 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi 5 wi
 │  │  - Check dissolve setting                  │         │
 │  │  - Reload if changed                       │         │
 │  └────────────────────────────────────────────┘         │
-│                                                          │
+│                                                         │
 │  ┌────────────────────────────────────────────┐         │
 │  │  Slideshow Timer (every I seconds)         │         │
 │  │  - Advance to next image                   │         │
