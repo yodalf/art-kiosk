@@ -94,8 +94,8 @@
 
         .image-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            gap: 10px;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
             margin-top: 20px;
         }
 
@@ -136,7 +136,7 @@
 
         .image-card img {
             width: 100%;
-            height: 100px;
+            height: 200px;
             object-fit: cover;
             background: #f0f0f0;
             cursor: pointer;
@@ -1077,7 +1077,7 @@
         // Apply crop to thumbnail image
         function applyCropToThumbnail(img, container, cropData) {
             const containerW = container.clientWidth;
-            const containerH = container.clientHeight; // 100px
+            const containerH = container.clientHeight; // 200px
 
             const cropX = cropData.x;
             const cropY = cropData.y;
@@ -1130,7 +1130,7 @@
             if (cropData) {
                 const cropContainer = document.createElement('div');
                 cropContainer.style.width = '100%';
-                cropContainer.style.height = '100px';
+                cropContainer.style.height = '200px';
                 cropContainer.style.overflow = 'hidden';
                 cropContainer.style.position = 'relative';
                 cropContainer.style.background = '#f0f0f0';
