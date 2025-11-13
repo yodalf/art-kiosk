@@ -138,24 +138,8 @@
             height: 200px;
             object-fit: cover;
             display: block;
-            border-radius: 8px 8px 0 0;
+            border-radius: 8px;
             overflow: hidden;
-        }
-
-        .card-info {
-            padding: 12px;
-        }
-
-        .image-name {
-            font-weight: 500;
-            color: #333;
-            margin-bottom: 5px;
-            word-break: break-word;
-        }
-
-        .image-size {
-            color: #999;
-            font-size: 12px;
         }
 
         /* Action menu styles */
@@ -553,10 +537,6 @@
                             </div>
                         </div>
                         <img src="${image.url}" alt="${image.name}" loading="lazy">
-                        <div class="card-info">
-                            <div class="image-name">${image.name}</div>
-                            <div class="image-size">${formatFileSize(image.size)}</div>
-                        </div>
                     `;
 
                     // Add menu button click handler
