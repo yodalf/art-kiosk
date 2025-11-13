@@ -609,30 +609,33 @@
 
         /* Action menu styles */
         .action-menu-container {
-            position: relative;
-            margin-top: 8px;
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            z-index: 10;
         }
 
         .action-menu-button {
-            background: #f5f5f5;
+            background: rgba(255, 255, 255, 0.9);
             border: 1px solid #ddd;
             border-radius: 4px;
-            padding: 4px 12px;
-            font-size: 20px;
+            padding: 4px 8px;
+            font-size: 18px;
             line-height: 1;
             cursor: pointer;
-            width: 100%;
+            color: #666;
             transition: background 0.2s;
         }
 
         .action-menu-button:hover {
-            background: #e0e0e0;
+            background: white;
+            color: #333;
         }
 
         .action-menu-dropdown {
             position: absolute;
             bottom: 100%;
-            right: 0;
+            left: 0;
             margin-bottom: 4px;
             background: white;
             border: 1px solid #ddd;
@@ -1282,8 +1285,8 @@
             menuContainer.appendChild(menuDropdown);
 
             info.appendChild(themesDiv);
-            info.appendChild(menuContainer);
 
+            card.appendChild(menuContainer);
             card.appendChild(checkboxContainer);
             // Image or crop container already appended above
             card.appendChild(info);
