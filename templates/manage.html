@@ -2163,6 +2163,10 @@
         async function updateLEDs() {
             try {
                 const response = await fetch('/api/kiosk/current-image');
+                if (!response.ok) {
+                    console.warn('Failed to fetch current image');
+                    return;
+                }
                 const data = await response.json();
                 const currentImage = data.current_image;
 
@@ -2184,10 +2188,14 @@
         setInterval(updateLEDs, 1000);
 
         // Load data on page load
-        loadAtmospheres();
-        loadThemes();
-        loadImages();
-        updateLEDs(); // Initialize LED indicators
+        async function initializePage() {
+            await loadAtmospheres();
+            await loadThemes();
+            await loadImages();
+            updateLEDs(); // Initialize LED indicators after images are loaded
+        }
+
+        initializePage();
     </script>
 
     <!-- Crop Modal -->
