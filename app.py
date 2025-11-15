@@ -330,6 +330,24 @@ def poll_command():
         return jsonify({'command': None})
 
 
+@app.route('/api/kiosk/current-image', methods=['POST'])
+def update_current_image():
+    """Update the current image being displayed on kiosk."""
+    global current_kiosk_image
+
+    data = request.json
+    image_name = data.get('image_name')
+
+    current_kiosk_image = image_name
+    return jsonify({'success': True})
+
+
+@app.route('/api/kiosk/current-image', methods=['GET'])
+def get_current_image():
+    """Get the current image being displayed on kiosk."""
+    return jsonify({'current_image': current_kiosk_image})
+
+
 @app.route('/api/debug/log', methods=['POST'])
 def log_debug():
     """Receive debug message from kiosk."""

@@ -155,6 +155,26 @@
             filter: brightness(1.1);
         }
 
+        /* Blue LED indicator for currently displayed image */
+        .current-image-led {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            width: 12px;
+            height: 12px;
+            background: #2196F3;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(33, 150, 243, 0.8), 0 0 16px rgba(33, 150, 243, 0.4);
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .current-image-led.active {
+            opacity: 1;
+        }
+
         .image-checkbox-container {
             position: absolute;
             top: 10px;
@@ -1302,6 +1322,12 @@
             // Image or crop container already appended above
             card.appendChild(info);
 
+            // Add blue LED indicator for current image
+            const led = document.createElement('div');
+            led.className = 'current-image-led';
+            led.dataset.imageName = image.name;
+            card.appendChild(led);
+
             return card;
         }
 
@@ -2132,6 +2158,30 @@
                 }
             });
         }
+
+        // Update LED indicators based on current kiosk image
+        async function updateLEDs() {
+            try {
+                const response = await fetch('/api/kiosk/current-image');
+                const data = await response.json();
+                const currentImage = data.current_image;
+
+                // Update all LED indicators
+                const allLEDs = document.querySelectorAll('.current-image-led');
+                allLEDs.forEach(led => {
+                    if (led.dataset.imageName === currentImage) {
+                        led.classList.add('active');
+                    } else {
+                        led.classList.remove('active');
+                    }
+                });
+            } catch (error) {
+                console.error('Error updating LED indicators:', error);
+            }
+        }
+
+        // Poll for current image every 1 second
+        setInterval(updateLEDs, 1000);
 
         // Load data on page load
         loadAtmospheres();
