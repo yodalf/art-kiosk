@@ -773,6 +773,17 @@
         <div class="section">
             <div style="border-bottom: 2px solid #e0e0e0; margin-bottom: 15px;"></div>
 
+            <h3 style="margin-bottom: 15px; color: #333;">Atmospheres</h3>
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
+                <button id="show-create-atmosphere-btn" style="background: #9C27B0; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">New Atmosphere</button>
+                <input type="text" id="new-atmosphere-name" placeholder="Atmosphere name" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; flex: 1; display: none;">
+            </div>
+
+            <div id="atmospheres-list" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 30px;">
+                <!-- Atmospheres will be loaded here -->
+            </div>
+
+            <h3 style="margin-bottom: 15px; color: #333;">Themes</h3>
             <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
                 <a href="/upload" target="_blank" style="display: inline-block; background: #4CAF50; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px;">File Upload</a>
                 <button id="show-create-theme-btn" style="background: #4CAF50; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">New Theme</button>
@@ -1354,6 +1365,274 @@
             }, 3000);
         }
 
+        // Atmosphere management functions
+        let availableAtmospheres = {};
+        let activeAtmosphere = null;
+        let atmosphereThemes = {};
+
+        async function loadAtmospheres() {
+            try {
+                const response = await fetch('/api/atmospheres');
+                const data = await response.json();
+                availableAtmospheres = data.atmospheres;
+                activeAtmosphere = data.active_atmosphere;
+                atmosphereThemes = data.atmosphere_themes;
+
+                // Update atmospheres list
+                const atmospheresList = document.getElementById('atmospheres-list');
+                atmospheresList.innerHTML = '';
+
+                for (const atmosphereName in availableAtmospheres) {
+                    const atmosphere = availableAtmospheres[atmosphereName];
+                    const intervalMinutes = (atmosphere.interval || 3600) / 60;
+                    const themesInAtmosphere = atmosphereThemes[atmosphereName] || [];
+
+                    const badge = document.createElement('div');
+                    badge.className = 'theme-badge';
+                    if (atmosphereName === activeAtmosphere) {
+                        badge.classList.add('active');
+                    }
+
+                    badge.innerHTML = `
+                        <span class="theme-name" data-atmosphere="${atmosphereName}">${atmosphereName}</span>
+                        <div style="font-size: 11px; color: #666; margin-top: 3px;">${themesInAtmosphere.length} theme(s)</div>
+                        <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;">
+                            <button class="interval-display-btn" data-atmosphere="${atmosphereName}" style="padding: 6px 12px; font-size: 12px; background: #f5f5f5; color: #333; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                                ${intervalMinutes} min
+                            </button>
+                            <input type="number" class="interval-input" data-atmosphere="${atmosphereName}" value="${intervalMinutes}" min="1" max="1440" step="0.5" style="width: 80px; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; display: none;">
+                            <button onclick="editAtmosphereThemes('${atmosphereName}')" style="padding: 6px 12px; font-size: 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Themes</button>
+                            <button onclick="deleteAtmosphere('${atmosphereName}')" style="padding: 6px 12px; font-size: 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
+                        </div>
+                    `;
+
+                    // Add click handler for atmosphere name to activate atmosphere
+                    const atmosphereNameSpan = badge.querySelector('.theme-name');
+                    atmosphereNameSpan.addEventListener('click', () => {
+                        setActiveAtmosphere(atmosphereName);
+                    });
+
+                    // Add click handler for interval button
+                    const intervalBtn = badge.querySelector('.interval-display-btn');
+                    const intervalInput = badge.querySelector('.interval-input');
+
+                    intervalBtn.addEventListener('click', () => {
+                        intervalBtn.style.display = 'none';
+                        intervalInput.style.display = 'block';
+                        intervalInput.focus();
+                        intervalInput.select();
+                    });
+
+                    // Save on blur or enter key
+                    intervalInput.addEventListener('blur', () => {
+                        saveAtmosphereIntervalFromInput(atmosphereName, intervalInput, intervalBtn);
+                    });
+
+                    intervalInput.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            intervalInput.blur();
+                        }
+                    });
+
+                    atmospheresList.appendChild(badge);
+                }
+            } catch (error) {
+                console.error('Error loading atmospheres:', error);
+            }
+        }
+
+        async function createAtmosphere() {
+            const nameInput = document.getElementById('new-atmosphere-name');
+            const createBtn = document.getElementById('show-create-atmosphere-btn');
+            const name = nameInput.value.trim();
+
+            if (!name) {
+                showMessage('Please enter an atmosphere name', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/atmospheres', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+
+                if (response.ok) {
+                    nameInput.value = '';
+                    nameInput.style.display = 'none';
+                    createBtn.style.display = 'block';
+                    await loadAtmospheres();
+                    showMessage(`Atmosphere "${name}" created`, 'success');
+                } else {
+                    const error = await response.json();
+                    showMessage(error.error || 'Error creating atmosphere', 'error');
+                }
+            } catch (error) {
+                console.error('Error creating atmosphere:', error);
+                showMessage('Error creating atmosphere', 'error');
+            }
+        }
+
+        function hideCreateAtmosphereInput() {
+            const nameInput = document.getElementById('new-atmosphere-name');
+            const createBtn = document.getElementById('show-create-atmosphere-btn');
+            nameInput.value = '';
+            nameInput.style.display = 'none';
+            createBtn.style.display = 'block';
+        }
+
+        async function saveAtmosphereIntervalFromInput(atmosphereName, inputElement, btnElement) {
+            const intervalMinutes = parseFloat(inputElement.value);
+
+            if (!intervalMinutes || intervalMinutes < 1) {
+                showMessage('Invalid interval value', 'error');
+                inputElement.style.display = 'none';
+                btnElement.style.display = 'block';
+                return;
+            }
+
+            const intervalSeconds = Math.round(intervalMinutes * 60);
+
+            try {
+                const response = await fetch(`/api/atmospheres/${encodeURIComponent(atmosphereName)}/interval`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ interval: intervalSeconds })
+                });
+
+                if (response.ok) {
+                    availableAtmospheres[atmosphereName].interval = intervalSeconds;
+                    btnElement.textContent = `${intervalMinutes} min`;
+                    inputElement.style.display = 'none';
+                    btnElement.style.display = 'block';
+                    showMessage(`Interval updated for atmosphere "${atmosphereName}"`, 'success');
+                } else {
+                    showMessage('Error updating atmosphere interval', 'error');
+                    inputElement.style.display = 'none';
+                    btnElement.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error updating atmosphere interval:', error);
+                showMessage('Error updating atmosphere interval', 'error');
+                inputElement.style.display = 'none';
+                btnElement.style.display = 'block';
+            }
+        }
+
+        async function setActiveAtmosphere(atmosphereName) {
+            try {
+                const response = await fetch('/api/atmospheres/active', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ atmosphere_name: atmosphereName })
+                });
+
+                if (response.ok) {
+                    activeAtmosphere = atmosphereName;
+                    await loadAtmospheres();
+                    await loadImages();
+                    showMessage(`Active atmosphere set to "${atmosphereName}"`, 'success');
+                } else {
+                    showMessage('Error setting active atmosphere', 'error');
+                }
+            } catch (error) {
+                console.error('Error setting active atmosphere:', error);
+                showMessage('Error setting active atmosphere', 'error');
+            }
+        }
+
+        async function deleteAtmosphere(atmosphereName) {
+            if (!confirm(`Delete atmosphere "${atmosphereName}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/atmospheres/${encodeURIComponent(atmosphereName)}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    await loadAtmospheres();
+                    await loadImages();
+                    showMessage(`Atmosphere "${atmosphereName}" deleted`, 'success');
+                } else {
+                    showMessage('Error deleting atmosphere', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting atmosphere:', error);
+                showMessage('Error deleting atmosphere', 'error');
+            }
+        }
+
+        function editAtmosphereThemes(atmosphereName) {
+            const themesInAtmosphere = atmosphereThemes[atmosphereName] || [];
+
+            // Build checkboxes for all themes
+            let themeCheckboxes = '';
+            for (const themeName in availableThemes) {
+                const checked = themesInAtmosphere.includes(themeName) ? 'checked' : '';
+                themeCheckboxes += `
+                    <div style="margin-bottom: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" value="${themeName}" ${checked} style="cursor: pointer;">
+                            <span>${themeName}</span>
+                        </label>
+                    </div>
+                `;
+            }
+
+            const html = `
+                <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;" id="atmosphere-themes-modal">
+                    <div style="background: white; padding: 30px; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                        <h3 style="margin-top: 0; margin-bottom: 20px;">Select Themes for "${atmosphereName}"</h3>
+                        <div id="theme-checkboxes">
+                            ${themeCheckboxes}
+                        </div>
+                        <div style="display: flex; gap: 10px; margin-top: 20px;">
+                            <button onclick="saveAtmosphereThemes('${atmosphereName}')" style="flex: 1; padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Save</button>
+                            <button onclick="closeAtmosphereThemesModal()" style="flex: 1; padding: 10px; background: #999; color: white; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        async function saveAtmosphereThemes(atmosphereName) {
+            const checkboxes = document.querySelectorAll('#theme-checkboxes input[type="checkbox"]:checked');
+            const selectedThemes = Array.from(checkboxes).map(cb => cb.value);
+
+            try {
+                const response = await fetch(`/api/atmospheres/${encodeURIComponent(atmosphereName)}/themes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ themes: selectedThemes })
+                });
+
+                if (response.ok) {
+                    atmosphereThemes[atmosphereName] = selectedThemes;
+                    closeAtmosphereThemesModal();
+                    await loadAtmospheres();
+                    await loadImages();
+                    showMessage(`Themes updated for atmosphere "${atmosphereName}"`, 'success');
+                } else {
+                    showMessage('Error updating atmosphere themes', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating atmosphere themes:', error);
+                showMessage('Error updating atmosphere themes', 'error');
+            }
+        }
+
+        function closeAtmosphereThemesModal() {
+            const modal = document.getElementById('atmosphere-themes-modal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
         // Theme management functions
         let availableThemes = {};
         let activeTheme = null;
@@ -1793,6 +2072,33 @@
             });
         }
 
+        // Handle "Create Atmosphere" button and input
+        const showCreateAtmosphereBtn = document.getElementById('show-create-atmosphere-btn');
+        const newAtmosphereNameInput = document.getElementById('new-atmosphere-name');
+
+        if (showCreateAtmosphereBtn && newAtmosphereNameInput) {
+            // Show input when button is clicked
+            showCreateAtmosphereBtn.addEventListener('click', function() {
+                showCreateAtmosphereBtn.style.display = 'none';
+                newAtmosphereNameInput.style.display = 'block';
+                newAtmosphereNameInput.focus();
+            });
+
+            // Create atmosphere on Enter key
+            newAtmosphereNameInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    createAtmosphere();
+                }
+            });
+
+            // Hide input on blur if empty
+            newAtmosphereNameInput.addEventListener('blur', function() {
+                if (!newAtmosphereNameInput.value.trim()) {
+                    hideCreateAtmosphereInput();
+                }
+            });
+        }
+
         // Handle "Create Theme" button and input
         const showCreateThemeBtn = document.getElementById('show-create-theme-btn');
         const newThemeNameInput = document.getElementById('new-theme-name');
@@ -1821,6 +2127,7 @@
         }
 
         // Load data on page load
+        loadAtmospheres();
         loadThemes();
         loadImages();
         updateLEDs(); // Initialize LED indicators

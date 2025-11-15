@@ -57,6 +57,9 @@ def get_settings():
         },  # Theme name -> theme info
         'image_themes': {},  # Image name -> list of theme names
         'active_theme': 'All Images',  # Default to All Images theme
+        'atmospheres': {},  # Atmosphere name -> atmosphere info
+        'atmosphere_themes': {},  # Atmosphere name -> list of theme names
+        'active_atmosphere': None,  # No atmosphere active by default
         'image_crops': {}  # Image name -> crop data
     }
 
@@ -86,6 +89,12 @@ def get_settings():
                 settings['image_themes'] = {}
             if 'active_theme' not in settings:
                 settings['active_theme'] = 'All Images'
+            if 'atmospheres' not in settings:
+                settings['atmospheres'] = {}
+            if 'atmosphere_themes' not in settings:
+                settings['atmosphere_themes'] = {}
+            if 'active_atmosphere' not in settings:
+                settings['active_atmosphere'] = None
             if 'image_crops' not in settings:
                 settings['image_crops'] = {}
             return settings
@@ -144,8 +153,20 @@ def list_images():
     enabled_only = request.args.get('enabled_only', 'false').lower() == 'true'
 
     settings = get_settings()
+    active_atmosphere = settings.get('active_atmosphere')
     active_theme = settings.get('active_theme')
     image_themes = settings.get('image_themes', {})
+    atmosphere_themes = settings.get('atmosphere_themes', {})
+
+    # Determine which themes to filter by
+    allowed_themes = None
+    if enabled_only:
+        if active_atmosphere:
+            # If atmosphere is active, get all themes in that atmosphere
+            allowed_themes = set(atmosphere_themes.get(active_atmosphere, []))
+        elif active_theme and active_theme != 'All Images':
+            # If only a theme is active (no atmosphere), use that theme
+            allowed_themes = {active_theme}
 
     images = []
     for file in sorted(app.config['UPLOAD_FOLDER'].iterdir()):
@@ -156,11 +177,11 @@ def list_images():
             if enabled_only and not enabled:
                 continue
 
-            # Skip images not in active theme if filtering and theme is set
-            # "All Images" theme shows all images, so skip theme filtering for it
-            if enabled_only and active_theme and active_theme != 'All Images':
-                image_theme_list = image_themes.get(file.name, [])
-                if active_theme not in image_theme_list:
+            # Apply theme/atmosphere filtering
+            if allowed_themes is not None:
+                image_theme_list = set(image_themes.get(file.name, []))
+                # Image must belong to at least one of the allowed themes
+                if not image_theme_list.intersection(allowed_themes):
                     continue
 
             # Get themes for this image
@@ -494,6 +515,165 @@ def update_image_themes(filename):
     image_themes = settings.get('image_themes', {})
     image_themes[filename] = themes
     settings['image_themes'] = image_themes
+    save_settings(settings)
+
+    return jsonify({'success': True, 'themes': themes})
+
+
+@app.route('/api/atmospheres', methods=['GET'])
+def list_atmospheres():
+    """Get list of all atmospheres."""
+    settings = get_settings()
+    atmospheres = settings.get('atmospheres', {})
+    active_atmosphere = settings.get('active_atmosphere')
+    atmosphere_themes = settings.get('atmosphere_themes', {})
+    return jsonify({
+        'atmospheres': atmospheres,
+        'active_atmosphere': active_atmosphere,
+        'atmosphere_themes': atmosphere_themes
+    })
+
+
+@app.route('/api/atmospheres', methods=['POST'])
+def create_atmosphere():
+    """Create a new atmosphere."""
+    data = request.json
+    atmosphere_name = data.get('name')
+
+    if not atmosphere_name:
+        return jsonify({'error': 'Atmosphere name is required'}), 400
+
+    settings = get_settings()
+    atmospheres = settings.get('atmospheres', {})
+
+    if atmosphere_name in atmospheres:
+        return jsonify({'error': 'Atmosphere already exists'}), 400
+
+    atmospheres[atmosphere_name] = {
+        'name': atmosphere_name,
+        'created': time.time(),
+        'interval': 3600  # Default: 60 minutes in seconds
+    }
+    settings['atmospheres'] = atmospheres
+    save_settings(settings)
+
+    return jsonify({'success': True, 'atmosphere': atmospheres[atmosphere_name]})
+
+
+@app.route('/api/atmospheres/<atmosphere_name>', methods=['DELETE'])
+def delete_atmosphere(atmosphere_name):
+    """Delete an atmosphere."""
+    settings = get_settings()
+    atmospheres = settings.get('atmospheres', {})
+
+    if atmosphere_name not in atmospheres:
+        return jsonify({'error': 'Atmosphere not found'}), 404
+
+    # Remove atmosphere
+    del atmospheres[atmosphere_name]
+    settings['atmospheres'] = atmospheres
+
+    # Remove atmosphere from atmosphere_themes mapping
+    atmosphere_themes = settings.get('atmosphere_themes', {})
+    if atmosphere_name in atmosphere_themes:
+        del atmosphere_themes[atmosphere_name]
+    settings['atmosphere_themes'] = atmosphere_themes
+
+    # Clear active atmosphere if it was the deleted one
+    if settings.get('active_atmosphere') == atmosphere_name:
+        settings['active_atmosphere'] = None
+
+    save_settings(settings)
+    return jsonify({'success': True})
+
+
+@app.route('/api/atmospheres/<atmosphere_name>/interval', methods=['POST'])
+def update_atmosphere_interval(atmosphere_name):
+    """Update an atmosphere's interval."""
+    data = request.json
+    interval = data.get('interval')
+
+    if interval is None:
+        return jsonify({'error': 'Interval is required'}), 400
+
+    try:
+        interval = int(interval)
+        if interval < 1:
+            return jsonify({'error': 'Interval must be positive'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid interval value'}), 400
+
+    settings = get_settings()
+    atmospheres = settings.get('atmospheres', {})
+
+    if atmosphere_name not in atmospheres:
+        return jsonify({'error': 'Atmosphere not found'}), 404
+
+    # Update atmosphere interval
+    atmospheres[atmosphere_name]['interval'] = interval
+    settings['atmospheres'] = atmospheres
+
+    # If this is the active atmosphere, also update the global interval
+    if settings.get('active_atmosphere') == atmosphere_name:
+        settings['interval'] = interval
+
+    save_settings(settings)
+    return jsonify({'success': True, 'atmosphere': atmospheres[atmosphere_name]})
+
+
+@app.route('/api/atmospheres/active', methods=['POST'])
+def set_active_atmosphere():
+    """Set the active atmosphere."""
+    data = request.json
+    atmosphere_name = data.get('atmosphere_name')
+
+    settings = get_settings()
+    atmospheres = settings.get('atmospheres', {})
+
+    # Allow setting to None to clear active atmosphere
+    if atmosphere_name is None:
+        settings['active_atmosphere'] = None
+        # Restore active theme's interval
+        active_theme = settings.get('active_theme')
+        if active_theme:
+            themes = settings.get('themes', {})
+            if active_theme in themes:
+                settings['interval'] = themes[active_theme].get('interval', 3600)
+        save_settings(settings)
+        return jsonify({'success': True, 'active_atmosphere': None})
+
+    if not atmosphere_name:
+        return jsonify({'error': 'Atmosphere name is required'}), 400
+
+    # Validate atmosphere exists
+    if atmosphere_name not in atmospheres:
+        return jsonify({'error': 'Atmosphere not found'}), 404
+
+    # Update interval to atmosphere's interval
+    atmosphere_interval = atmospheres[atmosphere_name].get('interval', 3600)
+    settings['interval'] = atmosphere_interval
+
+    settings['active_atmosphere'] = atmosphere_name
+    save_settings(settings)
+
+    return jsonify({'success': True, 'active_atmosphere': atmosphere_name, 'interval': settings['interval']})
+
+
+@app.route('/api/atmospheres/<atmosphere_name>/themes', methods=['POST'])
+def update_atmosphere_themes(atmosphere_name):
+    """Update themes for an atmosphere."""
+    settings = get_settings()
+    atmospheres = settings.get('atmospheres', {})
+
+    if atmosphere_name not in atmospheres:
+        return jsonify({'error': 'Atmosphere not found'}), 404
+
+    data = request.json
+    themes = data.get('themes', [])
+
+    atmosphere_themes = settings.get('atmosphere_themes', {})
+    atmosphere_themes[atmosphere_name] = themes
+    settings['atmosphere_themes'] = atmosphere_themes
     save_settings(settings)
 
     return jsonify({'success': True, 'themes': themes})
