@@ -223,9 +223,11 @@
                 }
 
                 // Check if shuffle_id changed (theme/atmosphere switched)
+                let shuffleChanged = false;
                 if (newShuffleId !== previousShuffleId) {
                     await debugLog(`Shuffle ID changed! Order will be refreshed.`, 'info');
                     previousShuffleId = newShuffleId;
+                    shuffleChanged = true;
                     needsReload = true;
                 }
 
@@ -245,7 +247,7 @@
 
                 if (needsReload) {
                     await debugLog('Reloading slideshow...', 'info');
-                    await reloadSlideshow();
+                    await reloadSlideshow(shuffleChanged);
                 }
             } catch (error) {
                 console.error('Error checking for changes:', error);
@@ -254,7 +256,7 @@
         }
 
         // Reload slideshow with new images
-        async function reloadSlideshow() {
+        async function reloadSlideshow(shuffleChanged = false) {
             // Save current image name to restore position after reload
             const currentImageName = images[currentIndex]?.name;
 
@@ -278,7 +280,8 @@
 
             // Find where the current image is in the new list
             let startIndex = 0;
-            if (currentImageName && newImages.length > 0) {
+            // Only preserve position if shuffle didn't change
+            if (!shuffleChanged && currentImageName && newImages.length > 0) {
                 const foundIndex = newImages.findIndex(img => img.name === currentImageName);
                 if (foundIndex !== -1) {
                     startIndex = foundIndex;
