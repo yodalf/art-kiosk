@@ -195,6 +195,15 @@ def upload_image():
     filepath = app.config['UPLOAD_FOLDER'] / filename
     file.save(filepath)
 
+    # Assign the new image to the active theme (if not "All Images")
+    settings = get_settings()
+    active_theme = settings.get('active_theme')
+    if active_theme and active_theme != 'All Images':
+        image_themes = settings.get('image_themes', {})
+        image_themes[filename] = [active_theme]
+        settings['image_themes'] = image_themes
+        save_settings(settings)
+
     # Automatically jump to the newly uploaded image
     current_command = {'command': 'jump', 'image_name': filename}
     command_timestamp = time.time()
