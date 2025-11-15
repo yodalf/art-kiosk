@@ -196,8 +196,13 @@ def list_images():
                 'themes': themes
             })
 
-    # Randomize the order of images
+    # Randomize the order of images with a consistent seed
+    # Use the active atmosphere/theme as seed so the order is consistent
+    # for the same selection across different API calls
+    seed_string = f"{active_atmosphere or ''}-{active_theme or ''}"
+    random.seed(seed_string)
     random.shuffle(images)
+    random.seed()  # Reset to random seed for other operations
 
     return jsonify(images)
 
