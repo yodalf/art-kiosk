@@ -2187,12 +2187,41 @@
         // Poll for current image every 1 second
         setInterval(updateLEDs, 1000);
 
+        // Track shuffle_id to detect when kiosk reshuffles
+        let previousShuffleId = null;
+
+        // Check if shuffle_id has changed (kiosk reshuffled)
+        async function checkShuffleIdChanged() {
+            try {
+                const response = await fetch('/api/settings');
+                const settings = await response.json();
+                const currentShuffleId = settings.shuffle_id;
+
+                if (previousShuffleId !== null && previousShuffleId !== currentShuffleId) {
+                    console.log(`Shuffle ID changed: ${previousShuffleId} -> ${currentShuffleId}. Reloading images...`);
+                    await loadImages(); // Reload current images with new order
+                }
+
+                previousShuffleId = currentShuffleId;
+            } catch (error) {
+                console.error('Error checking shuffle_id:', error);
+            }
+        }
+
+        // Poll for shuffle_id changes every 2 seconds (matches kiosk check interval)
+        setInterval(checkShuffleIdChanged, 2000);
+
         // Load data on page load
         async function initializePage() {
             await loadAtmospheres();
             await loadThemes();
             await loadImages();
             updateLEDs(); // Initialize LED indicators after images are loaded
+
+            // Initialize shuffle_id tracking
+            const response = await fetch('/api/settings');
+            const settings = await response.json();
+            previousShuffleId = settings.shuffle_id;
         }
 
         initializePage();
