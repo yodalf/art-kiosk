@@ -623,8 +623,10 @@
 
         // Next slide
         async function nextSlide() {
+            debugLog(`nextSlide called: currentIndex=${currentIndex}, images.length=${images.length}, last=${currentIndex === images.length - 1}`, 'debug');
+
             // Check if we're at the last image and about to loop
-            if (currentIndex === images.length - 1) {
+            if (currentIndex === images.length - 1 && images.length > 0) {
                 // We're about to loop back to the beginning
                 // Reshuffle the images, avoiding the current (last) image as the new first image
                 const lastImageName = images[currentIndex]?.name;
@@ -643,7 +645,14 @@
                         })
                     });
 
+                    if (!response.ok) {
+                        debugLog(`Reshuffle API error: ${response.status} ${response.statusText}`, 'error');
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
                     const result = await response.json();
+                    debugLog(`Reshuffle API response: ${JSON.stringify(result)}`, 'debug');
+
                     if (result.success) {
                         debugLog(`Reshuffled with new shuffle_id: ${result.shuffle_id}`, 'info');
 
@@ -655,6 +664,8 @@
                             startSlideshow();
                         }
                         return;
+                    } else {
+                        debugLog(`Reshuffle returned success=false`, 'error');
                     }
                 } catch (error) {
                     debugLog(`Error reshuffling: ${error.message}`, 'error');
@@ -663,6 +674,7 @@
             }
 
             // Normal advancement (or fallback if reshuffle failed)
+            debugLog(`Normal slide advancement: ${currentIndex} -> ${(currentIndex + 1) % images.length}`, 'debug');
             currentIndex = (currentIndex + 1) % images.length;
             showSlide(currentIndex);
         }
