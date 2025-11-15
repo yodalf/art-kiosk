@@ -385,9 +385,11 @@ def reshuffle_images():
 
             # Get images
             images = []
-            if os.path.exists(IMAGE_FOLDER):
-                for filename in os.listdir(IMAGE_FOLDER):
-                    if filename.lower().endswith(ALLOWED_EXTENSIONS):
+            upload_folder = app.config['UPLOAD_FOLDER']
+            if upload_folder.exists():
+                for file in upload_folder.iterdir():
+                    if file.is_file() and allowed_file(file.name):
+                        filename = file.name
                         # Check if image is enabled
                         is_enabled = settings.get('enabled_images', {}).get(filename, True)
                         if enabled_only and not is_enabled:
