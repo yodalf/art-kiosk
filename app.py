@@ -354,79 +354,77 @@ def reshuffle_images():
 
         print(f"[RESHUFFLE] Request received. avoid_first={avoid_first}")
 
-        # Try up to 10 times to get a shuffle where the first image is different
-        max_attempts = 10
-        for attempt in range(max_attempts):
-            # Generate new shuffle_id
-            new_shuffle_id = random.random()
+        # Generate new shuffle_id
+        new_shuffle_id = random.random()
 
-            if not avoid_first:
-                # No constraint, accept this shuffle
-                settings['shuffle_id'] = new_shuffle_id
-                save_settings(settings)
-                print(f"[RESHUFFLE] No constraint, using shuffle_id={new_shuffle_id}")
-                return jsonify({'success': True, 'shuffle_id': new_shuffle_id})
+        # Get the current image list (same logic as list_images endpoint)
+        enabled_only = True
+        active_atmosphere = settings.get('active_atmosphere')
+        active_theme = settings.get('active_theme')
+        image_themes = settings.get('image_themes', {})
+        atmosphere_themes = settings.get('atmosphere_themes', {})
 
-            # Test this shuffle to see if first image is different
-            # Get the current image list (same logic as list_images endpoint)
-            enabled_only = True
-            active_atmosphere = settings.get('active_atmosphere')
-            active_theme = settings.get('active_theme')
-            image_themes = settings.get('image_themes', {})
-            atmosphere_themes = settings.get('atmosphere_themes', {})
+        # Determine which themes to filter by
+        allowed_themes = None
+        if enabled_only:
+            if active_atmosphere:
+                allowed_themes = set(atmosphere_themes.get(active_atmosphere, []))
+            elif active_theme and active_theme != 'All Images':
+                allowed_themes = {active_theme}
 
-            # Determine which themes to filter by
-            allowed_themes = None
-            if enabled_only:
-                if active_atmosphere:
-                    allowed_themes = set(atmosphere_themes.get(active_atmosphere, []))
-                elif active_theme and active_theme != 'All Images':
-                    allowed_themes = {active_theme}
+        # Get images
+        images = []
+        upload_folder = app.config['UPLOAD_FOLDER']
+        if upload_folder.exists():
+            for file in upload_folder.iterdir():
+                if file.is_file() and allowed_file(file.name):
+                    filename = file.name
+                    # Check if image is enabled
+                    is_enabled = settings.get('enabled_images', {}).get(filename, True)
+                    if enabled_only and not is_enabled:
+                        continue
 
-            # Get images
-            images = []
-            upload_folder = app.config['UPLOAD_FOLDER']
-            if upload_folder.exists():
-                for file in upload_folder.iterdir():
-                    if file.is_file() and allowed_file(file.name):
-                        filename = file.name
-                        # Check if image is enabled
-                        is_enabled = settings.get('enabled_images', {}).get(filename, True)
-                        if enabled_only and not is_enabled:
+                    # Check theme filtering
+                    if allowed_themes is not None:
+                        img_themes = set(image_themes.get(filename, []))
+                        if not img_themes.intersection(allowed_themes):
                             continue
 
-                        # Check theme filtering
-                        if allowed_themes is not None:
-                            img_themes = set(image_themes.get(filename, []))
-                            if not img_themes.intersection(allowed_themes):
-                                continue
+                    images.append({'name': filename})
 
-                        images.append({'name': filename})
+        print(f"[RESHUFFLE] Found {len(images)} images to shuffle")
 
-            print(f"[RESHUFFLE] Attempt {attempt+1}: found {len(images)} images")
+        # Apply the shuffle
+        random.seed(new_shuffle_id)
+        random.shuffle(images)
+        random.seed()
 
-            # Apply the test shuffle
-            random.seed(new_shuffle_id)
-            random.shuffle(images)
-            random.seed()
+        # If we need to avoid a specific first image, swap it with another image
+        if avoid_first and images and images[0]['name'] == avoid_first:
+            print(f"[RESHUFFLE] First image is {avoid_first}, need to swap")
+            # Find first image that's not the avoided one
+            swap_index = None
+            for i in range(1, len(images)):
+                if images[i]['name'] != avoid_first:
+                    swap_index = i
+                    break
 
-            # Check if first image is different from avoid_first
-            if images and images[0]['name'] != avoid_first:
-                # Success! This shuffle has a different first image
-                settings['shuffle_id'] = new_shuffle_id
-                save_settings(settings)
-                print(f"[RESHUFFLE] Success! First image is {images[0]['name']}, shuffle_id={new_shuffle_id}")
-                return jsonify({'success': True, 'shuffle_id': new_shuffle_id})
+            if swap_index is not None:
+                # Swap first image with the found image
+                images[0], images[swap_index] = images[swap_index], images[0]
+                print(f"[RESHUFFLE] Swapped with image at index {swap_index}: {images[0]['name']}")
             else:
-                first_name = images[0]['name'] if images else 'NONE'
-                print(f"[RESHUFFLE] Attempt {attempt+1} failed: first={first_name}, avoid={avoid_first}")
+                # Edge case: all images are the same (only one unique image)
+                print(f"[RESHUFFLE] Warning: all images are the same, cannot avoid {avoid_first}")
 
-        # After max attempts, just use the last shuffle even if it matches
-        # (This should be very rare with even a few images)
+        first_image = images[0]['name'] if images else 'NONE'
+        print(f"[RESHUFFLE] Final first image: {first_image}, shuffle_id={new_shuffle_id}")
+
+        # Save the new shuffle_id
         settings['shuffle_id'] = new_shuffle_id
         save_settings(settings)
-        print(f"[RESHUFFLE] Max attempts reached, using shuffle_id={new_shuffle_id}")
-        return jsonify({'success': True, 'shuffle_id': new_shuffle_id, 'warning': 'Could not avoid specified image'})
+
+        return jsonify({'success': True, 'shuffle_id': new_shuffle_id})
 
     except Exception as e:
         print(f"[RESHUFFLE] ERROR: {type(e).__name__}: {str(e)}")
