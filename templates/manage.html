@@ -1555,7 +1555,16 @@
 
                 if (response.ok) {
                     activeAtmosphere = atmosphereName;
+
+                    // Clear active theme when selecting an atmosphere
+                    // Note: We don't need to call the API to clear theme because
+                    // the backend already handles this - when an atmosphere is active,
+                    // it takes precedence over the theme in the filtering logic
+                    activeTheme = null;
+
+                    // Reload both atmospheres and themes to update active state
                     await loadAtmospheres();
+                    await loadThemes();
                     await loadImages();
                     showMessage(`Active atmosphere set to "${atmosphereName}"`, 'success');
                 } else {
