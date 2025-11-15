@@ -254,6 +254,10 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
   - Jump requires: `{"command": "jump", "image_name": "photo.jpg"}`
 - `GET /api/control/poll` - Poll for commands (called by kiosk)
 
+### Kiosk State
+- `GET /api/kiosk/current-image` - Get currently displayed image name
+- `POST /api/kiosk/current-image` - Update currently displayed image (`{"image_name": "photo.jpg"}`)
+
 ### Debug
 - `POST /api/debug/log` - Log message from kiosk
 - `GET /api/debug/messages` - Get recent log messages (last 100)
@@ -432,7 +436,67 @@ save_settings(settings)
 - **All images included**: Every enabled image appears exactly once
 - **Kiosk detection**: Tracks previousShuffleId to detect order changes and restart from index 0
 
-### 6. Auto-Preview on Upload
+### 6. Firefox Profile Management
+
+**Purpose**: Prevent Firefox profile corruption by creating a fresh profile on each service start.
+
+**Implementation** (start-firefox-kiosk.sh):
+```bash
+# Remove old Firefox profile completely
+rm -rf "$HOME/.mozilla/firefox"
+
+# Create profile directory structure
+mkdir -p "$HOME/.mozilla/firefox/kiosk-profile"
+
+# Create profiles.ini
+cat > "$HOME/.mozilla/firefox/profiles.ini" << EOF
+[General]
+StartWithLastProfile=1
+Version=2
+
+[Profile0]
+Name=kiosk-profile
+IsRelative=1
+Path=kiosk-profile
+Default=1
+EOF
+
+# Create prefs.js with kiosk-optimized settings
+cat > "$PROFILE_DIR/prefs.js" << EOF
+user_pref("browser.startup.homepage", "http://localhost/view");
+user_pref("browser.shell.checkDefaultBrowser", false);
+user_pref("browser.aboutwelcome.enabled", false);
+user_pref("browser.sessionstore.resume_from_crash", false);
+user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);
+user_pref("browser.cache.disk.enable", false);
+user_pref("browser.cache.memory.enable", true);
+user_pref("permissions.default.microphone", 2);
+user_pref("permissions.default.camera", 2);
+# ... additional settings
+EOF
+
+# Launch Firefox with explicit profile
+firefox --kiosk --profile "$PROFILE_DIR" http://localhost/view
+```
+
+**Key Points**:
+- **Complete cleanup**: Deletes entire `~/.mozilla/firefox` directory on each start
+- **Fresh profile**: Creates new profile from scratch every time
+- **No welcome screens**: Disables first-run experiences and privacy notices
+- **No telemetry**: Disables crash reporting, telemetry, and update checks
+- **Security hardening**: Disables webcam, microphone, geolocation, notifications
+- **Performance**: Memory-only cache, disk cache disabled
+- **Kiosk homepage**: Sets `http://localhost/view` as startup page
+- **Prevents corruption**: Eliminates lock file conflicts and profile database corruption
+
+**Benefits**:
+- Reliable startup every time
+- No profile corruption issues
+- Optimized for kiosk use case
+- Minimal resource usage
+- No user interaction required
+
+### 7. Auto-Preview on Upload
 
 **Purpose**: Immediately display newly uploaded images on the kiosk for review.
 
@@ -493,6 +557,7 @@ kiosk_images/
 │   └── manage.html           # Management interface
 │
 ├── start-kiosk.sh            # Start script (cleanup + server + browser)
+├── start-firefox-kiosk.sh    # Firefox startup with profile management
 ├── stop-kiosk.sh             # Stop script
 ├── install-autostart.sh      # Systemd installer
 │
@@ -516,15 +581,28 @@ Two services work together:
 - Starts after network
 - Runs as user with virtual environment
 - Binds to port 80 (requires `CAP_NET_BIND_SERVICE` capability)
-- Auto-restarts on failure
+- **Kills any process using port 80 before starting** (via `fuser -k 80/tcp`)
+- Auto-restarts on failure (RestartSec=10)
 
 **kiosk-firefox.service** (Display):
 - Starts after `kiosk-display.service` and `graphical.target`
-- Waits 5 seconds for server to be ready
-- Disables screen blanking via `xset`
+- **Kills existing Firefox and unclutter processes** to prevent conflicts
+- Waits for server to respond (via `curl` loop) before launching Firefox
+- **Uses start-firefox-kiosk.sh** for automatic Firefox profile management:
+  - Deletes old Firefox profile on each start (prevents corruption)
+  - Creates fresh profile with kiosk-optimized settings
+  - Disables Firefox welcome screens, telemetry, updates, crash reporting
+  - Configures security settings (disable webcam, microphone, geolocation)
+  - Uses memory-only cache for better performance
+- Disables screen blanking via `xset` (X11 mode only)
 - Launches Firefox in kiosk mode pointing to `/view`
-- Starts `unclutter` to hide cursor
-- Auto-restarts on failure
+- Starts `unclutter` to hide cursor (X11 mode only)
+- Auto-restarts on failure (RestartSec=10)
+- Uses `KillMode=control-group` to ensure all child processes are terminated
+
+**Important**: Designed for X11. If using Wayland (newer Raspberry Pi OS), either:
+1. Switch to X11 mode via `raspi-config` (recommended), or
+2. Modify service to use Wayland environment variables (`WAYLAND_DISPLAY`, `MOZ_ENABLE_WAYLAND`)
 
 ### Startup Sequence
 
@@ -535,15 +613,29 @@ Network Ready
   ↓
 kiosk-display.service starts
   ↓
+Kill any process using port 80 (fuser -k)
+  ↓
 Flask server running on port 80
   ↓
-Desktop Environment Ready
+Desktop Environment Ready (X11)
   ↓
 kiosk-firefox.service starts
   ↓
-Wait 5 seconds
+Kill existing Firefox and unclutter processes
   ↓
-Disable screen blanking
+Wait 2 seconds for cleanup
+  ↓
+Wait 5 seconds for server startup
+  ↓
+Disable screen blanking (xset)
+  ↓
+Poll server with curl until /view responds
+  ↓
+start-firefox-kiosk.sh executes
+  ↓
+Delete old Firefox profile (~/.mozilla/firefox)
+  ↓
+Create fresh Firefox profile with kiosk settings
   ↓
 Start unclutter (hide cursor)
   ↓
@@ -698,8 +790,35 @@ Kiosk display showing
 ### Autostart Issues
 1. Check service status: `sudo systemctl status kiosk-firefox`
 2. View logs: `sudo journalctl -u kiosk-firefox -f`
-3. Verify DISPLAY=:0 and XAUTHORITY set correctly
-4. Check user permissions
+3. Verify X11 mode: `echo $WAYLAND_DISPLAY` (should be empty)
+4. Check DISPLAY=:0 and XAUTHORITY set correctly in service file
+5. Verify start-firefox-kiosk.sh is executable
+6. Check user permissions match systemd service User= field
+
+### Firefox Profile Corruption
+1. **Automatic fix**: Service now deletes and recreates profile on each start
+2. **Manual cleanup**:
+   ```bash
+   sudo systemctl stop kiosk-firefox
+   rm -rf ~/.mozilla/firefox
+   sudo systemctl start kiosk-firefox
+   ```
+3. Check if profile is being created: `ls -la ~/.mozilla/firefox/`
+4. Verify start-firefox-kiosk.sh has correct paths
+
+### Wayland vs X11 Issues
+1. **Preferred solution**: Switch to X11 mode
+   ```bash
+   sudo raspi-config
+   # Advanced Options > Wayland > X11
+   sudo reboot
+   ```
+2. **Check current mode**: `echo $WAYLAND_DISPLAY` (empty = X11, wayland-0 = Wayland)
+3. **Errors to watch for**:
+   - "Failed connect to PipeWire" = Wayland conflict
+   - "xset: unable to open display" = X11 commands on Wayland
+   - Firefox runs but no window = wrong display environment
+4. **For Wayland**: Modify service to use `WAYLAND_DISPLAY`, `MOZ_ENABLE_WAYLAND=1`, remove `xset` commands
 
 ### Theme/Atmosphere Filtering Not Working
 1. Verify active theme or atmosphere is set
@@ -734,6 +853,10 @@ Kiosk display showing
 - [x] Per-theme intervals
 - [x] Per-atmosphere intervals
 - [x] Remote control via polling
+- [x] Automatic Firefox profile management (prevents corruption)
+- [x] Server readiness checks before Firefox launch
+- [x] Process cleanup on service start (port 80, Firefox, unclutter)
+- [x] X11/Wayland compatibility considerations
 
 ### Potential Features
 - [ ] Video support (MP4, WebM)

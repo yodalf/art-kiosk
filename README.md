@@ -25,11 +25,19 @@ A web-based kiosk system for displaying images in slideshow mode, optimized for 
 
 ## Requirements
 
-- Raspberry Pi running Raspberry Pi OS
+- Raspberry Pi running Raspberry Pi OS (X11 mode recommended)
 - Python 3.7 or higher
 - Firefox browser
-- unclutter (optional, for hiding mouse cursor system-wide)
+- unclutter (for hiding mouse cursor in X11 mode)
+- curl (for server readiness checks)
 - Monitor: 2560x2880 (portrait orientation)
+
+**Important**: This system is designed for X11. If using Raspberry Pi OS with Wayland (newer versions), switch to X11 mode:
+```bash
+sudo raspi-config
+# Navigate to: Advanced Options > Wayland > Select "X11"
+# Then reboot
+```
 
 ## Installation
 
@@ -155,7 +163,14 @@ sudo ./install-autostart.sh
 
 This installs two systemd services:
 - **kiosk-display.service** - Flask server (starts first)
+  - Automatically kills any process using port 80 before starting
+  - Binds to port 80 using Linux capabilities (no root required)
 - **kiosk-firefox.service** - Firefox in kiosk mode (starts after server is ready)
+  - Uses **start-firefox-kiosk.sh** for automatic Firefox profile management
+  - Automatically cleans up old Firefox processes and profiles to prevent corruption
+  - Creates fresh Firefox profile on each start with kiosk-optimized settings
+  - Waits for server to respond before launching Firefox
+  - Disables screen blanking and hides cursor
 
 **Manual Installation** (if you prefer to install manually):
 
@@ -438,23 +453,24 @@ Usage:
 
 ```
 kiosk_images/
-├── app.py                   # Flask server
-├── requirements.txt         # Python dependencies
-├── settings.json           # Configuration (auto-generated)
-├── images/                 # Uploaded images (auto-generated)
-├── venv/                   # Python virtual environment
-├── start-kiosk.sh          # Start script (cleans up + starts)
-├── stop-kiosk.sh           # Stop script
-├── kiosk-display.service   # Systemd service file
-├── kiosk-firefox.service   # Systemd service file for Firefox
-├── install-autostart.sh    # Systemd installer
-├── README.md               # This file
-├── ARCHITECTURE.md         # Architecture documentation
-├── QUICKSTART.md           # Quick start guide
+├── app.py                     # Flask server
+├── requirements.txt           # Python dependencies
+├── settings.json              # Configuration (auto-generated)
+├── images/                    # Uploaded images (auto-generated)
+├── venv/                      # Python virtual environment
+├── start-kiosk.sh             # Start script (cleans up + starts)
+├── start-firefox-kiosk.sh     # Firefox startup with profile management
+├── stop-kiosk.sh              # Stop script
+├── kiosk-display.service      # Systemd service file for Flask
+├── kiosk-firefox.service      # Systemd service file for Firefox
+├── install-autostart.sh       # Systemd installer
+├── README.md                  # This file
+├── ARCHITECTURE.md            # Architecture documentation
+├── QUICKSTART.md              # Quick start guide
 └── templates/
-    ├── kiosk.html          # Main kiosk display
-    ├── manage.html         # Management interface
-    └── upload.html         # Upload interface
+    ├── kiosk.html             # Main kiosk display
+    ├── manage.html            # Management interface
+    └── upload.html            # Upload interface
 ```
 
 ## Supported Image Formats
@@ -490,7 +506,35 @@ kiosk_images/
 
 1. Check systemd service status: `sudo systemctl status kiosk-display`
 2. View logs: `sudo journalctl -u kiosk-display -f`
-3. Verify autostart configuration in `/etc/xdg/lxsession/LXDE-pi/autostart`
+3. View Firefox logs: `sudo journalctl -u kiosk-firefox -f`
+4. Verify X11 mode (not Wayland): `echo $WAYLAND_DISPLAY` should be empty when logged in locally
+5. Check that start-firefox-kiosk.sh is executable: `ls -la ~/kiosk_images/start-firefox-kiosk.sh`
+
+### Firefox not displaying or profile errors
+
+1. **Automatic fix**: The service now automatically cleans Firefox profiles on each start
+2. **Manual cleanup** (if needed):
+   ```bash
+   sudo systemctl stop kiosk-firefox
+   rm -rf ~/.mozilla/firefox
+   sudo systemctl start kiosk-firefox
+   ```
+3. Check Firefox logs: `sudo journalctl -u kiosk-firefox -f`
+4. Verify X11 is running: `ps aux | grep -E 'X|xinit'`
+5. Test manually: `DISPLAY=:0 firefox --kiosk http://localhost/view`
+
+### Wayland compatibility issues
+
+If you see errors like "Failed connect to PipeWire" or Firefox doesn't display:
+
+1. **Switch to X11 mode** (recommended):
+   ```bash
+   sudo raspi-config
+   # Navigate to: Advanced Options > Wayland > Select "X11"
+   sudo reboot
+   ```
+
+2. **Or modify for Wayland**: Edit `kiosk-firefox.service` to use Wayland environment variables (see ARCHITECTURE.md for details)
 
 ### Themes/Atmospheres not filtering
 
