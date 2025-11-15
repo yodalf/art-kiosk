@@ -179,6 +179,8 @@ def list_images():
 @app.route('/api/images', methods=['POST'])
 def upload_image():
     """Upload a new image."""
+    global current_command, command_timestamp
+
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
 
@@ -192,6 +194,10 @@ def upload_image():
     filename = secure_filename(file.filename)
     filepath = app.config['UPLOAD_FOLDER'] / filename
     file.save(filepath)
+
+    # Automatically jump to the newly uploaded image
+    current_command = {'command': 'jump', 'image_name': filename}
+    command_timestamp = time.time()
 
     return jsonify({
         'success': True,
