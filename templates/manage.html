@@ -1856,7 +1856,16 @@
                 if (response.ok) {
                     activeTheme = themeName;
 
-                    // Reload themes to update active state
+                    // Clear active atmosphere when directly selecting a theme
+                    await fetch('/api/atmospheres/active', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ atmosphere_name: null })
+                    });
+                    activeAtmosphere = null;
+
+                    // Reload atmospheres and themes to update active state
+                    await loadAtmospheres();
                     await loadThemes();
 
                     // Reload images to show filtered view
