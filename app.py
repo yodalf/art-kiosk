@@ -10,9 +10,11 @@ import time
 import random
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask_socketio import SocketIO, emit
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'images'
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}
@@ -107,9 +109,11 @@ def get_settings():
 
 
 def save_settings(settings):
-    """Save settings to file."""
+    """Save settings to file and notify clients."""
     with open(SETTINGS_FILE, 'w') as f:
         json.dump(settings, f, indent=2)
+    # Emit settings update to all connected clients
+    socketio.emit('settings_update', settings)
 
 
 def is_image_enabled(filename):
@@ -238,9 +242,11 @@ def upload_image():
         settings['image_themes'] = image_themes
         save_settings(settings)
 
-    # Automatically jump to the newly uploaded image
-    current_command = {'command': 'jump', 'image_name': filename}
-    command_timestamp = time.time()
+    # Automatically jump to the newly uploaded image via WebSocket
+    socketio.emit('remote_command', {'command': 'jump', 'image_name': filename})
+
+    # Notify clients that image list changed
+    notify_image_list_change()
 
     return jsonify({
         'success': True,
@@ -259,6 +265,10 @@ def delete_image(filename):
         return jsonify({'error': 'File not found'}), 404
 
     filepath.unlink()
+
+    # Notify clients that image list changed
+    notify_image_list_change()
+
     return jsonify({'success': True})
 
 
@@ -274,6 +284,9 @@ def toggle_image(filename):
     data = request.json
     enabled = data.get('enabled', True)
     set_image_enabled(filename, enabled)
+
+    # Notify clients that image list changed
+    notify_image_list_change()
 
     return jsonify({'success': True, 'enabled': enabled})
 
@@ -622,6 +635,9 @@ def update_image_themes(filename):
     settings['image_themes'] = image_themes
     save_settings(settings)
 
+    # Notify clients that image list changed (themes changed)
+    notify_image_list_change()
+
     return jsonify({'success': True, 'themes': themes})
 
 
@@ -796,6 +812,70 @@ def serve_image(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
+# WebSocket event handlers
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection."""
+    print(f"Client connected: {request.sid}")
+    # Send current settings to newly connected client
+    settings = get_settings()
+    emit('settings_update', settings)
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection."""
+    print(f"Client disconnected: {request.sid}")
+
+
+@socketio.on('send_command')
+def handle_send_command(data):
+    """Handle remote command via WebSocket."""
+    command = data.get('command')
+
+    # Handle jump command with image name parameter
+    if command == 'jump':
+        image_name = data.get('image_name')
+        if not image_name:
+            emit('command_error', {'error': 'Missing image_name parameter'})
+            return
+        # Broadcast to kiosk display
+        socketio.emit('remote_command', {'command': 'jump', 'image_name': image_name})
+        emit('command_sent', {'success': True, 'command': command, 'image_name': image_name})
+    elif command in ['next', 'prev', 'pause', 'play', 'reload']:
+        # Broadcast to kiosk display
+        socketio.emit('remote_command', command)
+        emit('command_sent', {'success': True, 'command': command})
+    else:
+        emit('command_error', {'error': 'Invalid command'})
+
+
+@socketio.on('log_debug')
+def handle_log_debug(data):
+    """Handle debug log message via WebSocket."""
+    global debug_messages
+
+    message = data.get('message', '')
+    level = data.get('level', 'info')
+    timestamp = time.time()
+
+    log_entry = {
+        'timestamp': timestamp,
+        'level': level,
+        'message': message
+    }
+
+    debug_messages.append(log_entry)
+
+    # Broadcast to all clients (especially management UI)
+    socketio.emit('debug_message', log_entry)
+
+
+def notify_image_list_change():
+    """Notify all clients that the image list has changed."""
+    socketio.emit('image_list_changed', {})
+
+
 if __name__ == '__main__':
     # Load and log settings on startup
     settings = get_settings()
@@ -808,4 +888,4 @@ if __name__ == '__main__':
             print(f"  - {img}: {'enabled' if enabled else 'disabled'}")
 
     # Run on all interfaces, port 80
-    app.run(host='0.0.0.0', port=80, debug=False)
+    socketio.run(app, host='0.0.0.0', port=80, debug=False, allow_unsafe_werkzeug=True)

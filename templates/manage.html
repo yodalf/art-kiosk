@@ -852,7 +852,11 @@
         </div>
     </div>
 
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+
         // Menu handling functions (define early for use in createImageCard)
         function toggleMenu(menuContainer) {
             const dropdown = menuContainer.querySelector('.action-menu-dropdown');
@@ -915,16 +919,10 @@
             debugEnabled = document.getElementById('debug-enabled').checked;
 
             if (debugEnabled) {
-                // Start polling for debug messages
+                // Load initial debug messages
                 refreshDebugConsole();
-                debugPollInterval = setInterval(refreshDebugConsole, 1000); // Poll every second
                 document.getElementById('debug-panel').classList.remove('disabled');
             } else {
-                // Stop polling
-                if (debugPollInterval) {
-                    clearInterval(debugPollInterval);
-                    debugPollInterval = null;
-                }
                 const console = document.getElementById('debug-console');
                 console.innerHTML = '<div class="debug-console-line">Debug console disabled. Enable to see live logs from the kiosk display.</div>';
             }
@@ -979,6 +977,34 @@
             }
         }
 
+        // Append a single debug message to the console
+        function appendDebugMessage(msg) {
+            if (!debugEnabled) return;
+
+            const consoleEl = document.getElementById('debug-console');
+
+            // Clear placeholder text if this is the first message
+            if (consoleEl.textContent.includes('No debug messages yet')) {
+                consoleEl.innerHTML = '';
+            }
+
+            const line = document.createElement('div');
+            line.className = `debug-console-line ${msg.level}`;
+
+            const timestamp = new Date(msg.timestamp * 1000).toLocaleTimeString();
+            const timestampSpan = document.createElement('span');
+            timestampSpan.className = 'debug-timestamp';
+            timestampSpan.textContent = `[${timestamp}]`;
+
+            line.appendChild(timestampSpan);
+            line.appendChild(document.createTextNode(msg.message));
+
+            consoleEl.appendChild(line);
+
+            // Auto-scroll to bottom
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
         // Track current playback state
         let isPlaying = true; // Assume playing by default
 
@@ -1004,20 +1030,10 @@
         }
 
         // Send remote control command
-        async function sendCommand(command) {
+        function sendCommand(command) {
             try {
-                const response = await fetch('/api/control/send', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ command })
-                });
-
-                if (!response.ok) {
-                    showMessage('Error sending command', 'error');
-                    return;
-                }
+                // Send command via WebSocket
+                socket.emit('send_command', { command });
 
                 // Update LED indicators based on command
                 switch(command) {
@@ -1048,19 +1064,10 @@
         }
 
         // Jump to specific image in kiosk display
-        async function jumpToImage(imageName) {
+        function jumpToImage(imageName) {
             try {
-                const response = await fetch('/api/control/send', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ command: 'jump', image_name: imageName })
-                });
-
-                if (!response.ok) {
-                    showMessage('Error jumping to image', 'error');
-                }
+                // Send jump command via WebSocket
+                socket.emit('send_command', { command: 'jump', image_name: imageName });
                 // Success - no message shown
             } catch (error) {
                 console.error('Error jumping to image:', error);
@@ -2215,8 +2222,43 @@
             }
         }
 
-        // Poll for shuffle_id changes every 2 seconds (matches kiosk check interval)
-        setInterval(checkShuffleIdChanged, 2000);
+        // WebSocket event handlers for real-time updates
+        socket.on('connect', () => {
+            console.log('WebSocket connected');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('WebSocket disconnected');
+        });
+
+        socket.on('reconnect', () => {
+            console.log('WebSocket reconnected');
+            // Reload page state after reconnection
+            initializePage();
+        });
+
+        socket.on('debug_message', (msg) => {
+            appendDebugMessage(msg);
+        });
+
+        socket.on('settings_update', (settings) => {
+            console.log('Settings updated via WebSocket');
+            // Check if shuffle_id changed
+            if (previousShuffleId !== null && previousShuffleId !== settings.shuffle_id) {
+                console.log(`Shuffle ID changed: ${previousShuffleId} -> ${settings.shuffle_id}. Reloading images...`);
+                loadImages(); // Reload current images with new order
+            }
+            previousShuffleId = settings.shuffle_id;
+
+            // Update themes and atmospheres in case they changed
+            loadAtmospheres();
+            loadThemes();
+        });
+
+        socket.on('image_list_changed', () => {
+            console.log('Image list changed via WebSocket');
+            loadImages();
+        });
 
         // Load data on page load
         async function initializePage() {

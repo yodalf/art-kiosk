@@ -98,7 +98,11 @@
         <div id="loading">Loading images...</div>
     </div>
 
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+
         let images = [];
         let currentIndex = 0;
         let interval = {{ interval }} * 1000; // Convert to milliseconds (I)
@@ -109,19 +113,12 @@
         let previousShuffleId = null; // Track shuffle_id to detect order changes
 
         // Debug logging function - sends to both console and server
-        async function debugLog(message, level = 'info') {
+        function debugLog(message, level = 'info') {
             console.log(message);
 
-            try {
-                await fetch('/api/debug/log', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ message, level })
-                });
-            } catch (error) {
-                // Silently fail if debug logging fails
+            // Send to server via WebSocket
+            if (socket.connected) {
+                socket.emit('log_debug', { message, level });
             }
         }
 
@@ -216,16 +213,16 @@
 
                 // Check if images changed
                 if (vectorsAreDifferent(newVector, previousImageVector)) {
-                    await debugLog(`Enabled images changed!`, 'info');
-                    await debugLog(`Old vector (VP): [${previousImageVector.join(', ')}]`);
-                    await debugLog(`New vector (V): [${newVector.join(', ')}]`);
+                    debugLog(`Enabled images changed!`, 'info');
+                    debugLog(`Old vector (VP): [${previousImageVector.join(', ')}]`);
+                    debugLog(`New vector (V): [${newVector.join(', ')}]`);
                     needsReload = true;
                 }
 
                 // Check if shuffle_id changed (theme/atmosphere switched)
                 let shuffleChanged = false;
                 if (newShuffleId !== previousShuffleId) {
-                    await debugLog(`Shuffle ID changed! Order will be refreshed.`, 'info');
+                    debugLog(`Shuffle ID changed! Order will be refreshed.`, 'info');
                     previousShuffleId = newShuffleId;
                     shuffleChanged = true;
                     needsReload = true;
@@ -233,25 +230,25 @@
 
                 // Check if interval changed
                 if (newInterval !== interval) {
-                    await debugLog(`Interval changed! ${interval / 1000}s -> ${newInterval / 1000}s`);
+                    debugLog(`Interval changed! ${interval / 1000}s -> ${newInterval / 1000}s`);
                     interval = newInterval;
                     needsReload = true;
                 }
 
                 // Check if crops changed
                 if (JSON.stringify(newImageCrops) !== JSON.stringify(imageCrops)) {
-                    await debugLog(`Image crops changed!`, 'info');
+                    debugLog(`Image crops changed!`, 'info');
                     imageCrops = newImageCrops;
                     needsReload = true;
                 }
 
                 if (needsReload) {
-                    await debugLog('Reloading slideshow...', 'info');
+                    debugLog('Reloading slideshow...', 'info');
                     await reloadSlideshow(shuffleChanged);
                 }
             } catch (error) {
                 console.error('Error checking for changes:', error);
-                await debugLog(`Error checking for changes: ${error.message}`, 'error');
+                debugLog(`Error checking for changes: ${error.message}`, 'error');
             }
         }
 
@@ -587,42 +584,88 @@
         }
 
         // Show specific slide
-        function showSlide(index) {
+        function showSlide(index, instant = false) {
             const slides = document.querySelectorAll('.slide');
 
-            // Hide all slides
-            slides.forEach(slide => {
-                slide.classList.remove('active');
-            });
+            if (instant) {
+                // Instant transition: disable transition FIRST, then change properties
+                // Step 1: Disable transitions on all slides
+                slides.forEach(slide => {
+                    slide.style.transition = 'none';
+                });
+                // Force reflow to ensure transition: none is applied
+                slides[0].offsetHeight;
 
-            // Show current slide
-            if (slides[index]) {
-                slides[index].classList.add('active');
-                currentIndex = index;
+                // Step 2: Now hide all slides
+                slides.forEach(slide => {
+                    slide.style.display = 'none';
+                    slide.style.opacity = '0';
+                    slide.classList.remove('active');
+                });
 
-                // Report current image to server
-                if (images[index]) {
-                    reportCurrentImage(images[index].name);
+                // Step 3: Show the target slide
+                if (slides[index]) {
+                    slides[index].style.display = 'flex';
+                    slides[index].style.opacity = '1';
+                    slides[index].classList.add('active');
+                    currentIndex = index;
+
+                    // Report current image to server
+                    if (images[index]) {
+                        reportCurrentImage(images[index].name);
+                    }
+
+                    // Check if this slide has a cropped image and reapply crop
+                    const cropContainer = slides[index].querySelector('div[style*="overflow: hidden"]');
+                    if (cropContainer) {
+                        const img = cropContainer.querySelector('img');
+                        const imageName = img.alt;
+                        const cropData = imageCrops[imageName];
+
+                        if (cropData) {
+                            debugLog(`Reapplying crop for ${imageName} when showing slide`, 'info');
+                            applyCrop(img, cropContainer, cropData);
+                        }
+                    }
                 }
+            } else {
+                // Normal transition: use CSS classes with opacity transition
+                // Clear any inline styles first
+                slides.forEach(slide => {
+                    slide.style.transition = '';
+                    slide.style.display = '';
+                    slide.style.opacity = '';
+                    slide.classList.remove('active');
+                });
 
-                // Check if this slide has a cropped image and reapply crop
-                const cropContainer = slides[index].querySelector('div[style*="overflow: hidden"]');
-                if (cropContainer) {
-                    const img = cropContainer.querySelector('img');
-                    const imageName = img.alt;
-                    const cropData = imageCrops[imageName];
+                // Show current slide
+                if (slides[index]) {
+                    slides[index].classList.add('active');
+                    currentIndex = index;
 
-                    if (cropData) {
-                        debugLog(`Reapplying crop for ${imageName} when showing slide`, 'info');
-                        // Reapply the crop now that the slide is active and has dimensions
-                        applyCrop(img, cropContainer, cropData);
+                    // Report current image to server
+                    if (images[index]) {
+                        reportCurrentImage(images[index].name);
+                    }
+
+                    // Check if this slide has a cropped image and reapply crop
+                    const cropContainer = slides[index].querySelector('div[style*="overflow: hidden"]');
+                    if (cropContainer) {
+                        const img = cropContainer.querySelector('img');
+                        const imageName = img.alt;
+                        const cropData = imageCrops[imageName];
+
+                        if (cropData) {
+                            debugLog(`Reapplying crop for ${imageName} when showing slide`, 'info');
+                            applyCrop(img, cropContainer, cropData);
+                        }
                     }
                 }
             }
         }
 
         // Next slide
-        async function nextSlide() {
+        async function nextSlide(instant = false) {
             debugLog(`nextSlide called: currentIndex=${currentIndex}, images.length=${images.length}, last=${currentIndex === images.length - 1}`, 'debug');
 
             // Check if we're at the last image and about to loop
@@ -676,13 +719,13 @@
             // Normal advancement (or fallback if reshuffle failed)
             debugLog(`Normal slide advancement: ${currentIndex} -> ${(currentIndex + 1) % images.length}`, 'debug');
             currentIndex = (currentIndex + 1) % images.length;
-            showSlide(currentIndex);
+            showSlide(currentIndex, instant);
         }
 
         // Previous slide
-        function prevSlide() {
+        function prevSlide(instant = false) {
             currentIndex = (currentIndex - 1 + images.length) % images.length;
-            showSlide(currentIndex);
+            showSlide(currentIndex, instant);
         }
 
         // Start automatic slideshow
@@ -712,14 +755,14 @@
             switch(e.key) {
                 case 'ArrowRight':
                 case ' ':
-                    nextSlide();
+                    nextSlide(true); // Instant transition for keyboard control
                     // Only restart timer if not paused
                     if (!isPaused) {
                         startSlideshow();
                     }
                     break;
                 case 'ArrowLeft':
-                    prevSlide();
+                    prevSlide(true); // Instant transition for keyboard control
                     // Only restart timer if not paused
                     if (!isPaused) {
                         startSlideshow();
@@ -739,18 +782,7 @@
         // Poll for remote control commands
         let isPaused = false;
 
-        async function pollRemoteControl() {
-            try {
-                const response = await fetch('/api/control/poll');
-                const data = await response.json();
-
-                if (data.command) {
-                    executeCommand(data.command);
-                }
-            } catch (error) {
-                console.error('Error polling for commands:', error);
-            }
-        }
+        // Removed pollRemoteControl - now using WebSocket events
 
         // Execute remote command
         async function executeCommand(command) {
@@ -759,8 +791,8 @@
                 const imageName = command.image_name;
                 const imageIndex = images.findIndex(img => img.name === imageName);
                 if (imageIndex !== -1) {
-                    // Image found in current array, jump to it
-                    showSlide(imageIndex);
+                    // Image found in current array, jump to it (instant transition)
+                    showSlide(imageIndex, true);
                     // Restart slideshow if not paused
                     if (!isPaused) {
                         startSlideshow();
@@ -776,14 +808,14 @@
             // Handle string commands
             switch(command) {
                 case 'next':
-                    nextSlide();
+                    nextSlide(true); // Instant transition for remote control
                     // Only restart slideshow if not paused
                     if (!isPaused) {
                         startSlideshow();
                     }
                     break;
                 case 'prev':
-                    prevSlide();
+                    prevSlide(true); // Instant transition for remote control
                     // Only restart slideshow if not paused
                     if (!isPaused) {
                         startSlideshow();
@@ -807,18 +839,41 @@
             }
         }
 
+        // WebSocket event handlers
+        socket.on('connect', () => {
+            debugLog('WebSocket connected', 'info');
+        });
+
+        socket.on('disconnect', () => {
+            debugLog('WebSocket disconnected', 'warn');
+        });
+
+        socket.on('reconnect', (attemptNumber) => {
+            debugLog(`WebSocket reconnected after ${attemptNumber} attempts`, 'info');
+            // Reload to ensure we have latest state
+            checkForImageChanges();
+        });
+
+        socket.on('remote_command', (command) => {
+            executeCommand(command);
+        });
+
+        socket.on('settings_update', (settings) => {
+            debugLog('Settings updated via WebSocket', 'info');
+            checkForImageChanges();
+        });
+
+        socket.on('image_list_changed', () => {
+            debugLog('Image list changed via WebSocket', 'info');
+            checkForImageChanges();
+        });
+
         // Send initial debug message
         debugLog('Kiosk display starting... (I=' + (interval/1000) + 's, C=' + (checkInterval/1000) + 's)', 'info');
         debugLog(`Screen resolution: ${window.screen.width}x${window.screen.height}`, 'info');
         debugLog(`Window inner size: ${window.innerWidth}x${window.innerHeight}`, 'info');
         debugLog(`Window outer size: ${window.outerWidth}x${window.outerHeight}`, 'info');
         debugLog(`Device pixel ratio: ${window.devicePixelRatio}`, 'info');
-
-        // Poll for commands every 500ms
-        setInterval(pollRemoteControl, 500);
-
-        // Check for enabled image changes every C seconds
-        setInterval(checkForImageChanges, checkInterval);
 
         // Parse URL parameters for starting image
         const urlParams = new URLSearchParams(window.location.search);
