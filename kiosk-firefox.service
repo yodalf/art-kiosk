@@ -9,13 +9,21 @@ Type=simple
 User=realo
 Environment="DISPLAY=:0"
 Environment="XAUTHORITY=/home/realo/.Xauthority"
+# Kill any existing Firefox and unclutter processes
+ExecStartPre=-/usr/bin/pkill -u realo firefox
+ExecStartPre=-/usr/bin/pkill -u realo unclutter
+ExecStartPre=/bin/sleep 2
+# Wait for Flask server to be ready
 ExecStartPre=/bin/sleep 5
-ExecStartPre=/usr/bin/xset s off
-ExecStartPre=/usr/bin/xset -dpms
-ExecStartPre=/usr/bin/xset s noblank
-ExecStart=/bin/bash -c 'unclutter -idle 0.1 -root & firefox --kiosk http://localhost/view'
+ExecStartPre=-/usr/bin/xset s off
+ExecStartPre=-/usr/bin/xset -dpms
+ExecStartPre=-/usr/bin/xset s noblank
+# Wait for server to respond before launching Firefox
+ExecStartPre=/bin/bash -c 'until curl -s http://localhost/view > /dev/null; do sleep 1; done'
+ExecStart=/home/realo/kiosk_images/start-firefox-kiosk.sh
 Restart=always
 RestartSec=10
+KillMode=control-group
 
 [Install]
 WantedBy=graphical.target

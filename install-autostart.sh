@@ -34,10 +34,15 @@ cp "$SCRIPT_DIR/kiosk-display.service" /etc/systemd/system/
 cp "$SCRIPT_DIR/kiosk-firefox.service" /etc/systemd/system/
 
 # Update WorkingDirectory and User in service files to actual values
-sed -i "s|/home/pi/kiosk_images|$SCRIPT_DIR|g" /etc/systemd/system/kiosk-display.service
-sed -i "s|/home/pi|$REAL_HOME|g" /etc/systemd/system/kiosk-firefox.service
-sed -i "s|User=pi|User=$REAL_USER|g" /etc/systemd/system/kiosk-display.service
-sed -i "s|User=pi|User=$REAL_USER|g" /etc/systemd/system/kiosk-firefox.service
+sed -i "s|/home/realo/kiosk_images|$SCRIPT_DIR|g" /etc/systemd/system/kiosk-display.service
+sed -i "s|/home/realo/kiosk_images|$SCRIPT_DIR|g" /etc/systemd/system/kiosk-firefox.service
+sed -i "s|/home/realo|$REAL_HOME|g" /etc/systemd/system/kiosk-firefox.service
+sed -i "s|User=realo|User=$REAL_USER|g" /etc/systemd/system/kiosk-display.service
+sed -i "s|User=realo|User=$REAL_USER|g" /etc/systemd/system/kiosk-firefox.service
+sed -i "s|-u realo|-u $REAL_USER|g" /etc/systemd/system/kiosk-firefox.service
+
+# Make startup scripts executable
+chmod +x "$SCRIPT_DIR/start-firefox-kiosk.sh"
 
 # Reload systemd
 echo ""

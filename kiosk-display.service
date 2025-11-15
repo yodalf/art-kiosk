@@ -7,6 +7,8 @@ Type=simple
 User=realo
 WorkingDirectory=/home/realo/kiosk_images
 Environment="DISPLAY=:0"
+# Kill any process using port 80 before starting
+ExecStartPre=-/usr/bin/fuser -k 80/tcp
 # Allow binding to port 80 without root
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 ExecStart=/home/realo/kiosk_images/venv/bin/python /home/realo/kiosk_images/app.py
