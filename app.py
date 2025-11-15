@@ -7,6 +7,7 @@ A simple Flask server for managing and displaying images in kiosk mode.
 import os
 import json
 import time
+import random
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
@@ -194,6 +195,10 @@ def list_images():
                 'enabled': enabled,
                 'themes': themes
             })
+
+    # Randomize the order of images
+    random.shuffle(images)
+
     return jsonify(images)
 
 
