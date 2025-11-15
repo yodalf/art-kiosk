@@ -1045,7 +1045,7 @@
         // Load and display images
         async function loadImages() {
             try {
-                const response = await fetch('/api/images');
+                const response = await fetch('/api/images?enabled_only=true');
                 const images = await response.json();
 
                 // Load crop settings
@@ -1057,50 +1057,22 @@
                 const heading = document.getElementById('current-images-heading');
                 grid.innerHTML = '';
 
-                if (images.length === 0) {
-                    grid.innerHTML = '<p style="color: #999;">No images uploaded yet</p>';
-                    heading.textContent = 'Current Images';
-                    return;
-                }
-
-                // Filter images by active atmosphere or theme
-                let filteredImages = images;
-
+                // Update heading based on active atmosphere or theme
                 if (activeAtmosphere) {
-                    // Update heading to show atmosphere name
                     heading.textContent = `Current Images - Atmosphere: ${activeAtmosphere}`;
-
-                    // If atmosphere is active, show images from all themes in that atmosphere
-                    const themesInAtmosphere = atmosphereThemes[activeAtmosphere] || [];
-                    filteredImages = images.filter(image => {
-                        if (!image.themes || image.themes.length === 0) return false;
-                        // Image must belong to at least one theme in the atmosphere
-                        return image.themes.some(theme => themesInAtmosphere.includes(theme));
-                    });
-
-                    if (filteredImages.length === 0) {
-                        grid.innerHTML = '<p style="color: #999;">No images in the selected atmosphere</p>';
-                        return;
-                    }
                 } else if (activeTheme && activeTheme !== 'All Images') {
-                    // Update heading to show theme name
                     heading.textContent = `Current Images - Theme: ${activeTheme}`;
-
-                    // Filter by active theme
-                    filteredImages = images.filter(image => {
-                        return image.themes && image.themes.includes(activeTheme);
-                    });
-
-                    if (filteredImages.length === 0) {
-                        grid.innerHTML = '<p style="color: #999;">No images in the selected theme</p>';
-                        return;
-                    }
                 } else {
-                    // No filter active
                     heading.textContent = activeTheme === 'All Images' ? 'Current Images - All Images' : 'Current Images';
                 }
 
-                filteredImages.forEach(image => {
+                if (images.length === 0) {
+                    grid.innerHTML = '<p style="color: #999;">No enabled images in current selection</p>';
+                    return;
+                }
+
+                // Images are already filtered and shuffled by backend
+                images.forEach(image => {
                     const cropData = imageCrops[image.name];
                     const card = createImageCard(image, cropData);
                     grid.appendChild(card);
