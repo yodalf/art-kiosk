@@ -1556,13 +1556,8 @@
                 if (response.ok) {
                     activeAtmosphere = atmosphereName;
 
-                    // Clear active theme when selecting an atmosphere
-                    // Note: We don't need to call the API to clear theme because
-                    // the backend already handles this - when an atmosphere is active,
-                    // it takes precedence over the theme in the filtering logic
-                    activeTheme = null;
-
                     // Reload both atmospheres and themes to update active state
+                    // Note: Theme badges won't show as active when an atmosphere is active
                     await loadAtmospheres();
                     await loadThemes();
                     await loadImages();
@@ -1689,7 +1684,8 @@
 
                     const badge = document.createElement('div');
                     badge.className = 'theme-badge';
-                    if (themeName === activeTheme) {
+                    // Only show theme as active if no atmosphere is active
+                    if (themeName === activeTheme && !activeAtmosphere) {
                         badge.classList.add('active');
                     }
 
