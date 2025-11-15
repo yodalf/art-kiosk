@@ -354,9 +354,6 @@ def reshuffle_images():
 
         print(f"[RESHUFFLE] Request received. avoid_first={avoid_first}")
 
-        # Generate new shuffle_id
-        new_shuffle_id = random.random()
-
         # Get the current image list (same logic as list_images endpoint)
         enabled_only = True
         active_atmosphere = settings.get('active_atmosphere')
@@ -394,37 +391,43 @@ def reshuffle_images():
 
         print(f"[RESHUFFLE] Found {len(images)} images to shuffle")
 
-        # Apply the shuffle
-        random.seed(new_shuffle_id)
-        random.shuffle(images)
-        random.seed()
+        # If no avoid_first constraint, just generate a new shuffle
+        if not avoid_first or len(images) <= 1:
+            new_shuffle_id = random.random()
+            settings['shuffle_id'] = new_shuffle_id
+            save_settings(settings)
+            print(f"[RESHUFFLE] No constraint, using shuffle_id={new_shuffle_id}")
+            return jsonify({'success': True, 'shuffle_id': new_shuffle_id})
 
-        # If we need to avoid a specific first image, swap it with another image
-        if avoid_first and images and images[0]['name'] == avoid_first:
-            print(f"[RESHUFFLE] First image is {avoid_first}, need to swap")
-            # Find first image that's not the avoided one
-            swap_index = None
-            for i in range(1, len(images)):
-                if images[i]['name'] != avoid_first:
-                    swap_index = i
-                    break
+        # Keep trying new shuffles until we find one where first image != avoid_first
+        # With N images avoiding 1, probability of success is (N-1)/N per attempt
+        # For 3 images: 66% per attempt, 99.9% within 20 attempts
+        max_attempts = 100
+        for attempt in range(max_attempts):
+            new_shuffle_id = random.random()
 
-            if swap_index is not None:
-                # Swap first image with the found image
-                images[0], images[swap_index] = images[swap_index], images[0]
-                print(f"[RESHUFFLE] Swapped with image at index {swap_index}: {images[0]['name']}")
+            # Test this shuffle
+            random.seed(new_shuffle_id)
+            test_images = images.copy()
+            random.shuffle(test_images)
+            random.seed()
+
+            first_image = test_images[0]['name'] if test_images else None
+
+            if first_image != avoid_first:
+                # Success! This shuffle has a different first image
+                settings['shuffle_id'] = new_shuffle_id
+                save_settings(settings)
+                print(f"[RESHUFFLE] Success on attempt {attempt+1}: first={first_image}, shuffle_id={new_shuffle_id}")
+                return jsonify({'success': True, 'shuffle_id': new_shuffle_id})
             else:
-                # Edge case: all images are the same (only one unique image)
-                print(f"[RESHUFFLE] Warning: all images are the same, cannot avoid {avoid_first}")
+                print(f"[RESHUFFLE] Attempt {attempt+1}: first={first_image} matches avoid={avoid_first}, retrying")
 
-        first_image = images[0]['name'] if images else 'NONE'
-        print(f"[RESHUFFLE] Final first image: {first_image}, shuffle_id={new_shuffle_id}")
-
-        # Save the new shuffle_id
+        # If we somehow fail after 100 attempts, just use the last one
         settings['shuffle_id'] = new_shuffle_id
         save_settings(settings)
-
-        return jsonify({'success': True, 'shuffle_id': new_shuffle_id})
+        print(f"[RESHUFFLE] Max attempts reached, using shuffle_id={new_shuffle_id}")
+        return jsonify({'success': True, 'shuffle_id': new_shuffle_id, 'warning': 'Could not avoid specified image'})
 
     except Exception as e:
         print(f"[RESHUFFLE] ERROR: {type(e).__name__}: {str(e)}")
