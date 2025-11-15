@@ -144,6 +144,16 @@
         // Fetch images from API
         async function loadImages(startIndex = 0, startImageName = null) {
             try {
+                // Stop current slideshow
+                if (slideTimer) {
+                    clearInterval(slideTimer);
+                }
+
+                // Clear existing slides to prevent duplicates
+                const container = document.getElementById('slideshow-container');
+                const slides = container.querySelectorAll('.slide');
+                slides.forEach(slide => slide.remove());
+
                 // Only fetch enabled images for the kiosk display
                 const response = await fetch('/api/images?enabled_only=true');
                 const newImages = await response.json();
