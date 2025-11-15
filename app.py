@@ -344,6 +344,78 @@ def current_image():
         return jsonify({'current_image': current_kiosk_image})
 
 
+@app.route('/api/kiosk/reshuffle', methods=['POST'])
+def reshuffle_images():
+    """Reshuffle images with a new random order, optionally avoiding a specific image as first."""
+    settings = get_settings()
+    data = request.json or {}
+    avoid_first = data.get('avoid_first')  # Image name to avoid as first image
+
+    # Try up to 10 times to get a shuffle where the first image is different
+    max_attempts = 10
+    for attempt in range(max_attempts):
+        # Generate new shuffle_id
+        new_shuffle_id = random.random()
+
+        if not avoid_first:
+            # No constraint, accept this shuffle
+            settings['shuffle_id'] = new_shuffle_id
+            save_settings(settings)
+            return jsonify({'success': True, 'shuffle_id': new_shuffle_id})
+
+        # Test this shuffle to see if first image is different
+        # Get the current image list (same logic as list_images endpoint)
+        enabled_only = True
+        active_atmosphere = settings.get('active_atmosphere')
+        active_theme = settings.get('active_theme')
+        image_themes = settings.get('image_themes', {})
+        atmosphere_themes = settings.get('atmosphere_themes', {})
+
+        # Determine which themes to filter by
+        allowed_themes = None
+        if enabled_only:
+            if active_atmosphere:
+                allowed_themes = set(atmosphere_themes.get(active_atmosphere, []))
+            elif active_theme and active_theme != 'All Images':
+                allowed_themes = {active_theme}
+
+        # Get images
+        images = []
+        if os.path.exists(IMAGE_FOLDER):
+            for filename in os.listdir(IMAGE_FOLDER):
+                if filename.lower().endswith(ALLOWED_EXTENSIONS):
+                    # Check if image is enabled
+                    is_enabled = settings.get('enabled_images', {}).get(filename, True)
+                    if enabled_only and not is_enabled:
+                        continue
+
+                    # Check theme filtering
+                    if allowed_themes is not None:
+                        img_themes = set(image_themes.get(filename, []))
+                        if not img_themes.intersection(allowed_themes):
+                            continue
+
+                    images.append({'name': filename})
+
+        # Apply the test shuffle
+        random.seed(new_shuffle_id)
+        random.shuffle(images)
+        random.seed()
+
+        # Check if first image is different from avoid_first
+        if images and images[0]['name'] != avoid_first:
+            # Success! This shuffle has a different first image
+            settings['shuffle_id'] = new_shuffle_id
+            save_settings(settings)
+            return jsonify({'success': True, 'shuffle_id': new_shuffle_id})
+
+    # After max attempts, just use the last shuffle even if it matches
+    # (This should be very rare with even a few images)
+    settings['shuffle_id'] = new_shuffle_id
+    save_settings(settings)
+    return jsonify({'success': True, 'shuffle_id': new_shuffle_id, 'warning': 'Could not avoid specified image'})
+
+
 @app.route('/api/debug/log', methods=['POST'])
 def log_debug():
     """Receive debug message from kiosk."""

@@ -622,7 +622,47 @@
         }
 
         // Next slide
-        function nextSlide() {
+        async function nextSlide() {
+            // Check if we're at the last image and about to loop
+            if (currentIndex === images.length - 1) {
+                // We're about to loop back to the beginning
+                // Reshuffle the images, avoiding the current (last) image as the new first image
+                const lastImageName = images[currentIndex]?.name;
+
+                debugLog(`Reached end of slideshow, reshuffling. Avoiding ${lastImageName} as first image.`, 'info');
+
+                try {
+                    // Call reshuffle API
+                    const response = await fetch('/api/kiosk/reshuffle', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            avoid_first: lastImageName
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        debugLog(`Reshuffled with new shuffle_id: ${result.shuffle_id}`, 'info');
+
+                        // Reload images with new shuffle
+                        await loadImages(0);  // Start from first image (index 0)
+
+                        // Restart slideshow if not paused
+                        if (!isPaused) {
+                            startSlideshow();
+                        }
+                        return;
+                    }
+                } catch (error) {
+                    debugLog(`Error reshuffling: ${error.message}`, 'error');
+                    // Fall through to normal behavior if reshuffle fails
+                }
+            }
+
+            // Normal advancement (or fallback if reshuffle failed)
             currentIndex = (currentIndex + 1) % images.length;
             showSlide(currentIndex);
         }
