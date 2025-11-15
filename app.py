@@ -508,7 +508,10 @@ def set_active_theme():
 
     settings['active_theme'] = theme_name
 
-    # Regenerate shuffle_id for new random order
+    # Clear active atmosphere when setting a theme
+    settings['active_atmosphere'] = None
+
+    # Regenerate shuffle_id for new random order (only once!)
     settings['shuffle_id'] = random.random()
 
     save_settings(settings)

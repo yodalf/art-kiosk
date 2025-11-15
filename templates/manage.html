@@ -1858,14 +1858,7 @@
 
                 if (response.ok) {
                     activeTheme = themeName;
-
-                    // Clear active atmosphere when directly selecting a theme
-                    await fetch('/api/atmospheres/active', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ atmosphere_name: null })
-                    });
-                    activeAtmosphere = null;
+                    activeAtmosphere = null; // Backend clears this automatically
 
                     // Reload atmospheres and themes to update active state
                     await loadAtmospheres();
