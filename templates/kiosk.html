@@ -106,6 +106,7 @@
         let slideTimer = null;
         let fillMode = false; // false = cover mode (fills screen), true = contain mode (shows full image)
         let previousImageVector = []; // VP - previous vector of enabled image names
+        let previousShuffleId = null; // Track shuffle_id to detect order changes
 
         // Debug logging function - sends to both console and server
         async function debugLog(message, level = 'info') {
@@ -175,10 +176,11 @@
                 images = newImages;
                 previousImageVector = getImageVector(images); // Store current vector as VP
 
-                // Load crop settings
+                // Load crop settings and shuffle_id
                 const settingsResponse = await fetch('/api/settings');
                 const settings = await settingsResponse.json();
                 imageCrops = settings.image_crops || {};
+                previousShuffleId = settings.shuffle_id; // Store shuffle_id to detect order changes
                 debugLog(`Loaded ${Object.keys(imageCrops).length} image crops from settings`, 'info');
                 if (Object.keys(imageCrops).length > 0) {
                     debugLog(`Crops for: ${Object.keys(imageCrops).join(', ')}`, 'info');
@@ -208,6 +210,7 @@
                 const settings = await settingsResponse.json();
                 const newInterval = settings.interval * 1000;
                 const newImageCrops = settings.image_crops || {};
+                const newShuffleId = settings.shuffle_id;
 
                 let needsReload = false;
 
@@ -216,6 +219,13 @@
                     await debugLog(`Enabled images changed!`, 'info');
                     await debugLog(`Old vector (VP): [${previousImageVector.join(', ')}]`);
                     await debugLog(`New vector (V): [${newVector.join(', ')}]`);
+                    needsReload = true;
+                }
+
+                // Check if shuffle_id changed (theme/atmosphere switched)
+                if (newShuffleId !== previousShuffleId) {
+                    await debugLog(`Shuffle ID changed! Order will be refreshed.`, 'info');
+                    previousShuffleId = newShuffleId;
                     needsReload = true;
                 }
 
