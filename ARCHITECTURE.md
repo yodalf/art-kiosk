@@ -41,10 +41,12 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 - Image management (upload, delete, list)
 - Image crop data storage and retrieval
 - Settings persistence (JSON file storage)
-- Theme management
+- Theme and atmosphere management
 - Remote control command queue
 - Debug logging
-- Image filtering by enabled state and active theme
+- Image filtering by enabled state, active theme, and active atmosphere
+- Randomization with consistent seeding via shuffle_id
+- Auto-preview newly uploaded images on kiosk display
 
 **Technology Stack**:
 - Python 3.7+
@@ -59,8 +61,9 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 **Key Features**:
 - Automatic slideshow with configurable interval
 - Image cropping with automatic scaling to fill display
-- Dissolve transitions (optional)
-- Smart reload algorithm
+- Dissolve transitions (always enabled)
+- Smart reload algorithm with shuffle_id detection
+- Randomized image ordering that changes with theme/atmosphere switches
 - Remote control command polling
 - Keyboard controls
 - Debug logging to server
@@ -82,7 +85,8 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 │  │  - Compare with previous vector (VP)       │         │
 │  │  - Check interval setting                  │         │
 │  │  - Check dissolve setting                  │         │
-│  │  - Reload if changed                       │         │
+│  │  - Check shuffle_id (order changes)        │         │
+│  │  - Reload if changed (reset to index 0)   │         │
 │  └────────────────────────────────────────────┘         │
 │                                                         │
 │  ┌────────────────────────────────────────────┐         │
@@ -97,21 +101,27 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 
 **Role**: Web interface for configuring and controlling the kiosk.
 
+**Design**: Professional dark theme with black background (#000000), dark containers (#1a1a1a), white text, and color-coded badges (purple for atmospheres, blue for themes).
+
 **Sections**:
 1. **Remote Control** - Control buttons with LED indicators
-2. **Themes** - Create, delete, select active theme (includes permanent "All Images" theme)
-3. **Upload Images** - Drag-and-drop upload area
-4. **Current Images** - Grid of thumbnails with controls (filtered by active theme)
-5. **Debug Console** - Live logs from kiosk display (toggle with DEBUG button)
+2. **Atmospheres** - Create, delete, select active atmosphere, assign themes to atmospheres (purple badges)
+3. **Themes** - Create, delete, select active theme (includes permanent "All Images" theme, blue badges)
+4. **Upload Images** - Drag-and-drop upload area
+5. **Current Images** - Grid of thumbnails with controls (filtered by active atmosphere or theme, randomized order)
+6. **Debug Console** - Live logs from kiosk display (toggle with DEBUG button)
 
 **Interactive Features**:
 - Click image thumbnail to jump to that image
 - Crop images using Cropper.js modal interface
 - Enable/disable images with checkboxes
 - Assign images to themes via dropdown
+- Assign themes to atmospheres via modal
 - Remove images from themes by clicking theme tags
 - LED indicators show play/pause state
 - Cropped thumbnails preview actual kiosk display
+- Mutual exclusivity: selecting atmosphere deselects theme, and vice versa
+- Auto-preview: newly uploaded images automatically display on kiosk
 
 ## Data Model
 
@@ -149,6 +159,24 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
     "photo3.jpg": ["Urban"]
   },
   "active_theme": "All Images",
+  "atmospheres": {
+    "Evening": {
+      "name": "Evening",
+      "created": 1699752300,
+      "interval": 1800
+    },
+    "Morning": {
+      "name": "Morning",
+      "created": 1699752400,
+      "interval": 3600
+    }
+  },
+  "atmosphere_themes": {
+    "Evening": ["Nature", "Urban"],
+    "Morning": ["Nature"]
+  },
+  "active_atmosphere": null,
+  "shuffle_id": 0.123456789,
   "image_crops": {
     "photo1.jpg": {
       "x": 0,
@@ -163,14 +191,18 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 ```
 
 **Fields**:
-- `interval` (I): Current slideshow transition interval in seconds (synced with active theme's interval)
+- `interval` (I): Current slideshow transition interval in seconds (synced with active theme/atmosphere interval)
 - `check_interval` (C): How often to check for changes (always 2)
 - `enabled_images`: Per-image enabled/disabled state
 - `dissolve_enabled`: Enable smooth fade transitions (always true)
 - `themes`: Dictionary of theme definitions, each theme has its own `interval` in seconds (default: 3600 = 60 minutes)
   - **"All Images"**: Permanent theme that cannot be deleted, shows all enabled images regardless of theme assignments
 - `image_themes`: Image-to-theme mappings (many-to-many)
-- `active_theme`: Currently selected theme (always set, defaults to "All Images"). Active theme's interval is used for slideshow.
+- `active_theme`: Currently selected theme (always set, defaults to "All Images"). Active theme's interval is used for slideshow when no atmosphere is active.
+- `atmospheres`: Dictionary of atmosphere definitions, each with its own `interval` in seconds
+- `atmosphere_themes`: Atmosphere-to-theme mappings (one-to-many, atmospheres contain themes)
+- `active_atmosphere`: Currently selected atmosphere (null if none active). Takes priority over active_theme for filtering and interval.
+- `shuffle_id`: Random seed for consistent image ordering. Regenerates on theme/atmosphere change to create new random order.
 - `image_crops`: Per-image crop data containing x, y, width, height coordinates in original image space, plus original imageWidth and imageHeight for scaling calculations
 
 ### Image Model
@@ -191,8 +223,8 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 ## API Endpoints
 
 ### Images
-- `GET /api/images?enabled_only=true` - List images (filtered by enabled and active theme)
-- `POST /api/images` - Upload image (multipart/form-data)
+- `GET /api/images?enabled_only=true` - List images (filtered by enabled, active atmosphere, and active theme, randomized by shuffle_id)
+- `POST /api/images` - Upload image (multipart/form-data, auto-assigns to active theme and sends jump command for preview)
 - `DELETE /api/images/<filename>` - Delete image
 - `POST /api/images/<filename>/toggle` - Toggle enabled state
 - `POST /api/images/<filename>/themes` - Update theme assignments
@@ -204,9 +236,17 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 ### Themes
 - `GET /api/themes` - List themes and active theme
 - `POST /api/themes` - Create theme (default interval: 3600 seconds = 60 minutes)
-- `DELETE /api/themes/<name>` - Delete theme
+- `DELETE /api/themes/<name>` - Delete theme (cannot delete "All Images")
 - `POST /api/themes/<name>/interval` - Update theme interval
-- `POST /api/themes/active` - Set active theme (also updates global interval to theme's interval)
+- `POST /api/themes/active` - Set active theme (clears active_atmosphere, updates global interval, regenerates shuffle_id)
+
+### Atmospheres
+- `GET /api/atmospheres` - List all atmospheres
+- `POST /api/atmospheres` - Create atmosphere (`{"name": "Atmosphere Name"}`, default interval: 3600 seconds)
+- `DELETE /api/atmospheres/<name>` - Delete atmosphere
+- `POST /api/atmospheres/<name>/interval` - Update atmosphere interval (seconds)
+- `POST /api/atmospheres/active` - Set active atmosphere (`{"atmosphere_name": "Name"}` or null, clears active_theme, regenerates shuffle_id)
+- `POST /api/atmospheres/<name>/themes` - Update themes in atmosphere (`{"themes": ["Theme1", "Theme2"]}`)
 
 ### Remote Control
 - `POST /api/control/send` - Send command to kiosk
@@ -229,15 +269,17 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 ```javascript
 // Every C seconds (2 seconds):
 1. Fetch current enabled images → V (new vector)
-2. Fetch current settings (interval, dissolve, crops)
+2. Fetch current settings (interval, dissolve, crops, shuffle_id)
 3. Compare V with VP (previous vector)
 4. Compare interval with previous interval
 5. Compare crop data with previous crop data
-6. If anything changed:
+6. Compare shuffle_id with previous shuffle_id
+7. If anything changed:
    - Log change
    - Reload slideshow
-   - Update VP = V
-7. Else:
+   - If shuffle_id changed: start from index 0 (new order)
+   - Update VP = V, previous shuffle_id
+8. Else:
    - Continue playing
 ```
 
@@ -275,33 +317,53 @@ Management Interface                Kiosk Display
 - Cleared after being retrieved once
 - Kiosk polls every 500ms
 
-### 3. Theme Filtering
+### 3. Hierarchical Filtering (Atmospheres & Themes)
 
-**Purpose**: Display only images belonging to the active theme.
+**Purpose**: Display images based on active atmosphere or theme with priority hierarchy.
+
+**Hierarchy**: Atmospheres → Themes → Images
 
 **Logic**:
 ```python
 def list_images(enabled_only=False):
+    # Determine filtering strategy
+    allowed_themes = None
+    if enabled_only:
+        if active_atmosphere:
+            # Priority 1: Atmosphere active - get all themes in that atmosphere
+            allowed_themes = set(atmosphere_themes.get(active_atmosphere, []))
+        elif active_theme and active_theme != 'All Images':
+            # Priority 2: Only theme active - use that single theme
+            allowed_themes = {active_theme}
+        # Priority 3: "All Images" or no selection - no filtering
+
     for image in all_images:
         # Skip disabled images if filtering
         if enabled_only and not image.enabled:
             continue
 
-        # Skip images not in active theme if filtering
-        # "All Images" theme shows all enabled images
-        if enabled_only and active_theme and active_theme != 'All Images':
-            if active_theme not in image.themes:
-                continue
+        # Apply theme filtering if we have allowed_themes
+        if allowed_themes is not None:
+            image_themes_set = set(image.themes)
+            if not image_themes_set.intersection(allowed_themes):
+                continue  # Image not in any allowed theme
 
         yield image
+
+    # Randomize with consistent seed
+    random.seed(shuffle_id)
+    random.shuffle(images)
+    random.seed()  # Reset to random for other operations
 ```
 
 **Key Points**:
-- Theme filtering only applies when `enabled_only=true`
+- **Atmosphere takes priority**: If atmosphere is active, theme selection is ignored for filtering
 - **"All Images" theme**: Shows all enabled images (no theme filtering)
 - **Other themes**: Only show images assigned to that theme
-- Images without themes are only shown in "All Images" theme
-- Images can belong to multiple themes
+- **Atmospheres**: Show all images from all themes in that atmosphere
+- **Mutual exclusivity**: Setting atmosphere clears theme (and vice versa) for clean UX
+- **Randomization**: Images shuffled with consistent seed (shuffle_id) for same order across kiosk and management
+- **shuffle_id regeneration**: New random order on every theme/atmosphere change
 
 ### 4. Crop Scaling Algorithm
 
@@ -343,6 +405,79 @@ def list_images(enabled_only=False):
 - Black bars appear on only one dimension (top/bottom OR left/right)
 - Container uses `overflow: hidden` to clip to viewport
 - Same algorithm used for both kiosk display and management thumbnails (different viewport sizes)
+
+### 5. Image Randomization with Shuffle ID
+
+**Purpose**: Provide randomized image order that stays consistent between kiosk and management, but changes with each theme/atmosphere switch.
+
+**Implementation**:
+```python
+# In settings.json
+shuffle_id = random.random()  # Value like 0.123456789
+
+# When listing images:
+random.seed(shuffle_id)
+random.shuffle(images)
+random.seed()  # Reset to unpredictable random
+
+# When changing theme/atmosphere:
+settings['shuffle_id'] = random.random()  # New random order
+save_settings(settings)
+```
+
+**Key Points**:
+- **Consistent order**: Same shuffle_id produces identical order on kiosk and management
+- **Truly random**: Each theme/atmosphere switch generates new shuffle_id
+- **No duplicates**: Uses Python's random.shuffle (Fisher-Yates algorithm)
+- **All images included**: Every enabled image appears exactly once
+- **Kiosk detection**: Tracks previousShuffleId to detect order changes and restart from index 0
+
+### 6. Auto-Preview on Upload
+
+**Purpose**: Immediately display newly uploaded images on the kiosk for review.
+
+**Implementation**:
+```python
+# In upload endpoint:
+def upload_image():
+    # Save image to disk
+    save_file(filename)
+
+    # Auto-assign to active theme (if not "All Images")
+    if active_theme and active_theme != 'All Images':
+        image_themes[filename] = [active_theme]
+        save_settings(settings)
+
+    # Send jump command to kiosk
+    current_command = {
+        'command': 'jump',
+        'image_name': filename
+    }
+    command_timestamp = time.time()
+
+    return success_response
+```
+
+**Jump Command with Reload Fallback**:
+```javascript
+// In kiosk.html executeCommand():
+case 'jump':
+    const imageIndex = images.findIndex(img => img.name === imageName);
+    if (imageIndex !== -1) {
+        // Image found - jump to it
+        showSlide(imageIndex);
+        if (!isPaused) startSlideshow();
+    } else {
+        // Image not in current list - reload to include it
+        await loadImages(0, imageName);
+    }
+```
+
+**Key Points**:
+- **Theme assignment**: New image added to active theme automatically
+- **Immediate display**: Jump command executes within 500ms via polling
+- **Reload fallback**: If image not in current list, triggers full reload
+- **Prevents duplicates**: loadImages() clears existing slides before rebuilding
 
 ## File Structure
 
@@ -423,12 +558,14 @@ Kiosk display showing
 
 **Persistent**:
 - Current image index
+- Current image name (for reload positioning)
 - Play/pause state
 - Fill mode (cover/contain)
 - Dissolve enabled
 
 **Ephemeral**:
 - Image vector (V, VP)
+- Previous shuffle_id (for change detection)
 - Slideshow timer
 - Poll intervals
 
@@ -439,7 +576,9 @@ Kiosk display showing
 
 **Ephemeral**:
 - Available themes (loaded on page load)
+- Available atmospheres (loaded on page load)
 - Active theme (loaded on page load)
+- Active atmosphere (loaded on page load)
 - LED states (play/pause indicators)
 - Debug console enabled/disabled
 
@@ -450,6 +589,9 @@ Kiosk display showing
 - Enabled images
 - Dissolve enabled
 - Themes, image_themes, active_theme
+- Atmospheres, atmosphere_themes, active_atmosphere
+- shuffle_id (for consistent randomization)
+- Image crops
 
 **Ephemeral** (in-memory):
 - Current remote control command
@@ -506,22 +648,29 @@ Kiosk display showing
 5. Add saving in `saveSettings()` in `manage.html`
 6. Add checking in `checkForImageChanges()` in `kiosk.html` if needed
 
-### Adding New Themes Features
-- Theme descriptions
+### Adding New Theme/Atmosphere Features
+- Theme descriptions and metadata
 - Theme colors/styling
-- Scheduled theme switching
-- Random theme selection
-- Theme-specific intervals
+- Scheduled theme/atmosphere switching (time-based)
+- Random theme/atmosphere selection
+- Atmosphere-specific intervals (already implemented)
+- Theme-specific intervals (already implemented)
+- Nested atmospheres (atmosphere hierarchies)
 
 ## Testing Recommendations
 
 ### Manual Testing
-1. **Image Management**: Upload, enable/disable, delete
-2. **Themes**: Create, assign, delete, switch active
-3. **Remote Control**: All buttons, LED states, pause behavior
-4. **Smart Reload**: Change images, interval, dissolve - verify reload
-5. **Click-to-Jump**: Click thumbnails, verify immediate switch
-6. **Autostart**: Reboot, verify services start correctly
+1. **Image Management**: Upload, enable/disable, delete, crop
+2. **Themes**: Create, assign, delete, switch active, verify "All Images" can't be deleted
+3. **Atmospheres**: Create, assign themes, delete, switch active
+4. **Hierarchy**: Verify atmosphere takes priority over theme
+5. **Mutual Exclusivity**: Verify selecting atmosphere clears theme and vice versa
+6. **Randomization**: Switch themes/atmospheres, verify order changes and matches between kiosk and management
+7. **Auto-Preview**: Upload image, verify kiosk immediately jumps to it
+8. **Remote Control**: All buttons, LED states, pause behavior
+9. **Smart Reload**: Change images, interval, dissolve, shuffle_id - verify reload
+10. **Click-to-Jump**: Click thumbnails, verify immediate switch
+11. **Autostart**: Reboot, verify services start correctly
 
 ### Browser Compatibility
 - Primary: Firefox (kiosk mode)
@@ -552,25 +701,54 @@ Kiosk display showing
 3. Verify DISPLAY=:0 and XAUTHORITY set correctly
 4. Check user permissions
 
-### Theme Filtering Not Working
-1. Verify active theme is set
+### Theme/Atmosphere Filtering Not Working
+1. Verify active theme or atmosphere is set
 2. Check images have themes assigned
-3. Look at API response: `/api/images?enabled_only=true`
-4. Check settings.json for correct theme mappings
+3. If using atmospheres, verify themes are assigned to the atmosphere
+4. Look at API response: `/api/images?enabled_only=true`
+5. Check settings.json for correct theme/atmosphere mappings
+6. Verify mutual exclusivity: only one of active_theme or active_atmosphere should be set
+
+### Randomization Not Working
+1. Check shuffle_id exists in settings.json
+2. Verify shuffle_id changes when switching themes/atmospheres
+3. Ensure both kiosk and management fetch with `enabled_only=true`
+4. Check that kiosk detects shuffle_id changes in checkForImageChanges()
+5. Verify kiosk restarts from index 0 when shuffle_id changes
+
+### Auto-Preview Not Working
+1. Verify jump command is sent on upload (check server logs)
+2. Check that uploaded image is assigned to active theme
+3. Verify kiosk polling is active (500ms interval)
+4. Check that loadImages() clears existing slides before rebuilding
+5. Look for errors in kiosk console (F12)
 
 ## Future Enhancements
+
+### Recently Implemented Features
+- [x] Hierarchical organization (Atmospheres → Themes → Images)
+- [x] Image randomization with consistent ordering
+- [x] Dark theme UI
+- [x] Auto-preview uploaded images on kiosk
+- [x] Image cropping with crop region preview
+- [x] Per-theme intervals
+- [x] Per-atmosphere intervals
+- [x] Remote control via polling
 
 ### Potential Features
 - [ ] Video support (MP4, WebM)
 - [ ] Audio narration per image
-- [ ] Scheduled theme switching (time-based)
-- [ ] Image transitions (slide, fade, zoom)
+- [ ] Scheduled theme/atmosphere switching (time-based, e.g., "Evening" atmosphere activates at 6 PM)
+- [ ] Image transitions (slide, fade, zoom, ken burns effect)
 - [ ] Multi-monitor support
-- [ ] EXIF data display
+- [ ] EXIF data display (camera, date, location)
 - [ ] Image ratings/favorites
-- [ ] Playlists (ordered sequences)
+- [ ] Playlists (ordered sequences with manual ordering)
 - [ ] Weather/clock overlays
-- [ ] REST API for external control (Home Assistant, etc.)
+- [ ] REST API for external control (Home Assistant, IFTTT, etc.)
+- [ ] Nested atmospheres (atmosphere hierarchies)
+- [ ] Theme/atmosphere descriptions and metadata
+- [ ] Image search and filtering
 
 ### Architecture Improvements
 - [ ] WebSocket instead of polling (real-time updates)

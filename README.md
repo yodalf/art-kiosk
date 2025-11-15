@@ -5,9 +5,13 @@ A web-based kiosk system for displaying images in slideshow mode, optimized for 
 ## Features
 
 - Web-based image upload and management
+- **Dark theme interface** - Professional black background across all pages
+- **Atmospheres** - Hierarchical organization layer above themes for complex content management
+- **Themes** - Organize images into multiple themes with per-theme intervals; images can belong to multiple themes
+- **Randomized ordering** - Images display in random order that changes with each theme/atmosphere switch
 - **Image cropping** - Crop images to select specific regions that fill the entire kiosk display
 - **Enable/disable individual images** - Control which images appear in the slideshow with checkboxes
-- **Themes** - Organize images into multiple themes with per-theme intervals; images can belong to multiple themes
+- **Auto-preview uploads** - Newly uploaded images automatically display on the kiosk for immediate review
 - **Remote control** - Control the kiosk from any device on your network
 - **Click-to-jump** - Click any image thumbnail to immediately display it on the kiosk
 - **Smooth dissolve transitions** - Optional fade effect between images
@@ -88,15 +92,22 @@ The server will start on `http://0.0.0.0:80` (accessible from any device on your
    - Upload images
    - **Crop images** - Click the "Crop" button to select a region that will fill the entire kiosk display
    - **Enable/disable images** - Use the "Show" checkbox on each image card
-   - Configure slideshow interval
+   - **Create and manage Atmospheres** - Organize themes into atmospheres
+   - **Create and manage Themes** - Organize images into themes
+   - Configure slideshow intervals per theme/atmosphere
    - Remote control the kiosk display
    - Delete images
-   - View current images (shows cropped thumbnails)
+   - View current images (shows cropped thumbnails in randomized order)
 
 2. **Kiosk Display**: `http://<raspberry-pi-ip>/view`
    - Main slideshow display
    - Optimized for fullscreen viewing
-   - Only shows enabled images
+   - Only shows enabled images in random order
+
+3. **Upload Page**: `http://<raspberry-pi-ip>/upload`
+   - Dedicated upload interface
+   - Drag-and-drop support
+   - Newly uploaded images automatically switch the kiosk display for preview
 
 ### Firefox Kiosk Mode
 
@@ -216,6 +227,16 @@ Configure settings through the management interface at `/`, or edit `settings.js
     "photo3.jpg": ["Urban"]
   },
   "active_theme": "All Images",
+  "atmospheres": {
+    "Evening": {"name": "Evening", "created": 1234567893, "interval": 1800},
+    "Morning": {"name": "Morning", "created": 1234567894, "interval": 3600}
+  },
+  "atmosphere_themes": {
+    "Evening": ["Nature", "Urban"],
+    "Morning": ["Nature"]
+  },
+  "active_atmosphere": null,
+  "shuffle_id": 0.123456789,
   "image_crops": {
     "photo1.jpg": {
       "x": 0,
@@ -229,31 +250,62 @@ Configure settings through the management interface at `/`, or edit `settings.js
 }
 ```
 
-- **interval** (I): Current slideshow interval in seconds (synced with active theme's interval)
+- **interval** (I): Current slideshow interval in seconds (synced with active theme/atmosphere interval)
 - **check_interval** (C): Time in seconds between checks for changes (default: 2)
 - **dissolve_enabled**: Smooth dissolve transition between images (always true)
 - **themes**: Dictionary of defined themes, each with its own interval in seconds
   - **"All Images"**: Permanent default theme (cannot be deleted), shows all enabled images
 - **image_themes**: Mapping of image names to their theme lists
 - **active_theme**: Currently active theme (defaults to "All Images")
+- **atmospheres**: Dictionary of defined atmospheres, each with its own interval
+- **atmosphere_themes**: Mapping of atmosphere names to theme lists
+- **active_atmosphere**: Currently active atmosphere (null if none active)
+- **shuffle_id**: Random seed for image ordering (regenerates on theme/atmosphere change)
 - **image_crops**: Mapping of image names to crop regions (x, y, width, height in original image coordinates)
+
+### Atmospheres
+
+Atmospheres provide a hierarchical organization layer above themes (Atmospheres → Themes → Images):
+
+1. **Create atmospheres** - Click "New Atmosphere", enter name, press Enter
+2. **Assign themes** - Click the "Themes" button on an atmosphere badge to select which themes belong to it
+3. **Set interval** - Click the interval display to edit the slideshow duration for that atmosphere
+4. **Activate atmosphere** - Click the atmosphere name to activate it and display all images from all its themes
+5. **Mutual exclusivity** - Activating an atmosphere deselects any active theme, and vice versa
+6. **Random ordering** - Each atmosphere displays images in a random order that changes every time you switch
+
+When an atmosphere is active:
+- All images from all themes in that atmosphere are shown
+- The atmosphere's interval setting is used for the slideshow
+- Images display in randomized order
 
 ### Themes
 
 Organize your images into themes for different occasions or categories:
 
 1. **Default theme** - "All Images" is a permanent theme that shows all enabled images (cannot be deleted)
-2. **Create themes** - Enter a theme name and click "Create Theme" (default interval: 60 minutes)
-3. **Set theme interval** - Each theme has its own slideshow interval. Edit it in the theme's settings and click "Save"
+2. **Create themes** - Enter a theme name and click "New Theme" (default interval: 60 minutes)
+3. **Set theme interval** - Each theme has its own slideshow interval. Click to edit it
 4. **Assign images** - Use the dropdown on each image card to add it to themes
 5. **Multiple themes** - Images can belong to multiple themes
 6. **Remove from theme** - Click the "✕" on a theme tag to remove the image from that theme
-7. **Select active theme** - Use the "Active Theme" dropdown to choose which theme to display
+7. **Select active theme** - Click a theme name to activate it
+8. **Random ordering** - Each theme displays images in a random order that changes every time you switch
 
 When a theme is active:
 - **"All Images" theme**: Shows all enabled images regardless of theme assignments
 - **Other themes**: Only enabled images belonging to that theme will appear in the slideshow
 - The slideshow uses the active theme's interval setting
+- Images display in randomized order
+
+### Image Randomization
+
+Images are displayed in random order, with the following behavior:
+
+- **Order changes** - Switching to a different theme or atmosphere generates a new random order
+- **Order persists** - The same theme/atmosphere always shows the same random order (within a session)
+- **Kiosk syncs automatically** - The kiosk display matches the order shown in Current Images
+- **All images included** - Every enabled image appears exactly once (no duplicates, no missing images)
 
 ### Image Cropping
 
@@ -274,6 +326,15 @@ Crop behavior:
 - Changes apply automatically within 2 seconds via the smart reload system
 - Crops are stored per-image and persist across restarts
 
+### Auto-Preview on Upload
+
+When you upload a new image via the upload page:
+
+1. The image is automatically assigned to the currently active theme (if not "All Images")
+2. A "jump" command is sent to the kiosk display
+3. The kiosk switches to the newly uploaded image within 500ms
+4. This allows immediate review of uploads
+
 ### Smart Reload Algorithm
 
 The kiosk uses an intelligent reload system:
@@ -282,11 +343,13 @@ The kiosk uses an intelligent reload system:
    - The list of enabled images (vector **V**)
    - The slideshow interval setting
    - Image crop data
+   - The shuffle_id (detects theme/atmosphere changes)
 2. It compares the current vector **V** with the previous vector **VP**
 3. It compares the current interval with the previous interval
 4. It compares the current crop data with the previous crop data
-5. If anything changed, the slideshow reloads from the beginning with the new settings
-6. If nothing changed, the slideshow continues uninterrupted
+5. It compares the current shuffle_id with the previous shuffle_id
+6. If anything changed, the slideshow reloads with the new settings
+7. If nothing changed, the slideshow continues uninterrupted
 
 This means:
 - No unnecessary reloads when nothing changes
@@ -294,6 +357,7 @@ This means:
 - Automatic updates when you enable/disable images in the management interface
 - Automatic updates when you change the slideshow interval
 - Automatic updates when you crop or modify image crops
+- Automatic updates when you switch themes or atmospheres (with new random order)
 - Changes apply within 2 seconds
 
 ### Image Scaling
@@ -333,6 +397,7 @@ The kiosk polls for commands every 500ms, so commands execute almost instantly. 
 - `POST /api/images` - Upload a new image
 - `POST /api/images/<filename>/toggle` - Toggle enabled state of an image
 - `DELETE /api/images/<filename>` - Delete an image
+- `POST /api/images/<filename>/themes` - Update image themes
 
 **Settings:**
 - `GET /api/settings` - Get current settings
@@ -347,8 +412,16 @@ The kiosk polls for commands every 500ms, so commands execute almost instantly. 
 - `GET /api/themes` - List all themes and active theme
 - `POST /api/themes` - Create a new theme (`{"name": "Theme Name"}`)
 - `DELETE /api/themes/<theme_name>` - Delete a theme
-- `POST /api/themes/active` - Set active theme (`{"theme_name": "Theme Name"}` or `{"theme_name": null}`)
-- `POST /api/images/<filename>/themes` - Update image themes (`{"themes": ["Theme1", "Theme2"]}`)
+- `POST /api/themes/active` - Set active theme (`{"theme_name": "Theme Name"}`)
+- `POST /api/themes/<theme_name>/interval` - Update theme interval (seconds)
+
+**Atmospheres:**
+- `GET /api/atmospheres` - List all atmospheres
+- `POST /api/atmospheres` - Create a new atmosphere (`{"name": "Atmosphere Name"}`)
+- `DELETE /api/atmospheres/<atmosphere_name>` - Delete an atmosphere
+- `POST /api/atmospheres/active` - Set active atmosphere (`{"atmosphere_name": "Atmosphere Name"}` or null)
+- `POST /api/atmospheres/<atmosphere_name>/interval` - Update atmosphere interval (seconds)
+- `POST /api/atmospheres/<atmosphere_name>/themes` - Update themes in atmosphere (`{"themes": ["Theme1", "Theme2"]}`)
 
 ## Convenience Scripts
 
@@ -373,10 +446,15 @@ kiosk_images/
 ├── start-kiosk.sh          # Start script (cleans up + starts)
 ├── stop-kiosk.sh           # Stop script
 ├── kiosk-display.service   # Systemd service file
+├── kiosk-firefox.service   # Systemd service file for Firefox
+├── install-autostart.sh    # Systemd installer
+├── README.md               # This file
+├── ARCHITECTURE.md         # Architecture documentation
 ├── QUICKSTART.md           # Quick start guide
 └── templates/
     ├── kiosk.html          # Main kiosk display
-    └── manage.html         # Management interface
+    ├── manage.html         # Management interface
+    └── upload.html         # Upload interface
 ```
 
 ## Supported Image Formats
@@ -392,8 +470,9 @@ kiosk_images/
 ### Images not displaying
 
 1. Check that images are uploaded via the management interface
-2. Verify the Flask server is running
-3. Check browser console for errors (F12)
+2. Verify images are enabled (checkbox is checked)
+3. Verify the Flask server is running
+4. Check browser console for errors (F12)
 
 ### Scaling issues
 
@@ -413,12 +492,19 @@ kiosk_images/
 2. View logs: `sudo journalctl -u kiosk-display -f`
 3. Verify autostart configuration in `/etc/xdg/lxsession/LXDE-pi/autostart`
 
+### Themes/Atmospheres not filtering
+
+1. Verify the theme or atmosphere is activated (badge shows as active)
+2. Check images have themes assigned
+3. Look at API response: `/api/images?enabled_only=true`
+4. Check settings.json for correct theme/atmosphere mappings
+
 ## Performance Tips
 
 - Use optimized image formats (WebP for smaller file sizes)
 - Pre-resize large images before uploading for better performance
 - Set appropriate slideshow intervals (longer for slower Pi models)
-- The page automatically reloads every 5 minutes to check for new images
+- The page automatically checks for changes every 2 seconds
 
 ## Security Considerations
 
