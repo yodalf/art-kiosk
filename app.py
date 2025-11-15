@@ -61,6 +61,7 @@ def get_settings():
         'atmospheres': {},  # Atmosphere name -> atmosphere info
         'atmosphere_themes': {},  # Atmosphere name -> list of theme names
         'active_atmosphere': None,  # No atmosphere active by default
+        'shuffle_id': random.random(),  # Random ID for consistent shuffling
         'image_crops': {}  # Image name -> crop data
     }
 
@@ -96,6 +97,8 @@ def get_settings():
                 settings['atmosphere_themes'] = {}
             if 'active_atmosphere' not in settings:
                 settings['active_atmosphere'] = None
+            if 'shuffle_id' not in settings:
+                settings['shuffle_id'] = random.random()
             if 'image_crops' not in settings:
                 settings['image_crops'] = {}
             return settings
@@ -197,10 +200,10 @@ def list_images():
             })
 
     # Randomize the order of images with a consistent seed
-    # Use the active atmosphere/theme as seed so the order is consistent
-    # for the same selection across different API calls
-    seed_string = f"{active_atmosphere or ''}-{active_theme or ''}"
-    random.seed(seed_string)
+    # Use shuffle_id so both management and kiosk see the same order
+    # shuffle_id is regenerated when atmosphere/theme changes
+    shuffle_id = settings.get('shuffle_id', 0)
+    random.seed(shuffle_id)
     random.shuffle(images)
     random.seed()  # Reset to random seed for other operations
 
@@ -504,6 +507,10 @@ def set_active_theme():
     settings['interval'] = theme_interval
 
     settings['active_theme'] = theme_name
+
+    # Regenerate shuffle_id for new random order
+    settings['shuffle_id'] = random.random()
+
     save_settings(settings)
 
     return jsonify({'success': True, 'active_theme': theme_name, 'interval': settings['interval']})
@@ -649,6 +656,8 @@ def set_active_atmosphere():
             themes = settings.get('themes', {})
             if active_theme in themes:
                 settings['interval'] = themes[active_theme].get('interval', 3600)
+        # Regenerate shuffle_id for new random order
+        settings['shuffle_id'] = random.random()
         save_settings(settings)
         return jsonify({'success': True, 'active_atmosphere': None})
 
@@ -664,6 +673,10 @@ def set_active_atmosphere():
     settings['interval'] = atmosphere_interval
 
     settings['active_atmosphere'] = atmosphere_name
+
+    # Regenerate shuffle_id for new random order
+    settings['shuffle_id'] = random.random()
+
     save_settings(settings)
 
     return jsonify({'success': True, 'active_atmosphere': atmosphere_name, 'interval': settings['interval']})
