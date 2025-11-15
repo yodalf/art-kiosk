@@ -684,11 +684,16 @@
                 const imageName = command.image_name;
                 const imageIndex = images.findIndex(img => img.name === imageName);
                 if (imageIndex !== -1) {
+                    // Image found in current array, jump to it
                     showSlide(imageIndex);
                     // Restart slideshow if not paused
                     if (!isPaused) {
                         startSlideshow();
                     }
+                } else {
+                    // Image not found (likely newly uploaded), reload with this image
+                    await debugLog(`Image ${imageName} not in current list, reloading...`, 'info');
+                    await loadImages(0, imageName);
                 }
                 return;
             }
