@@ -6,29 +6,18 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 
 ## System Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Raspberry Pi                           │
-│                                                             │
-│  ┌──────────────┐         ┌─────────────────┐               │
-│  │   Flask      │◄────────┤  Firefox        │               │
-│  │   Server     │         │  (Kiosk Mode)   │               │
-│  │  (Port 80)   │         │  /view          │               │
-│  │              │         └─────────────────┘               │
-│  │   app.py     │                                           │
-│  │              │         ┌─────────────────┐               │
-│  │   REST API   │◄────────┤  Management     │               │
-│  │              │         │  Interface      │               │
-│  │   Settings   │         │  (Any Browser)  │               │
-│  │   Storage    │         │  /              │               │
-│  └──────────────┘         └─────────────────┘               │
-│         ▲                                                   │
-│         │                                                   │
-│  ┌──────┴─────────┐                                         │
-│  │  settings.json  │                                        │
-│  │  images/        │                                        │
-│  └────────────────┘                                         │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph RaspberryPi["Raspberry Pi"]
+        Flask["Flask Server<br/>(Port 80)<br/>app.py<br/>REST API<br/>Settings Storage"]
+        Firefox["Firefox<br/>(Kiosk Mode)<br/>/view"]
+        Management["Management<br/>Interface<br/>(Any Browser)<br/>/"]
+        Storage[("settings.json<br/>images/")]
+
+        Firefox -->|HTTP GET| Flask
+        Management -->|HTTP POST/GET| Flask
+        Flask -->|Read/Write| Storage
+    end
 ```
 
 ## Components
@@ -69,32 +58,17 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 - Debug logging to server
 
 **Update Mechanism**:
-```
-┌─────────────────────────────────────────────────────────┐
-│  Kiosk Display (kiosk.html)                             │
-│                                                         │
-│  ┌────────────────────────────────────────────┐         │
-│  │  Poll Loop (every 500ms)                   │         │
-│  │  - Check for remote commands               │         │
-│  │  - Execute: next, prev, pause, play, jump  │         │
-│  └────────────────────────────────────────────┘         │
-│                                                         │
-│  ┌────────────────────────────────────────────┐         │
-│  │  Check Loop (every 2 seconds - C interval) │         │
-│  │  - Fetch enabled images (V)                │         │
-│  │  - Compare with previous vector (VP)       │         │
-│  │  - Check interval setting                  │         │
-│  │  - Check dissolve setting                  │         │
-│  │  - Check shuffle_id (order changes)        │         │
-│  │  - Reload if changed (reset to index 0)   │         │
-│  └────────────────────────────────────────────┘         │
-│                                                         │
-│  ┌────────────────────────────────────────────┐         │
-│  │  Slideshow Timer (every I seconds)         │         │
-│  │  - Advance to next image                   │         │
-│  │  - Can be paused/resumed                   │         │
-│  └────────────────────────────────────────────┘         │
-└─────────────────────────────────────────────────────────┘
+
+```mermaid
+graph TB
+    subgraph KioskDisplay["Kiosk Display (kiosk.html)"]
+        PollLoop["Poll Loop<br/>(every 500ms)<br/>- Check for remote commands<br/>- Execute: next, prev, pause, play, jump"]
+        CheckLoop["Check Loop<br/>(every 2 seconds - C interval)<br/>- Fetch enabled images (V)<br/>- Compare with previous vector (VP)<br/>- Check interval setting<br/>- Check dissolve setting<br/>- Check shuffle_id (order changes)<br/>- Reload if changed (reset to index 0)"]
+        SlideTimer["Slideshow Timer<br/>(every I seconds)<br/>- Advance to next image<br/>- Can be paused/resumed"]
+
+        PollLoop -.->|parallel| CheckLoop
+        CheckLoop -.->|parallel| SlideTimer
+    end
 ```
 
 ### 3. Frontend - Management (manage.html)
@@ -298,21 +272,21 @@ The Art Kiosk is a web-based image display system designed for Raspberry Pi with
 **Purpose**: Allow management interface to control kiosk without WebSockets.
 
 **Implementation**:
-```
-Management Interface                Kiosk Display
-       │                                  │
-       ├──POST /api/control/send──────────┤
-       │   {"command": "pause"}           │
-       │                                  │
-       │                            ┌─────▼────┐
-       │                            │ Poll loop│
-       │                            │ (500ms)  │
-       │                            └─────┬────┘
-       │                                  │
-       │◄─────GET /api/control/poll───────┤
-       │    {"command": "pause"}          │
-       │                                  │
-       │                            Execute pause
+
+```mermaid
+sequenceDiagram
+    participant Mgmt as Management Interface
+    participant Server as Flask Server
+    participant Kiosk as Kiosk Display
+
+    Mgmt->>Server: POST /api/control/send<br/>{"command": "pause"}
+    Server-->>Mgmt: OK
+
+    loop Poll every 500ms
+        Kiosk->>Server: GET /api/control/poll
+        Server-->>Kiosk: {"command": "pause"}
+        Kiosk->>Kiosk: Execute pause
+    end
 ```
 
 **Command Queue**:
@@ -606,42 +580,25 @@ Two services work together:
 
 ### Startup Sequence
 
-```
-Boot
-  ↓
-Network Ready
-  ↓
-kiosk-display.service starts
-  ↓
-Kill any process using port 80 (fuser -k)
-  ↓
-Flask server running on port 80
-  ↓
-Desktop Environment Ready (X11)
-  ↓
-kiosk-firefox.service starts
-  ↓
-Kill existing Firefox and unclutter processes
-  ↓
-Wait 2 seconds for cleanup
-  ↓
-Wait 5 seconds for server startup
-  ↓
-Disable screen blanking (xset)
-  ↓
-Poll server with curl until /view responds
-  ↓
-start-firefox-kiosk.sh executes
-  ↓
-Delete old Firefox profile (~/.mozilla/firefox)
-  ↓
-Create fresh Firefox profile with kiosk settings
-  ↓
-Start unclutter (hide cursor)
-  ↓
-Launch Firefox → http://localhost/view
-  ↓
-Kiosk display showing
+```mermaid
+flowchart TD
+    A[Boot] --> B[Network Ready]
+    B --> C[kiosk-display.service starts]
+    C --> D[Kill any process using port 80<br/>fuser -k 80/tcp]
+    D --> E[Flask server running on port 80]
+    E --> F[Desktop Environment Ready<br/>X11]
+    F --> G[kiosk-firefox.service starts]
+    G --> H[Kill existing Firefox and<br/>unclutter processes]
+    H --> I[Wait 2 seconds for cleanup]
+    I --> J[Wait 5 seconds for server startup]
+    J --> K[Disable screen blanking<br/>xset commands]
+    K --> L[Poll server with curl until<br/>/view responds]
+    L --> M[start-firefox-kiosk.sh executes]
+    M --> N[Delete old Firefox profile<br/>~/.mozilla/firefox]
+    N --> O[Create fresh Firefox profile<br/>with kiosk settings]
+    O --> P[Start unclutter<br/>hide cursor]
+    P --> Q[Launch Firefox<br/>http://localhost/view]
+    Q --> R[Kiosk display showing]
 ```
 
 ## State Management
