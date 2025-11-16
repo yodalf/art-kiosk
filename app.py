@@ -273,21 +273,48 @@ def upload_image():
     })
 
 
-@app.route('/api/images/<filename>', methods=['DELETE'])
+@app.route('/api/images/<path:filename>', methods=['DELETE'])
 def delete_image(filename):
     """Delete an image."""
-    filename = secure_filename(filename)
-    filepath = app.config['UPLOAD_FOLDER'] / filename
+    try:
+        print(f"Delete request received for: {filename}")
+        # Don't use secure_filename here as it modifies the filename
+        # Just ensure it doesn't have path traversal
+        if '..' in filename or filename.startswith('/'):
+            print(f"Delete failed: Invalid filename (path traversal attempt): {filename}")
+            return jsonify({'error': 'Invalid filename'}), 400
 
-    if not filepath.exists():
-        return jsonify({'error': 'File not found'}), 404
+        filepath = app.config['UPLOAD_FOLDER'] / filename
 
-    filepath.unlink()
+        if not filepath.exists():
+            print(f"Delete failed: File not found: {filepath}")
+            # List files in directory for debugging
+            print(f"Files in upload folder: {list(app.config['UPLOAD_FOLDER'].iterdir())}")
+            return jsonify({'error': 'File not found'}), 404
 
-    # Notify clients that image list changed
-    notify_image_list_change()
+        print(f"Deleting image: {filepath}")
+        filepath.unlink()
 
-    return jsonify({'success': True})
+        # Clean up settings for this image
+        settings = get_settings()
+        if 'enabled_images' in settings and filename in settings['enabled_images']:
+            del settings['enabled_images'][filename]
+        if 'image_themes' in settings and filename in settings['image_themes']:
+            del settings['image_themes'][filename]
+        if 'image_crops' in settings and filename in settings['image_crops']:
+            del settings['image_crops'][filename]
+        save_settings(settings)
+
+        # Notify clients that image list changed
+        notify_image_list_change()
+
+        print(f"Successfully deleted image: {filename}")
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error deleting image {filename}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/images/<filename>/toggle', methods=['POST'])
@@ -928,6 +955,13 @@ def import_single_extra_image(filename):
 
         shutil.move(str(source), str(dest))
 
+        # Enable the imported image by default
+        settings = get_settings()
+        if 'enabled_images' not in settings:
+            settings['enabled_images'] = {}
+        settings['enabled_images'][dest.name] = True
+        save_settings(settings)
+
         socketio.emit('image_list_changed')
         return jsonify({'success': True, 'imported_filename': dest.name})
     except Exception as e:
@@ -942,6 +976,10 @@ def import_all_extra_images():
     """Import all extra images to main images folder."""
     try:
         import shutil
+
+        settings = get_settings()
+        if 'enabled_images' not in settings:
+            settings['enabled_images'] = {}
 
         imported = 0
         for file in EXTRA_IMAGES_FOLDER.iterdir():
@@ -958,8 +996,13 @@ def import_all_extra_images():
                         counter += 1
 
                 shutil.move(str(file), str(dest))
+
+                # Enable the imported image by default
+                settings['enabled_images'][dest.name] = True
+
                 imported += 1
 
+        save_settings(settings)
         socketio.emit('image_list_changed')
         return jsonify({'success': True, 'imported_count': imported})
     except Exception as e:
