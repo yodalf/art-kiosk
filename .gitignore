@@ -9,6 +9,8 @@ __pycache__/
 # User data
 images/
 settings.json
+api_keys.json
+EXTRA_IMAGES/
 
 # OS
 .DS_Store

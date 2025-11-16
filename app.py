@@ -8,10 +8,12 @@ import os
 import json
 import time
 import random
+import requests
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 from werkzeug.utils import secure_filename
+from painting_searcher import PaintingSearcher
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -22,6 +24,10 @@ app.config['SLIDESHOW_INTERVAL'] = 600  # seconds (10 minutes)
 
 # Create upload folder if it doesn't exist
 app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
+
+# Create EXTRA_IMAGES folder for art search downloads
+EXTRA_IMAGES_FOLDER = Path(__file__).parent / 'EXTRA_IMAGES'
+EXTRA_IMAGES_FOLDER.mkdir(exist_ok=True)
 
 # Settings file
 SETTINGS_FILE = Path(__file__).parent / 'settings.json'
@@ -152,6 +158,18 @@ def kiosk():
 def upload():
     """Image upload page."""
     return render_template('upload.html')
+
+
+@app.route('/search')
+def search_art():
+    """Art search page."""
+    return render_template('search.html')
+
+
+@app.route('/extra-images')
+def extra_images_page():
+    """Extra images management page."""
+    return render_template('extra-images.html')
 
 
 @app.route('/api/images', methods=['GET'])
@@ -812,6 +830,318 @@ def serve_image(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
+@app.route('/extra-images/<filename>')
+def serve_extra_image(filename):
+    """Serve extra images."""
+    return send_from_directory(EXTRA_IMAGES_FOLDER, filename)
+
+
+@app.route('/api/extra-images', methods=['GET'])
+def list_extra_images():
+    """List all extra images."""
+    try:
+        images = []
+        settings = get_settings()
+
+        for file in EXTRA_IMAGES_FOLDER.iterdir():
+            if file.is_file() and file.suffix.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']:
+                images.append({
+                    'name': file.name,
+                    'url': f'/extra-images/{file.name}',
+                    'size': file.stat().st_size,
+                    'themes': settings.get('image_themes', {}).get(file.name, [])
+                })
+
+        # Sort by name
+        images.sort(key=lambda x: x['name'])
+
+        return jsonify(images)
+    except Exception as e:
+        print(f"Error listing extra images: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/extra-images/<filename>', methods=['DELETE'])
+def delete_extra_image(filename):
+    """Delete an extra image."""
+    try:
+        filepath = EXTRA_IMAGES_FOLDER / filename
+        if filepath.exists():
+            filepath.unlink()
+
+            # Remove from settings
+            settings = get_settings()
+            if 'image_themes' in settings and filename in settings['image_themes']:
+                del settings['image_themes'][filename]
+                save_settings(settings)
+
+            socketio.emit('image_list_changed')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'File not found'}), 404
+    except Exception as e:
+        print(f"Error deleting extra image: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/extra-images/<filename>/themes', methods=['POST'])
+def update_extra_image_themes(filename):
+    """Update theme assignments for an extra image."""
+    try:
+        data = request.json
+        themes = data.get('themes', [])
+
+        settings = get_settings()
+        if 'image_themes' not in settings:
+            settings['image_themes'] = {}
+
+        settings['image_themes'][filename] = themes
+        save_settings(settings)
+
+        socketio.emit('settings_update', settings)
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error updating themes: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/extra-images/<filename>/import', methods=['POST'])
+def import_single_extra_image(filename):
+    """Import a single extra image to main images folder."""
+    try:
+        import shutil
+
+        source = EXTRA_IMAGES_FOLDER / filename
+        if not source.exists():
+            return jsonify({'error': 'Image not found'}), 404
+
+        dest = app.config['UPLOAD_FOLDER'] / filename
+
+        # Handle name conflicts
+        if dest.exists():
+            base = dest.stem
+            ext = dest.suffix
+            counter = 1
+            while dest.exists():
+                dest = app.config['UPLOAD_FOLDER'] / f"{base}_{counter}{ext}"
+                counter += 1
+
+        shutil.move(str(source), str(dest))
+
+        socketio.emit('image_list_changed')
+        return jsonify({'success': True, 'imported_filename': dest.name})
+    except Exception as e:
+        print(f"Error importing image: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/extra-images/import-all', methods=['POST'])
+def import_all_extra_images():
+    """Import all extra images to main images folder."""
+    try:
+        import shutil
+
+        imported = 0
+        for file in EXTRA_IMAGES_FOLDER.iterdir():
+            if file.is_file() and file.suffix.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']:
+                dest = app.config['UPLOAD_FOLDER'] / file.name
+
+                # Handle name conflicts
+                if dest.exists():
+                    base = dest.stem
+                    ext = dest.suffix
+                    counter = 1
+                    while dest.exists():
+                        dest = app.config['UPLOAD_FOLDER'] / f"{base}_{counter}{ext}"
+                        counter += 1
+
+                shutil.move(str(file), str(dest))
+                imported += 1
+
+        socketio.emit('image_list_changed')
+        return jsonify({'success': True, 'imported_count': imported})
+    except Exception as e:
+        print(f"Error importing images: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/extra-images/delete-all', methods=['POST'])
+def delete_all_extra_images():
+    """Delete all extra images."""
+    try:
+        deleted = 0
+        for file in EXTRA_IMAGES_FOLDER.iterdir():
+            if file.is_file() and file.suffix.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']:
+                file.unlink()
+                deleted += 1
+
+        # Clear theme assignments
+        settings = get_settings()
+        if 'image_themes' in settings:
+            # Remove only extra images from themes
+            for filename in list(settings['image_themes'].keys()):
+                if not (app.config['UPLOAD_FOLDER'] / filename).exists():
+                    del settings['image_themes'][filename]
+            save_settings(settings)
+
+        socketio.emit('image_list_changed')
+        return jsonify({'success': True, 'deleted': deleted})
+    except Exception as e:
+        print(f"Error deleting all images: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@socketio.on('start_art_search')
+def handle_art_search(data):
+    """Handle art search via WebSocket with progress updates."""
+    try:
+        query = data.get('query', 'portrait')
+        min_aspect_ratio_match = data.get('min_aspect_ratio_match', 85.0)
+        google_only = data.get('google_only', False)
+
+        def progress_callback(message):
+            """Emit progress messages to client."""
+            socketio.emit('search_progress', {'message': message}, room=request.sid)
+
+        progress_callback(f"Starting search for '{query}'...")
+        progress_callback(f"Aspect ratio threshold: {min_aspect_ratio_match}%")
+        if google_only:
+            progress_callback("Mode: Google Images only")
+
+        # Create searcher with custom aspect ratio match threshold
+        searcher = PaintingSearcher(
+            min_aspect_ratio_match=min_aspect_ratio_match,
+            api_keys_file='api_keys.json'
+        )
+
+        # Search each source individually with progress updates
+        all_results = []
+        sources_config = searcher.sources_config.get('sources', {})
+
+        if google_only:
+            # Only search Google Images
+            if sources_config.get('google_images', {}).get('enabled', False):
+                progress_callback("🎨 Searching Google Images...")
+                results = searcher.search_google_images(query, 10)
+                all_results.extend(results)
+                progress_callback(f"✓ Google: Found {len(results)} artworks")
+        else:
+            # Search all museums
+            if sources_config.get('cleveland', {}).get('enabled', True):
+                progress_callback("🎨 Searching Cleveland Museum of Art...")
+                results = searcher.search_cleveland_museum(query, 10)
+                all_results.extend(results)
+                progress_callback(f"✓ Cleveland: Found {len(results)} artworks")
+
+            if sources_config.get('rijksmuseum', {}).get('enabled', True):
+                progress_callback("🎨 Searching Rijksmuseum...")
+                results = searcher.search_rijksmuseum(query, 10)
+                all_results.extend(results)
+                progress_callback(f"✓ Rijksmuseum: Found {len(results)} artworks")
+
+            if sources_config.get('wikimedia', {}).get('enabled', True):
+                progress_callback("🎨 Searching Wikimedia Commons...")
+                results = searcher.search_wikimedia_commons(query, 10)
+                all_results.extend(results)
+                progress_callback(f"✓ Wikimedia: Found {len(results)} artworks")
+
+            if sources_config.get('europeana', {}).get('enabled', True):
+                progress_callback("🎨 Searching Europeana...")
+                results = searcher.search_europeana(query, 10)
+                all_results.extend(results)
+                progress_callback(f"✓ Europeana: Found {len(results)} artworks")
+
+            if sources_config.get('harvard', {}).get('enabled', False):
+                progress_callback("🎨 Searching Harvard Art Museums...")
+                results = searcher.search_harvard(query, 10)
+                all_results.extend(results)
+                progress_callback(f"✓ Harvard: Found {len(results)} artworks")
+
+            if sources_config.get('google_images', {}).get('enabled', False):
+                progress_callback("🎨 Searching Google Images...")
+                results = searcher.search_google_images(query, 10)
+                all_results.extend(results)
+                progress_callback(f"✓ Google: Found {len(results)} artworks")
+
+        # Randomize results
+        random.shuffle(all_results)
+
+        progress_callback(f"✅ Search complete! Total: {len(all_results)} artworks")
+
+        emit('search_complete', {
+            'success': True,
+            'results': all_results,
+            'query': query,
+            'total': len(all_results)
+        })
+
+    except Exception as e:
+        print(f"Art search error: {e}")
+        import traceback
+        traceback.print_exc()
+        emit('search_error', {
+            'success': False,
+            'error': str(e)
+        })
+
+
+@app.route('/api/download-art', methods=['POST'])
+def api_download_art():
+    """Download an artwork to EXTRA_IMAGES folder."""
+    try:
+        data = request.json
+        image_url = data.get('image_url')
+        title = data.get('title', 'Untitled')
+        artist = data.get('artist', 'Unknown')
+        source = data.get('source', 'Unknown')
+
+        if not image_url:
+            return jsonify({'error': 'Missing image_url'}), 400
+
+        # Create a safe filename
+        safe_artist = "".join(c for c in artist[:30] if c.isalnum() or c in (' ', '-', '_')).strip()
+        safe_title = "".join(c for c in title[:50] if c.isalnum() or c in (' ', '-', '_')).strip()
+
+        # Try to determine extension from URL
+        extension = '.jpg'
+        if image_url.lower().endswith('.png'):
+            extension = '.png'
+        elif image_url.lower().endswith('.jpeg'):
+            extension = '.jpeg'
+
+        filename = f"{safe_artist} - {safe_title}{extension}"
+        filepath = EXTRA_IMAGES_FOLDER / filename
+
+        # Download the image
+        response = requests.get(image_url, timeout=30, stream=True)
+        response.raise_for_status()
+
+        # Save to EXTRA_IMAGES folder
+        with open(filepath, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'filepath': str(filepath),
+            'size': filepath.stat().st_size
+        })
+
+    except Exception as e:
+        print(f"Download error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 # WebSocket event handlers
 @socketio.on('connect')
 def handle_connect():
@@ -842,7 +1172,16 @@ def handle_send_command(data):
         # Broadcast to kiosk display
         socketio.emit('remote_command', {'command': 'jump', 'image_name': image_name})
         emit('command_sent', {'success': True, 'command': command, 'image_name': image_name})
-    elif command in ['next', 'prev', 'pause', 'play', 'reload']:
+    # Handle jump_extra command for displaying extra images
+    elif command == 'jump_extra':
+        image_name = data.get('image_name')
+        if not image_name:
+            emit('command_error', {'error': 'Missing image_name parameter'})
+            return
+        # Broadcast to kiosk display
+        socketio.emit('remote_command', {'command': 'jump_extra', 'image_name': image_name})
+        emit('command_sent', {'success': True, 'command': command, 'image_name': image_name})
+    elif command in ['next', 'prev', 'pause', 'play', 'reload', 'resume_from_extra']:
         # Broadcast to kiosk display
         socketio.emit('remote_command', command)
         emit('command_sent', {'success': True, 'command': command})

@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Art Search - Kiosk Image Management</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #000000;
+            padding: 20px;
+            color: #ffffff;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #1a1a1a;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(255, 255, 255, 0.1);
+            padding: 30px;
+        }
+
+        h1 {
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #aaaaaa;
+            margin-bottom: 30px;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: #2196F3;
+            text-decoration: none;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            border: 1px solid #2196F3;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+
+        .back-link:hover {
+            background: #2196F3;
+            color: white;
+        }
+
+        .search-section {
+            background: #2a2a2a;
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .search-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-weight: 500;
+            color: #cccccc;
+            font-size: 14px;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="number"] {
+            padding: 12px 16px;
+            border: 1px solid #444444;
+            border-radius: 4px;
+            font-size: 16px;
+            background: #1a1a1a;
+            color: #ffffff;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input[type="text"]:focus,
+        .form-group input[type="number"]:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slider-container input[type="range"] {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: #444444;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #2196F3;
+            cursor: pointer;
+        }
+
+        .slider-container input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #2196F3;
+            cursor: pointer;
+            border: none;
+        }
+
+        .slider-value {
+            min-width: 60px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: 600;
+            color: #2196F3;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .search-button {
+            background: #4CAF50;
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .search-button:hover {
+            background: #45a049;
+        }
+
+        .search-button:disabled {
+            background: #666666;
+            cursor: not-allowed;
+        }
+
+        .cancel-button {
+            background: #f44336;
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.3s;
+            display: none;
+        }
+
+        .cancel-button:hover {
+            background: #d32f2f;
+        }
+
+        .cancel-button.show {
+            display: block;
+        }
+
+        .progress-pane {
+            background: #2a2a2a;
+            border: 1px solid #444444;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .progress-pane.show {
+            display: block;
+        }
+
+        .progress-line {
+            color: #cccccc;
+            padding: 3px 0;
+            line-height: 1.5;
+        }
+
+        .progress-line.highlight {
+            color: #2196F3;
+            font-weight: 600;
+        }
+
+        .status-message {
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status-message.info {
+            background: #1976D2;
+            color: white;
+            display: block;
+        }
+
+        .status-message.success {
+            background: #4CAF50;
+            color: white;
+            display: block;
+        }
+
+        .status-message.error {
+            background: #f44336;
+            color: white;
+            display: block;
+        }
+
+        .results-section {
+            margin-top: 30px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #333333;
+        }
+
+        .results-header h2 {
+            color: #ffffff;
+            font-size: 20px;
+        }
+
+        .results-count {
+            color: #aaaaaa;
+            font-size: 14px;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+        }
+
+        .result-card {
+            background: #2a2a2a;
+            border: 1px solid #333333;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .result-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.3);
+        }
+
+        .result-card img {
+            width: 100%;
+            height: 280px;
+            object-fit: cover;
+            background: #1a1a1a;
+        }
+
+        .result-info {
+            padding: 15px;
+        }
+
+        .result-title {
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 8px;
+            font-size: 15px;
+            line-height: 1.4;
+        }
+
+        .result-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .meta-item {
+            font-size: 13px;
+            color: #aaaaaa;
+        }
+
+        .meta-item strong {
+            color: #cccccc;
+        }
+
+        .resolution-badge {
+            display: inline-block;
+            background: #9C27B0;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .aspect-ratio-badge {
+            display: inline-block;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 4px;
+            margin-left: 6px;
+        }
+
+        .aspect-ratio-excellent {
+            background: #4CAF50;
+        }
+
+        .aspect-ratio-good {
+            background: #FF9800;
+        }
+
+        .aspect-ratio-fair {
+            background: #F44336;
+        }
+
+        .source-badge {
+            display: inline-block;
+            background: #2196F3;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .download-button {
+            width: 100%;
+            background: #FF9800;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.3s;
+            margin-top: 10px;
+        }
+
+        .download-button:hover {
+            background: #F57C00;
+        }
+
+        .download-button:disabled {
+            background: #666666;
+            cursor: not-allowed;
+        }
+
+        .download-button.downloading {
+            background: #2196F3;
+        }
+
+        .download-button.success {
+            background: #4CAF50;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666666;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .loading-spinner {
+            border: 4px solid #333333;
+            border-top: 4px solid #2196F3;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 40px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <a href="/" class="back-link" style="margin-bottom: 0;">← Back to Management</a>
+            <a href="/extra-images" target="_blank" style="display: inline-block; background: #9C27B0; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 600;">📦 EXTRA IMAGES</a>
+        </div>
+
+        <h1>🎨 Search for Art</h1>
+        <p class="subtitle">Search museum collections for high-resolution portrait paintings</p>
+
+        <div class="search-section">
+            <form class="search-form" id="search-form">
+                <div class="form-group">
+                    <label for="query">Search Query</label>
+                    <input type="text" id="query" name="query" placeholder="e.g., portrait, landscape, rembrandt..." value="portrait" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="aspect-ratio-match">Aspect Ratio Match (% match to 2560x2880 display)</label>
+                    <div class="slider-container">
+                        <input type="range" id="aspect-ratio-match" name="aspect-ratio-match" min="70" max="100" value="85" step="1">
+                        <span class="slider-value" id="slider-value">85%</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="google-only" name="google-only" style="width: 18px; height: 18px; cursor: pointer;">
+                        <span>Search Google Images only (skip museums)</span>
+                    </label>
+                </div>
+
+                <div class="button-group">
+                    <button type="submit" class="search-button" id="search-btn">🔍 Search Museums</button>
+                    <button type="button" class="cancel-button" id="cancel-btn">✖ Cancel Search</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="progress-pane" id="progress-pane">
+            <div class="progress-line" id="progress-line-1"></div>
+            <div class="progress-line" id="progress-line-2"></div>
+            <div class="progress-line" id="progress-line-3"></div>
+            <div class="progress-line" id="progress-line-4"></div>
+            <div class="progress-line" id="progress-line-5"></div>
+            <div class="progress-line" id="progress-line-6"></div>
+            <div class="progress-line" id="progress-line-7"></div>
+        </div>
+
+        <div id="status-message" class="status-message"></div>
+
+        <div class="results-section" id="results-section" style="display: none;">
+            <div class="results-header">
+                <h2>Search Results</h2>
+                <span class="results-count" id="results-count">0 images found</span>
+            </div>
+            <div class="results-grid" id="results-grid">
+                <!-- Results will be inserted here -->
+            </div>
+        </div>
+
+        <div class="empty-state" id="empty-state">
+            <div class="empty-state-icon">🖼️</div>
+            <h3>Ready to search</h3>
+            <p>Enter a search query above to find high-resolution artwork</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        // Initialize Socket.IO
+        const socket = io();
+
+        const slider = document.getElementById('aspect-ratio-match');
+        const sliderValue = document.getElementById('slider-value');
+        const searchForm = document.getElementById('search-form');
+        const searchBtn = document.getElementById('search-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const statusMessage = document.getElementById('status-message');
+        const resultsSection = document.getElementById('results-section');
+        const resultsGrid = document.getElementById('results-grid');
+        const resultsCount = document.getElementById('results-count');
+        const emptyState = document.getElementById('empty-state');
+        const progressPane = document.getElementById('progress-pane');
+        const progressLine1 = document.getElementById('progress-line-1');
+        const progressLine2 = document.getElementById('progress-line-2');
+        const progressLine3 = document.getElementById('progress-line-3');
+        const progressLine4 = document.getElementById('progress-line-4');
+        const progressLine5 = document.getElementById('progress-line-5');
+        const progressLine6 = document.getElementById('progress-line-6');
+        const progressLine7 = document.getElementById('progress-line-7');
+
+        let searchInProgress = false;
+        let progressMessages = [];
+
+        // Update slider value display
+        slider.addEventListener('input', (e) => {
+            sliderValue.textContent = e.target.value + '%';
+        });
+
+        // Progress update function (keeps last 7 messages)
+        function updateProgress(message) {
+            progressMessages.push(message);
+            if (progressMessages.length > 7) {
+                progressMessages.shift();
+            }
+
+            progressLine1.textContent = progressMessages[0] || '';
+            progressLine2.textContent = progressMessages[1] || '';
+            progressLine3.textContent = progressMessages[2] || '';
+            progressLine4.textContent = progressMessages[3] || '';
+            progressLine5.textContent = progressMessages[4] || '';
+            progressLine6.textContent = progressMessages[5] || '';
+            progressLine7.textContent = progressMessages[6] || '';
+
+            // Highlight the most recent line
+            [progressLine1, progressLine2, progressLine3, progressLine4, progressLine5, progressLine6, progressLine7].forEach(line => {
+                line.classList.remove('highlight');
+            });
+
+            const lastLineIndex = progressMessages.length;
+            if (lastLineIndex === 1) progressLine1.classList.add('highlight');
+            if (lastLineIndex === 2) progressLine2.classList.add('highlight');
+            if (lastLineIndex === 3) progressLine3.classList.add('highlight');
+            if (lastLineIndex === 4) progressLine4.classList.add('highlight');
+            if (lastLineIndex === 5) progressLine5.classList.add('highlight');
+            if (lastLineIndex === 6) progressLine6.classList.add('highlight');
+            if (lastLineIndex === 7) progressLine7.classList.add('highlight');
+        }
+
+        // Cancel button handler
+        cancelBtn.addEventListener('click', () => {
+            if (searchInProgress) {
+                socket.disconnect();
+                socket.connect();
+                searchInProgress = false;
+                searchBtn.disabled = false;
+                searchBtn.textContent = '🔍 Search Museums';
+                cancelBtn.classList.remove('show');
+                updateProgress('❌ Search cancelled by user');
+                showStatus('Search cancelled', 'error');
+                setTimeout(() => {
+                    progressPane.classList.remove('show');
+                }, 3000);
+            }
+        });
+
+        // WebSocket event handlers
+        socket.on('search_progress', (data) => {
+            updateProgress(data.message);
+        });
+
+        socket.on('search_complete', (data) => {
+            searchInProgress = false;
+            searchBtn.disabled = false;
+            searchBtn.textContent = '🔍 Search Museums';
+            cancelBtn.classList.remove('show');
+
+            displayResults(data.results);
+            showStatus(`Found ${data.results.length} high-resolution artworks`, 'success');
+
+            setTimeout(() => {
+                progressPane.classList.remove('show');
+            }, 3000);
+        });
+
+        socket.on('search_error', (data) => {
+            searchInProgress = false;
+            searchBtn.disabled = false;
+            searchBtn.textContent = '🔍 Search Museums';
+            cancelBtn.classList.remove('show');
+
+            showStatus('Search failed: ' + data.error, 'error');
+            resultsSection.style.display = 'none';
+            emptyState.style.display = 'block';
+
+            setTimeout(() => {
+                progressPane.classList.remove('show');
+            }, 3000);
+        });
+
+        // Handle form submission
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const query = document.getElementById('query').value;
+            const aspectRatioMatch = parseFloat(slider.value);
+            const googleOnly = document.getElementById('google-only').checked;
+
+            // Show loading state
+            searchInProgress = true;
+            searchBtn.disabled = true;
+            searchBtn.textContent = '🔍 Searching...';
+            cancelBtn.classList.add('show');
+            progressMessages = [];
+            progressPane.classList.add('show');
+            emptyState.style.display = 'none';
+            resultsSection.style.display = 'none';
+            statusMessage.style.display = 'none';
+
+            // Start search via WebSocket
+            socket.emit('start_art_search', {
+                query: query,
+                min_aspect_ratio_match: aspectRatioMatch,
+                google_only: googleOnly
+            });
+        });
+
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = 'status-message ' + type;
+            setTimeout(() => {
+                if (type !== 'error') {
+                    statusMessage.style.display = 'none';
+                }
+            }, 5000);
+        }
+
+        function displayResults(results) {
+            resultsGrid.innerHTML = '';
+            resultsCount.textContent = `${results.length} images found`;
+
+            if (results.length === 0) {
+                resultsSection.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            results.forEach((result, index) => {
+                const card = createResultCard(result, index);
+                resultsGrid.appendChild(card);
+            });
+
+            resultsSection.style.display = 'block';
+        }
+
+        function createResultCard(result, index) {
+            const card = document.createElement('div');
+            card.className = 'result-card';
+
+            const imgUrl = result.thumbnail_url || result.image_url;
+            const resolution = result.resolution || 'Unknown';
+            const aspectRatioMatch = result.aspect_ratio_match || 0;
+
+            let aspectBadgeClass = 'aspect-ratio-fair';
+            let aspectLabel = `${aspectRatioMatch}% Match`;
+
+            if (aspectRatioMatch >= 95) {
+                aspectBadgeClass = 'aspect-ratio-excellent';
+                aspectLabel = `✓ ${aspectRatioMatch}% Perfect`;
+            } else if (aspectRatioMatch >= 90) {
+                aspectBadgeClass = 'aspect-ratio-excellent';
+                aspectLabel = `✓ ${aspectRatioMatch}% Excellent`;
+            } else if (aspectRatioMatch >= 85) {
+                aspectBadgeClass = 'aspect-ratio-good';
+                aspectLabel = `✓ ${aspectRatioMatch}% Good`;
+            }
+
+            card.innerHTML = `
+                <img src="${imgUrl}" alt="${result.title}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22280%22><rect fill=%22%23333%22 width=%22280%22 height=%22280%22/><text x=%2250%%22 y=%2250%%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22>No Image</text></svg>'">
+                <div class="result-info">
+                    <div class="result-title">${result.title}</div>
+                    <div class="result-meta">
+                        <div class="meta-item"><strong>Artist:</strong> ${result.artist}</div>
+                        <div class="meta-item"><strong>Date:</strong> ${result.date || 'Unknown'}</div>
+                        <div class="meta-item">
+                            <span class="resolution-badge">${resolution}</span>
+                            ${result.aspect_ratio_match ? `<span class="aspect-ratio-badge ${aspectBadgeClass}">${aspectLabel}</span>` : ''}
+                        </div>
+                        <div class="meta-item">
+                            <span class="source-badge">${result.source}</span>
+                        </div>
+                    </div>
+                    <button class="download-button" onclick="downloadImage(${index})">
+                        ⬇️ Download to EXTRA_IMAGES
+                    </button>
+                </div>
+            `;
+
+            return card;
+        }
+
+        let currentResults = [];
+
+        function displayResults(results) {
+            currentResults = results;
+            resultsGrid.innerHTML = '';
+            resultsCount.textContent = `${results.length} images found`;
+
+            if (results.length === 0) {
+                resultsSection.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            results.forEach((result, index) => {
+                const card = createResultCard(result, index);
+                resultsGrid.appendChild(card);
+            });
+
+            resultsSection.style.display = 'block';
+        }
+
+        async function downloadImage(index) {
+            const result = currentResults[index];
+            const button = event.target;
+
+            button.disabled = true;
+            button.className = 'download-button downloading';
+            button.textContent = '⏳ Downloading...';
+
+            try {
+                const response = await fetch('/api/download-art', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        image_url: result.image_url,
+                        title: result.title,
+                        artist: result.artist,
+                        source: result.source
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Download failed');
+                }
+
+                button.className = 'download-button success';
+                button.textContent = '✓ Downloaded';
+
+                setTimeout(() => {
+                    button.disabled = false;
+                    button.className = 'download-button';
+                    button.textContent = '⬇️ Download to EXTRA_IMAGES';
+                }, 3000);
+
+            } catch (error) {
+                console.error('Download error:', error);
+                button.className = 'download-button';
+                button.textContent = '✗ Download Failed';
+
+                setTimeout(() => {
+                    button.disabled = false;
+                    button.textContent = '⬇️ Download to EXTRA_IMAGES';
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>

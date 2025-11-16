@@ -1,0 +1,135 @@
+{
+  "sources": {
+    "cleveland": {
+      "name": "Cleveland Museum of Art",
+      "enabled": true,
+      "requires_api_key": false,
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/",
+      "search_params": {
+        "has_image": "1",
+        "type": "Painting"
+      },
+      "dimension_fields": {
+        "width_path": "images.web.width",
+        "height_path": "images.web.height"
+      },
+      "result_mapping": {
+        "title": "title",
+        "artist": "creators[0].description",
+        "date": "creation_date",
+        "image_url": "images.web.url",
+        "print_url": "images.print.url",
+        "full_url": "images.full.url",
+        "museum_url": "url"
+      }
+    },
+    "rijksmuseum": {
+      "name": "Rijksmuseum",
+      "enabled": true,
+      "requires_api_key": true,
+      "api_key_name": "rijksmuseum_key",
+      "api_url": "https://www.rijksmuseum.nl/api/en/collection",
+      "search_params": {
+        "type": "painting",
+        "imgonly": "true"
+      },
+      "dimension_fields": {
+        "width_path": "webImage.width",
+        "height_path": "webImage.height"
+      },
+      "result_mapping": {
+        "title": "title",
+        "artist": "principalOrFirstMaker",
+        "date": "longTitle",
+        "image_url": "webImage.url",
+        "museum_url": "links.web"
+      }
+    },
+    "wikimedia": {
+      "name": "Wikimedia Commons",
+      "enabled": true,
+      "requires_api_key": false,
+      "api_url": "https://commons.wikimedia.org/w/api.php",
+      "search_method": "custom",
+      "note": "Uses custom implementation due to complex two-step API calls"
+    },
+    "harvard": {
+      "name": "Harvard Art Museums",
+      "enabled": true,
+      "requires_api_key": true,
+      "api_key_name": "harvard_key",
+      "api_url": "https://api.harvardartmuseums.org/object",
+      "search_params": {
+        "classification": "Paintings",
+        "hasimage": 1
+      },
+      "dimension_fields": {
+        "width_path": "images[0].width",
+        "height_path": "images[0].height"
+      },
+      "result_mapping": {
+        "title": "title",
+        "artist": "people[0].name",
+        "date": "dated",
+        "image_url": "primaryimageurl",
+        "museum_url": "url"
+      },
+      "note": "Requires free API key from https://harvardartmuseums.org/collections/api"
+    },
+    "cooper_hewitt": {
+      "name": "Cooper Hewitt",
+      "enabled": false,
+      "requires_api_key": true,
+      "api_key_name": "cooper_hewitt_key",
+      "api_url": "https://api.collection.cooperhewitt.org/rest/",
+      "note": "Requires OAuth token from https://collection.cooperhewitt.org/api/"
+    },
+    "finnish_national_gallery": {
+      "name": "Finnish National Gallery",
+      "enabled": false,
+      "requires_api_key": true,
+      "api_key_name": "finnish_key",
+      "api_url": "http://kokoelmat.fng.fi/api/v2",
+      "note": "Requires API key - see http://kokoelmat.fng.fi/api/v2support/docs/"
+    },
+    "europeana": {
+      "name": "Europeana",
+      "enabled": true,
+      "requires_api_key": true,
+      "api_key_name": "europeana_key",
+      "api_url": "https://api.europeana.eu/record/v2",
+      "search_url": "https://api.europeana.eu/record/v2/search.json",
+      "dimension_fields": {
+        "width_path": "webResources.ebucoreWidth",
+        "height_path": "webResources.ebucoreHeight"
+      },
+      "result_mapping": {
+        "title": "title",
+        "artist": "dcCreator",
+        "date": "year",
+        "image_url": "edmIsShownBy",
+        "museum_url": "guid"
+      },
+      "note": "European cultural heritage aggregator. Get API key at https://pro.europeana.eu/page/get-api"
+    },
+    "google_images": {
+      "name": "Google Images",
+      "enabled": true,
+      "requires_api_key": true,
+      "api_key_name": "google_api_key",
+      "search_engine_id": "google_search_engine_id",
+      "api_url": "https://www.googleapis.com/customsearch/v1",
+      "search_params": {
+        "searchType": "image",
+        "imgSize": "xxlarge",
+        "imgType": "photo"
+      },
+      "note": "Google Custom Search API - Free tier: 100 queries/day. Get API key at console.cloud.google.com"
+    }
+  },
+  "default_settings": {
+    "limit_per_source": 10,
+    "rate_limit_delay": 0.1,
+    "timeout": 10
+  }
+}

@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extra Images - Kiosk Management</title>
+
+    <!-- Cropper.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #000000;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #1a1a1a;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(255, 255, 255, 0.1);
+            padding: 30px;
+        }
+
+        h1 {
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #aaaaaa;
+            margin-bottom: 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            color: #ffffff;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #333333;
+            padding-bottom: 10px;
+        }
+
+        .settings-form {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .settings-form label {
+            font-weight: 500;
+            color: #cccccc;
+        }
+
+        .settings-form input[type="number"] {
+            padding: 8px 12px;
+            border: 1px solid #444444;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 100px;
+            background: #2a2a2a;
+            color: #ffffff;
+        }
+
+        .settings-form input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .settings-form button {
+            background: #2196F3;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .settings-form button:hover {
+            background: #1976D2;
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .image-card {
+            border: 1px solid #333333;
+            border-radius: 8px;
+            overflow: visible;
+            background: #2a2a2a;
+            transition: transform 0.2s, box-shadow 0.2s, border 0.2s;
+            position: relative;
+        }
+
+        .image-card.active {
+            border: 3px solid #FF9800;
+        }
+
+        /* Keep image area clipped to rounded corners */
+        .image-card > img,
+        .image-card > div[style*="overflow: hidden"] {
+            border-radius: 8px 8px 0 0;
+            overflow: hidden;
+        }
+
+        .image-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .image-card.disabled {
+            border: 1px solid #444444;
+        }
+
+        .image-card.disabled img {
+            filter: grayscale(100%);
+            opacity: 0.5;
+        }
+
+        .image-card.disabled .card-info,
+        .image-card.disabled .image-tags {
+            opacity: 0.5;
+        }
+
+        .image-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: #1a1a1a;
+            cursor: pointer;
+            transition: transform 0.2s, filter 0.2s;
+        }
+
+        .image-card img:hover {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+        }
+
+        /* Hover effect for crop containers */
+        .image-card > div[style*="overflow: hidden"]:hover img {
+            filter: brightness(1.1);
+        }
+
+        /* Blue LED indicator for currently displayed image */
+        .current-image-led {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            width: 12px;
+            height: 12px;
+            background: #2196F3;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(33, 150, 243, 0.8), 0 0 16px rgba(33, 150, 243, 0.4);
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .current-image-led.active {
+            opacity: 1;
+        }
+
+        .image-checkbox-container {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(26, 26, 26, 0.9);
+            padding: 8px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            z-index: 10;
+        }
+
+        .image-checkbox-container label {
+            font-size: 12px;
+            font-weight: 500;
+            color: #ffffff;
+            cursor: pointer;
+            margin: 0;
+        }
+
+        .image-checkbox-container input[type="checkbox"] {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+
+        .image-card-info {
+            padding: 12px;
+        }
+
+        .image-card-name {
+            font-size: 14px;
+            color: #ffffff;
+            margin-bottom: 8px;
+            word-break: break-all;
+        }
+
+        .image-card-size {
+            font-size: 12px;
+            color: #888888;
+            margin-bottom: 12px;
+        }
+
+        .delete-button {
+            background: #f44336;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            width: 100%;
+        }
+
+        .delete-button:hover {
+            background: #d32f2f;
+        }
+
+        .message {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .message.success {
+            background: #1b5e20;
+            color: #a5d6a7;
+            border: 1px solid #4caf50;
+        }
+
+        .message.error {
+            background: #b71c1c;
+            color: #ef9a9a;
+            border: 1px solid #f44336;
+        }
+
+        .message.visible {
+            display: block;
+        }
+
+        .links {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .links a {
+            color: #64b5f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .links a:hover {
+            text-decoration: underline;
+        }
+
+
+        .remote-control {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #ff9800;
+            margin-bottom: 20px;
+        }
+
+        .remote-control h3 {
+            color: #ffb74d;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .control-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .control-button {
+            background: #ff9800;
+            color: white;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .control-button:hover {
+            background: #f57c00;
+        }
+
+        .control-button:active {
+            transform: scale(0.95);
+        }
+
+        .control-button.danger {
+            background: #f44336;
+        }
+
+        .control-button.danger:hover {
+            background: #d32f2f;
+        }
+
+        .control-button.success {
+            background: #4CAF50;
+        }
+
+        .control-button.success:hover {
+            background: #45a049;
+        }
+
+        .control-button-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .led-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+            transition: background 0.3s;
+        }
+
+        .led-indicator.active {
+            background: #2196F3;
+            box-shadow: 0 0 8px #2196F3;
+        }
+
+        .debug-toggle-button {
+            background: #9e9e9e;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .debug-toggle-button:hover {
+            background: #757575;
+        }
+
+        .debug-toggle-button.active {
+            background: #4CAF50;
+        }
+
+        .debug-toggle-button.active:hover {
+            background: #45a049;
+        }
+
+        .debug-panel {
+            background: #2a2a2a;
+            border: 2px solid #444444;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .debug-panel h3 {
+            color: #ffffff;
+            margin-bottom: 15px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .debug-console {
+            background: #263238;
+            color: #aed581;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 15px;
+            border-radius: 4px;
+            height: 1000px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .debug-console-line {
+            margin-bottom: 4px;
+            word-wrap: break-word;
+        }
+
+        .debug-console-line.error {
+            color: #ef5350;
+        }
+
+        .debug-console-line.info {
+            color: #81c784;
+        }
+
+        .debug-timestamp {
+            color: #78909c;
+            margin-right: 8px;
+        }
+
+        .debug-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .debug-button {
+            background: #757575;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .debug-button:hover {
+            background: #616161;
+        }
+
+        .debug-panel.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .theme-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #1e3a5f;
+            border: 1px solid #2196F3;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #64b5f6;
+        }
+
+        .theme-badge.active {
+            background: #2196F3;
+            color: white;
+            border: 3px solid #FF9800;
+        }
+
+        .theme-badge .theme-name {
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .theme-badge .theme-name:hover {
+            text-decoration: underline;
+        }
+
+        .theme-badge button {
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 2px 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .theme-badge button:hover {
+            background: #d32f2f;
+        }
+
+        .image-themes {
+            margin-top: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .image-theme-tag {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #e3f2fd;
+            color: #1565c0;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+
+        .theme-selector {
+            margin-top: 8px;
+        }
+
+        .theme-selector select {
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 12px;
+            width: 100%;
+        }
+
+        /* Crop Modal */
+        .crop-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        .crop-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .crop-modal-content {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 90vw;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .crop-container {
+            max-width: 800px;
+            max-height: 600px;
+            margin: 20px 0;
+        }
+
+        .crop-container img {
+            max-width: 100%;
+        }
+
+        .crop-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 15px;
+        }
+
+        .crop-button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .crop-button.primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .crop-button.primary:hover {
+            background: #45a049;
+        }
+
+        .crop-button.secondary {
+            background: #f44336;
+            color: white;
+        }
+
+        .crop-button.secondary:hover {
+            background: #da190b;
+        }
+
+        .crop-button.tertiary {
+            background: #757575;
+            color: white;
+        }
+
+        .crop-button.tertiary:hover {
+            background: #616161;
+        }
+
+        .crop-image-button {
+            background: #2196F3;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-right: 8px;
+        }
+
+        /* Action menu styles */
+        .action-menu-container {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            z-index: 10;
+        }
+
+        .action-menu-button {
+            background: rgba(26, 26, 26, 0.9);
+            border: 1px solid #444444;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+            color: #ffffff;
+            transition: background 0.2s;
+        }
+
+        .action-menu-button:hover {
+            background: #2a2a2a;
+            color: #ffffff;
+        }
+
+        .action-menu-dropdown {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            margin-bottom: 4px;
+            background: #2a2a2a;
+            border: 1px solid #444444;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            min-width: 180px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .action-menu-dropdown.show {
+            display: block;
+        }
+
+        .menu-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #ffffff;
+            transition: background 0.2s;
+            position: relative;
+        }
+
+        .menu-item:hover {
+            background: #3a3a3a;
+        }
+
+        .menu-item:first-child {
+            border-radius: 4px 4px 0 0;
+        }
+
+        .menu-item:last-child {
+            border-radius: 0 0 4px 4px;
+        }
+
+        .menu-item-danger {
+            color: #f44336;
+        }
+
+        .menu-item-danger:hover {
+            background: #ffebee;
+        }
+
+        .menu-item.has-submenu {
+            padding-right: 32px;
+        }
+
+        .submenu-arrow {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+        }
+
+        .submenu {
+            position: absolute;
+            left: 100%;
+            bottom: 0;
+            margin-left: 4px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            min-width: 150px;
+            display: none;
+            z-index: 1001;
+        }
+
+        .submenu.show {
+            display: block;
+        }
+
+        .submenu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #333;
+            transition: background 0.2s;
+        }
+
+        .submenu-item:hover {
+            background: #f5f5f5;
+        }
+
+        .submenu-item:first-child {
+            border-radius: 4px 4px 0 0;
+        }
+
+        .submenu-item:last-child {
+            border-radius: 0 0 4px 4px;
+        }
+
+        .crop-image-button:hover {
+            background: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Extra Images Management</h1>
+        <p class="subtitle">Manage downloaded art search results before importing to main storage</p>
+
+        <div class="links">
+            <a href="/" onclick="resumeSlideshow(event, '/')">← Back to Main Management</a>
+            <a href="/search" onclick="resumeSlideshow(event, '/search')">🎨 Back to Search</a>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <div class="section">
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button onclick="importAllImages()" style="background: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 600;">📥 IMPORT ALL TO MAIN</button>
+                <button onclick="deleteAllImages()" style="background: #f44336; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 600;">🗑️ DELETE ALL</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 id="current-images-heading">Extra Images</h2>
+            <div class="image-grid" id="image-grid">
+                <p style="color: #999;">Loading extra images...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+
+        // Menu handling functions (define early for use in createImageCard)
+        function toggleMenu(menuContainer) {
+            const dropdown = menuContainer.querySelector('.action-menu-dropdown');
+            const isOpen = dropdown.classList.contains('show');
+
+            // Close all other menus first
+            closeAllMenus();
+
+            // Toggle this menu
+            if (!isOpen) {
+                dropdown.classList.add('show');
+                // Raise the parent card's z-index so dropdown and submenu appear above other cards
+                const card = menuContainer.closest('.image-card');
+                if (card) {
+                    card.style.zIndex = '1002';
+                }
+            }
+        }
+
+        function closeAllMenus() {
+            document.querySelectorAll('.action-menu-dropdown.show').forEach(dropdown => {
+                dropdown.classList.remove('show');
+                // Reset the parent card's z-index
+                const card = dropdown.closest('.image-card');
+                if (card) {
+                    card.style.zIndex = '';
+                }
+            });
+        }
+
+        // Close menus when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.action-menu-container')) {
+                closeAllMenus();
+            }
+        });
+
+        // Jump to display extra image on kiosk
+        function jumpToExtraImage(imageName) {
+            try {
+                // Send jump command for extra image via WebSocket
+                socket.emit('send_command', { command: 'jump_extra', image_name: imageName });
+            } catch (error) {
+                console.error('Error jumping to extra image:', error);
+                showMessage('Error displaying image', 'error');
+            }
+        }
+
+        // Resume slideshow when leaving extra images page
+        function resumeSlideshow(event, targetUrl) {
+            event.preventDefault();
+            try {
+                // Send resume command to restore slideshow
+                socket.emit('send_command', { command: 'resume_from_extra' });
+
+                // Wait a bit for the command to be sent, then navigate
+                setTimeout(() => {
+                    window.location.href = targetUrl;
+                }, 100);
+            } catch (error) {
+                console.error('Error resuming slideshow:', error);
+                // Navigate anyway
+                window.location.href = targetUrl;
+            }
+        }
+
+        // Import single image to main storage
+        async function importSingleImage(filename) {
+            if (!confirm(`Import "${filename}" to main storage? The image will be moved (not copied).`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/extra-images/${encodeURIComponent(filename)}/import`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(`Successfully imported "${filename}"`, 'success');
+                    loadImages(); // Reload the grid
+                } else {
+                    showMessage(result.error || 'Error importing image', 'error');
+                }
+            } catch (error) {
+                console.error('Error importing image:', error);
+                showMessage('Error importing image', 'error');
+            }
+        }
+
+        // Import all images to main storage
+        async function importAllImages() {
+            if (!confirm('Import all extra images to main storage? Images will be moved (not copied).')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/extra-images/import-all', {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(`Successfully imported ${result.imported_count} image(s)`, 'success');
+                    loadImages(); // Reload the grid
+                } else {
+                    showMessage(result.error || 'Error importing images', 'error');
+                }
+            } catch (error) {
+                console.error('Error importing images:', error);
+                showMessage('Error importing images', 'error');
+            }
+        }
+
+        // Delete all extra images
+        async function deleteAllImages() {
+            if (!confirm('Delete ALL extra images? This cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/extra-images/delete-all', {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(`Successfully deleted ${result.deleted_count} image(s)`, 'success');
+                    loadImages(); // Reload the grid
+                } else {
+                    showMessage(result.error || 'Error deleting images', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting images:', error);
+                showMessage('Error deleting images', 'error');
+            }
+        }
+
+        // Load and display images
+        async function loadImages() {
+            try {
+                const response = await fetch('/api/extra-images');
+                const images = await response.json();
+
+                // Load crop settings
+                const settingsResponse = await fetch('/api/settings');
+                const settings = await settingsResponse.json();
+                const imageCrops = settings.image_crops || {};
+
+                const grid = document.getElementById('image-grid');
+                const heading = document.getElementById('current-images-heading');
+                grid.innerHTML = '';
+
+                heading.textContent = 'Extra Images';
+
+                if (images.length === 0) {
+                    grid.innerHTML = '<p style="color: #999;">No extra images. Download images from the art search page.</p>';
+                    return;
+                }
+
+                // Display all extra images
+                images.forEach(image => {
+                    const cropData = imageCrops[image.name];
+                    const card = createImageCard(image, cropData);
+                    grid.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error loading images:', error);
+                showMessage('Error loading images', 'error');
+            }
+        }
+
+        // Apply crop to thumbnail image
+        function applyCropToThumbnail(img, container, cropData) {
+            const containerW = container.clientWidth;
+            const containerH = container.clientHeight; // 200px
+
+            const cropX = cropData.x;
+            const cropY = cropData.y;
+            const cropW = cropData.width;
+            const cropH = cropData.height;
+            const imgW = cropData.imageWidth;
+            const imgH = cropData.imageHeight;
+
+            // Calculate scale to make crop region fill container (cover behavior)
+            const scaleX = containerW / cropW;
+            const scaleY = containerH / cropH;
+            const scale = Math.max(scaleX, scaleY);
+
+            // Calculate scaled image dimensions
+            const scaledImgW = imgW * scale;
+            const scaledImgH = imgH * scale;
+
+            // Calculate scaled crop dimensions
+            const scaledCropW = cropW * scale;
+            const scaledCropH = cropH * scale;
+
+            // Calculate position to place crop region
+            const offsetX = -cropX * scale;
+            const offsetY = -cropY * scale;
+
+            // Center the crop region in container
+            const centerX = (containerW - scaledCropW) / 2;
+            const centerY = (containerH - scaledCropH) / 2;
+
+            // Apply styles
+            img.style.position = 'absolute';
+            img.style.width = `${scaledImgW}px`;
+            img.style.height = `${scaledImgH}px`;
+            img.style.left = `${offsetX + centerX}px`;
+            img.style.top = `${offsetY + centerY}px`;
+            img.style.objectFit = 'fill';
+            img.style.maxWidth = 'none';
+            img.style.maxHeight = 'none';
+        }
+
+        // Create image card element
+        function createImageCard(image, cropData) {
+            const card = document.createElement('div');
+            card.className = 'image-card';
+            // Extra images are always shown (no disabled state)
+
+            // If crop exists, create a container for the cropped image
+            if (cropData) {
+                const cropContainer = document.createElement('div');
+                cropContainer.style.width = '100%';
+                cropContainer.style.height = '200px';
+                cropContainer.style.overflow = 'hidden';
+                cropContainer.style.position = 'relative';
+                cropContainer.style.background = '#f0f0f0';
+                cropContainer.style.cursor = 'pointer';
+                cropContainer.onclick = () => jumpToExtraImage(image.name);
+                cropContainer.title = 'Click to display this image on the kiosk';
+
+                const img = document.createElement('img');
+                img.src = image.url;
+                img.alt = image.name;
+
+                // Apply crop when image loads
+                img.onload = () => applyCropToThumbnail(img, cropContainer, cropData);
+
+                cropContainer.appendChild(img);
+                card.appendChild(cropContainer);
+            } else {
+                // No crop - show normal image
+                const img = document.createElement('img');
+                img.src = image.url;
+                img.alt = image.name;
+                img.style.cursor = 'pointer';
+                img.onclick = () => jumpToExtraImage(image.name);
+                img.title = 'Click to display this image on the kiosk';
+                card.appendChild(img);
+            }
+
+            // No checkbox for extra images - they're managed separately from main images
+
+            const info = document.createElement('div');
+            info.className = 'image-card-info';
+
+            // Theme tags
+            const themesDiv = document.createElement('div');
+            themesDiv.className = 'image-themes';
+            (image.themes || []).forEach(themeName => {
+                const tag = document.createElement('span');
+                tag.className = 'image-theme-tag';
+                tag.style.cursor = 'pointer';
+                tag.title = 'Click to remove from theme';
+                tag.textContent = themeName + ' ✕';
+                tag.onclick = async () => {
+                    const newThemes = (image.themes || []).filter(t => t !== themeName);
+                    await updateImageThemes(image.name, newThemes);
+                    await loadImages();
+                };
+                themesDiv.appendChild(tag);
+            });
+
+            // Action menu (three dots)
+            const menuContainer = document.createElement('div');
+            menuContainer.className = 'action-menu-container';
+
+            const menuButton = document.createElement('button');
+            menuButton.className = 'action-menu-button';
+            menuButton.innerHTML = '⋮';
+            menuButton.title = 'Actions';
+            menuButton.onclick = (e) => {
+                e.stopPropagation();
+                toggleMenu(menuContainer);
+            };
+
+            const menuDropdown = document.createElement('div');
+            menuDropdown.className = 'action-menu-dropdown';
+
+            // Add to theme submenu
+            if (Object.keys(availableThemes).length > 0) {
+                const themeMenuItem = document.createElement('div');
+                themeMenuItem.className = 'menu-item has-submenu';
+                themeMenuItem.innerHTML = 'Add to theme <span class="submenu-arrow">▸</span>';
+
+                const themeSubmenu = document.createElement('div');
+                themeSubmenu.className = 'submenu';
+
+                for (const themeName in availableThemes) {
+                    if (!(image.themes || []).includes(themeName)) {
+                        const themeOption = document.createElement('div');
+                        themeOption.className = 'submenu-item';
+                        themeOption.textContent = themeName;
+                        themeOption.onclick = async (e) => {
+                            e.stopPropagation();
+                            const newThemes = [...(image.themes || []), themeName];
+                            await updateImageThemes(image.name, newThemes);
+                            await loadImages();
+                        };
+                        themeSubmenu.appendChild(themeOption);
+                    }
+                }
+
+                themeMenuItem.appendChild(themeSubmenu);
+
+                // Handle submenu hover interaction
+                themeMenuItem.addEventListener('mouseenter', () => {
+                    themeSubmenu.classList.add('show');
+                });
+
+                themeMenuItem.addEventListener('mouseleave', (e) => {
+                    // Delay hiding to allow mouse movement to submenu
+                    setTimeout(() => {
+                        if (!themeSubmenu.matches(':hover')) {
+                            themeSubmenu.classList.remove('show');
+                        }
+                    }, 100);
+                });
+
+                themeSubmenu.addEventListener('mouseleave', () => {
+                    themeSubmenu.classList.remove('show');
+                });
+
+                menuDropdown.appendChild(themeMenuItem);
+            }
+
+            // Import to Main menu item
+            const importMenuItem = document.createElement('div');
+            importMenuItem.className = 'menu-item';
+            importMenuItem.textContent = '📥 Import to Main';
+            importMenuItem.onclick = (e) => {
+                e.stopPropagation();
+                closeAllMenus();
+                importSingleImage(image.name);
+            };
+            menuDropdown.appendChild(importMenuItem);
+
+            // Crop menu item
+            const cropMenuItem = document.createElement('div');
+            cropMenuItem.className = 'menu-item';
+            cropMenuItem.textContent = 'Crop';
+            cropMenuItem.onclick = (e) => {
+                e.stopPropagation();
+                closeAllMenus();
+                openCropModal(image.name, image.url);
+            };
+            menuDropdown.appendChild(cropMenuItem);
+
+            // Delete menu item
+            const deleteMenuItem = document.createElement('div');
+            deleteMenuItem.className = 'menu-item menu-item-danger';
+            deleteMenuItem.textContent = 'Delete';
+            deleteMenuItem.onclick = (e) => {
+                e.stopPropagation();
+                closeAllMenus();
+                deleteImage(image.name);
+            };
+            menuDropdown.appendChild(deleteMenuItem);
+
+            menuContainer.appendChild(menuButton);
+            menuContainer.appendChild(menuDropdown);
+
+            info.appendChild(themesDiv);
+
+            card.appendChild(menuContainer);
+            // Image or crop container already appended above
+            card.appendChild(info);
+
+            return card;
+        }
+
+        // Delete image
+        async function deleteImage(filename) {
+            if (!confirm(`Delete ${filename}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/extra-images/${encodeURIComponent(filename)}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showMessage('Image deleted successfully', 'success');
+                    loadImages();
+                } else {
+                    showMessage('Error deleting image', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting image:', error);
+                showMessage('Error deleting image', 'error');
+            }
+        }
+
+        // Toggle image enabled state (not used for extra images, but kept for compatibility)
+        async function toggleImageEnabled(filename, enabled, cardElement) {
+            // Extra images don't have enabled/disabled state
+            // Just update visual state locally
+            if (enabled) {
+                cardElement.classList.remove('disabled');
+            } else {
+                cardElement.classList.add('disabled');
+            }
+        }
+
+        // Show message
+        function showMessage(text, type) {
+            const message = document.getElementById('message');
+            message.textContent = text;
+            message.className = `message ${type} visible`;
+
+            setTimeout(() => {
+                message.classList.remove('visible');
+            }, 3000);
+        }
+
+        // Theme management - only needed for loading available themes for tag display
+        let availableThemes = {};
+
+        async function loadThemes() {
+            try {
+                const response = await fetch('/api/themes');
+                const data = await response.json();
+                availableThemes = data.themes;
+            } catch (error) {
+                console.error('Error loading themes:', error);
+            }
+        }
+
+        async function updateImageThemes(imageName, themes) {
+            try {
+                const response = await fetch(`/api/extra-images/${encodeURIComponent(imageName)}/themes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ themes })
+                });
+
+                if (!response.ok) {
+                    showMessage('Error updating image themes', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating image themes:', error);
+                showMessage('Error updating image themes', 'error');
+            }
+        }
+
+        // Crop functionality
+        let currentCropper = null;
+        let currentCropImage = null;
+
+        async function openCropModal(imageName, imageUrl) {
+            currentCropImage = imageName;
+            const modal = document.getElementById('crop-modal');
+            const image = document.getElementById('crop-image');
+
+            // Set image source
+            image.src = imageUrl;
+
+            // Show modal
+            modal.classList.add('active');
+
+            // Wait for image to load
+            await new Promise(resolve => {
+                if (image.complete) {
+                    resolve();
+                } else {
+                    image.onload = resolve;
+                }
+            });
+
+            // Destroy existing cropper if any
+            if (currentCropper) {
+                currentCropper.destroy();
+            }
+
+            // Get existing crop data if any
+            const settings = await fetch('/api/settings').then(r => r.json());
+            const imageCrops = settings.image_crops || {};
+            const cropData = imageCrops[imageName];
+
+            // Initialize cropper
+            currentCropper = new Cropper(image, {
+                viewMode: 1,
+                dragMode: 'move',
+                aspectRatio: NaN, // Free aspect ratio
+                autoCropArea: 1,
+                restore: false,
+                guides: true,
+                center: true,
+                highlight: true,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                toggleDragModeOnDblclick: false,
+                ready: function() {
+                    // If crop data exists, set it
+                    if (cropData) {
+                        currentCropper.setData({
+                            x: cropData.x,
+                            y: cropData.y,
+                            width: cropData.width,
+                            height: cropData.height
+                        });
+                    }
+                }
+            });
+        }
+
+        function closeCropModal() {
+            const modal = document.getElementById('crop-modal');
+            modal.classList.remove('active');
+
+            if (currentCropper) {
+                currentCropper.destroy();
+                currentCropper = null;
+            }
+
+            currentCropImage = null;
+        }
+
+        async function saveCrop() {
+            if (!currentCropper || !currentCropImage) {
+                return;
+            }
+
+            // Get crop data
+            const cropData = currentCropper.getData();
+            const imageData = currentCropper.getImageData();
+
+            // Save crop data (as percentages for responsiveness)
+            const cropInfo = {
+                x: cropData.x,
+                y: cropData.y,
+                width: cropData.width,
+                height: cropData.height,
+                imageWidth: imageData.naturalWidth,
+                imageHeight: imageData.naturalHeight
+            };
+
+            try {
+                // Get current settings
+                const settings = await fetch('/api/settings').then(r => r.json());
+
+                // Update image_crops
+                if (!settings.image_crops) {
+                    settings.image_crops = {};
+                }
+                settings.image_crops[currentCropImage] = cropInfo;
+
+                // Save settings
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(settings)
+                });
+
+                if (response.ok) {
+                    showMessage('Crop saved successfully!', 'success');
+                    closeCropModal();
+                } else {
+                    showMessage('Failed to save crop', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving crop:', error);
+                showMessage('Error saving crop', 'error');
+            }
+        }
+
+        async function clearCrop() {
+            if (!currentCropImage) {
+                return;
+            }
+
+            try {
+                // Get current settings
+                const settings = await fetch('/api/settings').then(r => r.json());
+
+                // Remove crop data
+                if (settings.image_crops && settings.image_crops[currentCropImage]) {
+                    delete settings.image_crops[currentCropImage];
+
+                    // Save settings
+                    const response = await fetch('/api/settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(settings)
+                    });
+
+                    if (response.ok) {
+                        showMessage('Crop cleared successfully!', 'success');
+                        closeCropModal();
+                    } else {
+                        showMessage('Failed to clear crop', 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('Error clearing crop:', error);
+                showMessage('Error clearing crop', 'error');
+            }
+        }
+
+        // WebSocket event handlers for real-time updates
+        socket.on('connect', () => {
+            console.log('WebSocket connected');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('WebSocket disconnected');
+        });
+
+        socket.on('reconnect', () => {
+            console.log('WebSocket reconnected');
+            // Reload page state after reconnection
+            initializePage();
+        });
+
+        socket.on('image_list_changed', () => {
+            console.log('Image list changed via WebSocket');
+            loadImages();
+        });
+
+        // Load data on page load
+        async function initializePage() {
+            await loadThemes(); // Load themes for tag display
+            await loadImages();
+        }
+
+        initializePage();
+    </script>
+
+    <!-- Crop Modal -->
+    <div id="crop-modal" class="crop-modal">
+        <div class="crop-modal-content">
+            <h2>Crop Image</h2>
+            <div class="crop-container">
+                <img id="crop-image" src="" alt="Image to crop">
+            </div>
+            <div class="crop-buttons">
+                <button class="crop-button tertiary" onclick="closeCropModal()">Cancel</button>
+                <button class="crop-button secondary" onclick="clearCrop()">Clear Crop</button>
+                <button class="crop-button primary" onclick="saveCrop()">Save Crop</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cropper.js Script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+</body>
+</html>

@@ -786,6 +786,53 @@
 
         // Execute remote command
         async function executeCommand(command) {
+            // Handle jump_extra command (display extra image temporarily)
+            if (typeof command === 'object' && command.command === 'jump_extra') {
+                const imageName = command.image_name;
+                await debugLog(`Displaying extra image: ${imageName}`, 'info');
+
+                const container = document.getElementById('slideshow-container');
+
+                // Remove any existing extra image overlay first
+                const existingOverlay = container.querySelector('.extra-image-overlay');
+                if (existingOverlay) {
+                    existingOverlay.remove();
+                }
+
+                // Hide all existing slides (only if not already hidden)
+                const allSlides = container.querySelectorAll('.slide:not(.extra-image-overlay)');
+                allSlides.forEach(s => {
+                    s.style.opacity = '0';
+                    s.style.pointerEvents = 'none';
+                });
+
+                // Create a temporary overlay slide for the extra image
+                const extraSlide = document.createElement('div');
+                extraSlide.className = 'slide extra-image-overlay';
+                extraSlide.style.backgroundImage = `url('/extra-images/${encodeURIComponent(imageName)}')`;
+                extraSlide.style.backgroundSize = 'cover';
+                extraSlide.style.backgroundPosition = 'center';
+                extraSlide.style.backgroundRepeat = 'no-repeat';
+                extraSlide.style.position = 'absolute';
+                extraSlide.style.top = '0';
+                extraSlide.style.left = '0';
+                extraSlide.style.width = '100%';
+                extraSlide.style.height = '100%';
+                extraSlide.style.opacity = '1';
+                extraSlide.style.zIndex = '1000';
+
+                container.appendChild(extraSlide);
+
+                // Pause the slideshow
+                if (slideTimer) {
+                    clearInterval(slideTimer);
+                    slideTimer = null;
+                    isPaused = true;
+                }
+
+                return;
+            }
+
             // Handle jump command (object with command and image_name)
             if (typeof command === 'object' && command.command === 'jump') {
                 const imageName = command.image_name;
@@ -829,12 +876,47 @@
                     }
                     break;
                 case 'play':
+                    // Remove extra image overlay if present
+                    const extraOverlay = document.querySelector('.extra-image-overlay');
+                    if (extraOverlay) {
+                        extraOverlay.remove();
+                        // Show the current slide
+                        const currentSlide = document.querySelector(`.slide[data-index="${currentIndex}"]`);
+                        if (currentSlide) {
+                            currentSlide.style.opacity = '1';
+                            currentSlide.style.pointerEvents = 'auto';
+                        }
+                    }
                     isPaused = false;
                     startSlideshow();
                     break;
                 case 'reload':
                     isPaused = false; // Resume playback on reload
                     await reloadSlideshow();
+                    break;
+                case 'resume_from_extra':
+                    // Remove extra image overlay if present
+                    const extraOverlay2 = document.querySelector('.extra-image-overlay');
+                    if (extraOverlay2) {
+                        extraOverlay2.remove();
+                    }
+
+                    // Show the current slide
+                    const currentSlide2 = document.querySelector(`.slide[data-index="${currentIndex}"]`);
+                    if (currentSlide2) {
+                        currentSlide2.style.opacity = '1';
+                        currentSlide2.style.pointerEvents = 'auto';
+                    } else {
+                        // Try to show any slide as fallback
+                        const anySlide = document.querySelector('.slide:not(.extra-image-overlay)');
+                        if (anySlide) {
+                            anySlide.style.opacity = '1';
+                            anySlide.style.pointerEvents = 'auto';
+                        }
+                    }
+
+                    isPaused = false;
+                    startSlideshow();
                     break;
             }
         }
