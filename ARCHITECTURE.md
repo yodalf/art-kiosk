@@ -41,6 +41,9 @@ graph TB
 - Python 3.7+
 - Flask 3.0.0
 - Werkzeug 3.0.1
+- Flask-SocketIO 5.3.6
+- python-socketio 5.11.1
+- Socket.IO JavaScript Client 4.7.2
 - Cropper.js 1.6.1 (JavaScript image cropping library)
 
 ### 2. Frontend - Display (kiosk.html)
@@ -50,24 +53,23 @@ graph TB
 **Key Features**:
 - Automatic slideshow with configurable interval
 - Image cropping with automatic scaling to fill display
-- Dissolve transitions (always enabled)
+- Dissolve transitions for automatic playback
+- Instant transitions for manual controls (next/prev/jump)
 - Smart reload algorithm with shuffle_id detection
 - Randomized image ordering that changes with theme/atmosphere switches
-- Remote control command polling
+- Real-time WebSocket communication for remote control
 - Keyboard controls
-- Debug logging to server
+- Debug logging to server via WebSocket
 
 **Update Mechanism**:
 
 ```mermaid
 graph TB
     subgraph KioskDisplay["Kiosk Display (kiosk.html)"]
-        PollLoop["Poll Loop<br/>(every 500ms)<br/>- Check for remote commands<br/>- Execute: next, prev, pause, play, jump"]
-        CheckLoop["Check Loop<br/>(every 2 seconds - C interval)<br/>- Fetch enabled images (V)<br/>- Compare with previous vector (VP)<br/>- Check interval setting<br/>- Check dissolve setting<br/>- Check shuffle_id (order changes)<br/>- Reload if changed (reset to index 0)"]
-        SlideTimer["Slideshow Timer<br/>(every I seconds)<br/>- Advance to next image<br/>- Can be paused/resumed"]
+        WebSocket["WebSocket Connection<br/>- Receive remote commands (instant)<br/>- Receive settings updates (instant)<br/>- Receive image list changes (instant)<br/>- Send debug logs (real-time)"]
+        SlideTimer["Slideshow Timer<br/>(every I seconds)<br/>- Advance to next image with dissolve<br/>- Can be paused/resumed"]
 
-        PollLoop -.->|parallel| CheckLoop
-        CheckLoop -.->|parallel| SlideTimer
+        WebSocket -.->|parallel| SlideTimer
     end
 ```
 
@@ -267,33 +269,42 @@ graph TB
 - Smooth playback when stable
 - Debug logs show what changed
 
-### 2. Remote Control Polling
+### 2. Real-Time Communication via WebSockets
 
-**Purpose**: Allow management interface to control kiosk without WebSockets.
+**Purpose**: Provide instant, bidirectional communication between server and clients.
 
 **Implementation**:
 
 ```mermaid
 sequenceDiagram
     participant Mgmt as Management Interface
-    participant Server as Flask Server
+    participant Server as Flask Server (SocketIO)
     participant Kiosk as Kiosk Display
 
-    Mgmt->>Server: POST /api/control/send<br/>{"command": "pause"}
-    Server-->>Mgmt: OK
+    Note over Mgmt,Kiosk: WebSocket connections established on page load
 
-    loop Poll every 500ms
-        Kiosk->>Server: GET /api/control/poll
-        Server-->>Kiosk: {"command": "pause"}
-        Kiosk->>Kiosk: Execute pause
-    end
+    Mgmt->>Server: emit('send_command', {command: 'pause'})
+    Server->>Kiosk: emit('remote_command', 'pause')
+    Kiosk->>Kiosk: Execute pause instantly
+
+    Note over Mgmt,Kiosk: Settings change example
+
+    Mgmt->>Server: POST /api/settings (interval change)
+    Server->>Server: save_settings()
+    Server->>Mgmt: emit('settings_update', settings)
+    Server->>Kiosk: emit('settings_update', settings)
+    Kiosk->>Kiosk: Reload slideshow with new settings
 ```
 
-**Command Queue**:
-- Server stores one command at a time
-- Command expires after 5 seconds
-- Cleared after being retrieved once
-- Kiosk polls every 500ms
+**WebSocket Events**:
+- `connect` / `disconnect` - Connection lifecycle
+- `send_command` - Client sends remote command (emitted by management)
+- `remote_command` - Server broadcasts command to all clients (received by kiosk)
+- `log_debug` - Kiosk sends debug message (emitted by kiosk)
+- `debug_message` - Server broadcasts debug message to all clients (received by management)
+- `settings_update` - Server broadcasts settings changes
+- `image_list_changed` - Server broadcasts image list updates
+- Automatic reconnection on network interruption
 
 ### 3. Hierarchical Filtering (Atmospheres & Themes)
 
@@ -655,10 +666,11 @@ flowchart TD
 - Browser handles all scaling via CSS
 - Consider pre-resizing large images for better performance
 
-### Polling Overhead
-- Remote control polling: 500ms (minimal overhead)
-- Settings check: 2 seconds (minimal API calls)
-- Debug console: 1 second when enabled
+### WebSocket Communication
+- Real-time bidirectional communication (0ms latency)
+- Event-driven updates (no polling overhead)
+- Automatic reconnection on network interruption
+- Minimal bandwidth usage (only sends data when changes occur)
 
 ### Memory Usage
 - Flask server: ~50-100MB
@@ -809,7 +821,9 @@ flowchart TD
 - [x] Image cropping with crop region preview
 - [x] Per-theme intervals
 - [x] Per-atmosphere intervals
-- [x] Remote control via polling
+- [x] Real-time WebSocket communication (replaced polling)
+- [x] Instant transitions for manual controls (next/prev/jump)
+- [x] Real-time debug message streaming
 - [x] Automatic Firefox profile management (prevents corruption)
 - [x] Server readiness checks before Firefox launch
 - [x] Process cleanup on service start (port 80, Firefox, unclutter)
@@ -831,7 +845,6 @@ flowchart TD
 - [ ] Image search and filtering
 
 ### Architecture Improvements
-- [ ] WebSocket instead of polling (real-time updates)
 - [ ] Database (SQLite) instead of JSON
 - [ ] Image thumbnails (performance)
 - [ ] CDN for static assets

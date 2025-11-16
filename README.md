@@ -32,6 +32,12 @@ A web-based kiosk system for displaying images in slideshow mode, optimized for 
 - curl (for server readiness checks)
 - Monitor: 2560x2880 (portrait orientation)
 
+### Python Dependencies
+- Flask 3.0.0
+- Werkzeug 3.0.1
+- flask-socketio 5.3.6
+- python-socketio 5.11.1
+
 **Important**: This system is designed for X11. If using Raspberry Pi OS with Wayland (newer versions), switch to X11 mode:
 ```bash
 sudo raspi-config
@@ -396,14 +402,14 @@ Toggle between modes by pressing `F` while viewing the kiosk display.
 Since the kiosk is a remote display without a keyboard, you can control it from any device on your network via the management interface at `/`.
 
 **Available Controls:**
-- **Previous** - Go to previous image
-- **Next** - Go to next image
+- **Previous** - Go to previous image (instant transition)
+- **Next** - Go to next image (instant transition)
 - **Pause** - Pause the slideshow
 - **Play** - Resume the slideshow
 - **Reload** - Refresh the kiosk display
-- **Click on any image** - Jump directly to that image in the slideshow
+- **Click on any image** - Jump directly to that image in the slideshow (instant transition)
 
-The kiosk polls for commands every 500ms, so commands execute almost instantly. Clicking on any image thumbnail in the "Current Images" section will immediately switch the kiosk display to that image.
+**Real-Time Communication**: The system uses WebSockets for instant communication between the management interface and kiosk display. Commands execute immediately with 0ms latency. Automatic slideshow transitions still use smooth dissolve effects, while manual controls (next/prev/jump) use instant transitions.
 
 ## API Endpoints
 
@@ -421,7 +427,17 @@ The kiosk polls for commands every 500ms, so commands execute almost instantly. 
 **Remote Control:**
 - `POST /api/control/send` - Send command to kiosk (commands: next, prev, pause, play, reload, jump)
   - For jump command, include `image_name` parameter: `{"command": "jump", "image_name": "photo.jpg"}`
-- `GET /api/control/poll` - Poll for commands (used by kiosk display)
+- `GET /api/control/poll` - Poll for commands (legacy, replaced by WebSockets)
+
+**WebSocket Events:**
+- `connect` - Client connected to server
+- `disconnect` - Client disconnected from server
+- `send_command` - Send remote command (emitted by client)
+- `remote_command` - Receive remote command (broadcasted to all clients)
+- `log_debug` - Send debug message from kiosk (emitted by client)
+- `debug_message` - Receive debug message (broadcasted to all clients)
+- `settings_update` - Settings changed (broadcasted to all clients)
+- `image_list_changed` - Image list changed (broadcasted to all clients)
 
 **Themes:**
 - `GET /api/themes` - List all themes and active theme
