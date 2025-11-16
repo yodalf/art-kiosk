@@ -112,6 +112,7 @@ The server will start on `http://0.0.0.0:80` (accessible from any device on your
    - Remote control the kiosk display
    - Delete images
    - View current images (shows cropped thumbnails in randomized order)
+   - **Debug Console** - Click the 🐛 DEBUG button to view real-time logs from the kiosk display
 
 2. **Kiosk Display**: `http://<raspberry-pi-ip>/view`
    - Main slideshow display
@@ -410,6 +411,24 @@ Since the kiosk is a remote display without a keyboard, you can control it from 
 - **Click on any image** - Jump directly to that image in the slideshow (instant transition)
 
 **Real-Time Communication**: The system uses WebSockets for instant communication between the management interface and kiosk display. Commands execute immediately with 0ms latency. Automatic slideshow transitions still use smooth dissolve effects, while manual controls (next/prev/jump) use instant transitions.
+
+## Debug Console
+
+Monitor your kiosk display in real-time with the built-in debug console:
+
+1. **Open Debug Console** - Click the **🐛 DEBUG** button in the management interface
+2. **Real-time logs** - Messages stream live from the kiosk display via WebSocket
+3. **Copy logs** - Click **📋 Clip** to copy all debug messages to clipboard (works over HTTP)
+4. **Clear logs** - Click **Clear Console** to remove accumulated messages
+5. **Auto-enable** - Debug console automatically starts when opened, stops when closed
+
+The debug console shows:
+- Image change events
+- Settings updates
+- Slideshow state changes
+- Crop calculations
+- Error messages
+- WebSocket connection status
 
 ## API Endpoints
 

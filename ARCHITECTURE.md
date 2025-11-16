@@ -85,7 +85,12 @@ graph TB
 3. **Themes** - Create, delete, select active theme (includes permanent "All Images" theme, blue badges)
 4. **Upload Images** - Drag-and-drop upload area
 5. **Current Images** - Grid of thumbnails with controls (filtered by active atmosphere or theme, randomized order)
-6. **Debug Console** - Live logs from kiosk display (toggle with DEBUG button)
+6. **Debug Console** - Real-time logs from kiosk display
+   - Toggle visibility with 🐛 DEBUG button
+   - Auto-enable debugging when opened, auto-disable when closed
+   - Copy logs to clipboard with 📋 Clip button (HTTP-compatible fallback)
+   - Clear accumulated messages with Clear Console button
+   - Messages stream in real-time via WebSocket
 
 **Interactive Features**:
 - Click image thumbnail to jump to that image
@@ -98,6 +103,7 @@ graph TB
 - Cropped thumbnails preview actual kiosk display
 - Mutual exclusivity: selecting atmosphere deselects theme, and vice versa
 - Auto-preview: newly uploaded images automatically display on kiosk
+- Real-time debug console with clipboard copy support
 
 ## Data Model
 
@@ -824,6 +830,8 @@ flowchart TD
 - [x] Real-time WebSocket communication (replaced polling)
 - [x] Instant transitions for manual controls (next/prev/jump)
 - [x] Real-time debug message streaming
+- [x] Improved debug console UX (auto-enable, clipboard copy, visual feedback)
+- [x] HTTP-compatible clipboard fallback (works without HTTPS)
 - [x] Automatic Firefox profile management (prevents corruption)
 - [x] Server readiness checks before Firefox launch
 - [x] Process cleanup on service start (port 80, Firefox, unclutter)
