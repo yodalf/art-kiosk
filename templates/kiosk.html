@@ -242,6 +242,14 @@
                     needsReload = true;
                 }
 
+                // Don't reload if currently viewing an extra image overlay
+                const extraOverlay = document.querySelector('.extra-image-overlay');
+                if (extraOverlay) {
+                    debugLog('Extra image overlay active, skipping slideshow reload', 'info');
+                    // Update imageCrops but don't reload
+                    needsReload = false;
+                }
+
                 if (needsReload) {
                     debugLog('Reloading slideshow...', 'info');
                     await reloadSlideshow(shuffleChanged);
