@@ -108,7 +108,7 @@
         let interval = {{ interval }} * 1000; // Convert to milliseconds (I)
         let checkInterval = {{ check_interval }} * 1000; // Convert to milliseconds (C)
         let slideTimer = null;
-        let fillMode = true; // false = cover mode (fills screen), true = contain mode (shows full image)
+        let fillMode = false; // false = cover mode (fills screen), true = contain mode (shows full image)
         let previousImageVector = []; // VP - previous vector of enabled image names
         let previousShuffleId = null; // Track shuffle_id to detect order changes
 
@@ -988,9 +988,16 @@
         debugLog(`Window outer size: ${window.outerWidth}x${window.outerHeight}`, 'info');
         debugLog(`Device pixel ratio: ${window.devicePixelRatio}`, 'info');
 
-        // Parse URL parameters for starting image
+        // Parse URL parameters for starting image and fit mode
         const urlParams = new URLSearchParams(window.location.search);
         const startImage = urlParams.get('image');
+        const fitParam = urlParams.get('fit');
+
+        // Set fillMode based on URL parameter (for external web clients)
+        if (fitParam === 'true') {
+            fillMode = true;
+            debugLog('External client detected: starting in FIT mode', 'info');
+        }
 
         // Load images on page load
         if (startImage) {
