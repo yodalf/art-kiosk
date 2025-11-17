@@ -4,6 +4,7 @@ A web-based kiosk system for displaying images in slideshow mode, optimized for 
 
 ## Features
 
+- **Single-Page App** - Unified navigation across all sections without opening new tabs
 - Web-based image upload and management
 - **Dark theme interface** - Professional black background across all pages
 - **Atmospheres** - Hierarchical organization layer above themes for complex content management
@@ -102,27 +103,35 @@ The server will start on `http://0.0.0.0:80` (accessible from any device on your
 
 ### Accessing the Interfaces
 
-1. **Management Interface**: `http://<raspberry-pi-ip>/`
-   - Upload images
-   - **Crop images** - Click the "Crop" button to select a region that will fill the entire kiosk display
-   - **Enable/disable images** - Use the "Show" checkbox on each image card
-   - **Create and manage Atmospheres** - Organize themes into atmospheres
-   - **Create and manage Themes** - Organize images into themes
-   - Configure slideshow intervals per theme/atmosphere
-   - Remote control the kiosk display
-   - Delete images
-   - View current images (shows cropped thumbnails in randomized order)
-   - **Debug Console** - Click the 🐛 DEBUG button to view real-time logs from the kiosk display
+**Single-Page App**: All management interfaces are accessible through a unified navigation menu:
 
-2. **Kiosk Display**: `http://<raspberry-pi-ip>/view`
-   - Main slideshow display
-   - Optimized for fullscreen viewing
-   - Only shows enabled images in random order
+- **Management Interface**: `http://<raspberry-pi-ip>/` (default page)
+  - Manage atmospheres and themes
+  - Enable/disable images
+  - Crop images
+  - Remote control the kiosk display
+  - View current images (shows cropped thumbnails in randomized order)
+  - Debug console with real-time logs
 
-3. **Upload Page**: `http://<raspberry-pi-ip>/upload`
-   - Dedicated upload interface
-   - Drag-and-drop support
-   - Newly uploaded images automatically switch the kiosk display for preview
+- **Upload**: Navigate via menu or `http://<raspberry-pi-ip>/upload`
+  - Drag-and-drop file upload
+  - Newly uploaded images automatically display on kiosk for preview
+
+- **Search Art**: Navigate via menu or `http://<raspberry-pi-ip>/search`
+  - Search museum collections for high-resolution portrait paintings
+  - Download images to extra images folder
+
+- **Extra Images**: Navigate via menu or `http://<raspberry-pi-ip>/extra-images`
+  - Review downloaded art search results
+  - Import images to main storage
+  - Bulk operations
+
+- **Kiosk Display**: `http://<raspberry-pi-ip>/view`
+  - Main slideshow display
+  - Optimized for fullscreen viewing
+  - Only shows enabled images in random order
+
+**Navigation**: All pages include a unified navigation menu at the top for seamless switching between sections without opening new tabs.
 
 ### Firefox Kiosk Mode
 

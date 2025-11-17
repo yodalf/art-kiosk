@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Art Kiosk is a web-based image display system designed for Raspberry Pi with a portrait monitor (2560x2880). It consists of a Flask backend server, two HTML frontends (management and display), and system integration components for autostart.
+The Art Kiosk is a web-based image display system designed for Raspberry Pi with a portrait monitor (2560x2880). It consists of a Flask backend server, multiple HTML frontends unified through a single-page app navigation system (management, upload, search, extra images, and display), and system integration components for autostart.
 
 ## System Architecture
 
@@ -73,26 +73,54 @@ graph TB
     end
 ```
 
-### 3. Frontend - Management (manage.html)
+### 3. Frontend - Management Pages (Single-Page App)
 
-**Role**: Web interface for configuring and controlling the kiosk.
+**Role**: Web interfaces for configuring, uploading, searching, and managing kiosk content.
 
-**Design**: Professional dark theme with black background (#000000), dark containers (#1a1a1a), white text, and color-coded badges (purple for atmospheres, blue for themes).
+**Design**: Professional dark theme with black background (#000000), dark containers (#1a1a1a), white text, and color-coded badges (purple for atmospheres, blue for themes). Unified navigation menu across all pages.
 
-**Sections**:
+**Navigation Menu**:
+- **Manage** - Main management interface (active page highlighted with blue underline)
+- **Upload** - File upload interface
+- **Search Art** - Museum collection search
+- **Extra Images** - Downloaded images management
+- **View Kiosk Display** - Link to kiosk view (green, right-aligned)
+
+**Pages**:
+
+**A. Manage (manage.html)** - Main management interface
 1. **Remote Control** - Control buttons with LED indicators
 2. **Atmospheres** - Create, delete, select active atmosphere, assign themes to atmospheres (purple badges)
 3. **Themes** - Create, delete, select active theme (includes permanent "All Images" theme, blue badges)
-4. **Upload Images** - Drag-and-drop upload area
-5. **Current Images** - Grid of thumbnails with controls (filtered by active atmosphere or theme, randomized order)
-6. **Debug Console** - Real-time logs from kiosk display
+4. **Current Images** - Grid of thumbnails with controls (filtered by active atmosphere or theme, randomized order)
+5. **Debug Console** - Real-time logs from kiosk display
    - Toggle visibility with 🐛 DEBUG button
    - Auto-enable debugging when opened, auto-disable when closed
    - Copy logs to clipboard with 📋 Clip button (HTTP-compatible fallback)
    - Clear accumulated messages with Clear Console button
    - Messages stream in real-time via WebSocket
 
+**B. Upload (upload.html)** - Dedicated upload interface
+- Drag-and-drop file upload area
+- Multi-file upload support
+- Auto-preview on kiosk after upload
+- UUID-based automatic naming
+
+**C. Search Art (search.html)** - Museum collection search
+- Search multiple museum APIs (Cleveland, Rijksmuseum, Wikimedia, etc.)
+- Portrait aspect ratio filtering
+- Download to extra images folder
+- Real-time search progress
+
+**D. Extra Images (extra-images.html)** - Downloaded images management
+- Review art search results
+- Import to main storage (single or bulk)
+- Delete unwanted images
+- Preview before importing
+
 **Interactive Features**:
+- **Unified Navigation** - All pages share the same navigation menu for seamless browsing
+- **No New Tabs** - All internal links navigate within the same window
 - Click image thumbnail to jump to that image
 - Crop images using Cropper.js modal interface
 - Enable/disable images with checkboxes
@@ -910,6 +938,7 @@ flowchart TD
 ## Future Enhancements
 
 ### Recently Implemented Features
+- [x] Single-page app with unified navigation (no new tabs)
 - [x] Hierarchical organization (Atmospheres → Themes → Images)
 - [x] Image randomization with consistent ordering
 - [x] Dark theme UI
@@ -927,6 +956,8 @@ flowchart TD
 - [x] Process cleanup on service start (port 80, Firefox, unclutter)
 - [x] X11/Wayland compatibility considerations
 - [x] UUID-based image naming (prevents conflicts and special character issues)
+- [x] Museum API integration for art search (Cleveland, Rijksmuseum, Wikimedia, etc.)
+- [x] Extra images staging area for review before import
 
 ### Potential Features
 - [ ] Video support (MP4, WebM)
