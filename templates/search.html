@@ -37,6 +37,42 @@
             margin-bottom: 30px;
         }
 
+        .navigation {
+            display: flex;
+            gap: 0;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333333;
+        }
+
+        .nav-link {
+            padding: 12px 24px;
+            text-decoration: none;
+            color: #aaaaaa;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            color: #ffffff;
+            background: #2a2a2a;
+        }
+
+        .nav-link.active {
+            color: #ffffff;
+            border-bottom-color: #2196F3;
+        }
+
+        .nav-link.view-kiosk {
+            margin-left: auto;
+            color: #4CAF50;
+        }
+
+        .nav-link.view-kiosk:hover {
+            color: #66BB6A;
+            background: transparent;
+        }
+
         .back-link {
             display: inline-block;
             color: #2196F3;
@@ -418,13 +454,15 @@
 </head>
 <body>
     <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <a href="/" class="back-link" style="margin-bottom: 0;">← Back to Management</a>
-            <a href="/extra-images" target="_blank" style="display: inline-block; background: #9C27B0; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 600;">📦 EXTRA IMAGES</a>
-        </div>
-
         <h1>🎨 Search for Art</h1>
-        <p class="subtitle">Search museum collections for high-resolution portrait paintings</p>
+
+        <div class="navigation">
+            <a href="/" class="nav-link">Manage</a>
+            <a href="/upload" class="nav-link">Upload</a>
+            <a href="/search" class="nav-link active">Search Art</a>
+            <a href="/extra-images" class="nav-link">Extra Images</a>
+            <a href="/view" class="nav-link view-kiosk">View Kiosk Display</a>
+        </div>
 
         <div class="search-section">
             <form class="search-form" id="search-form">
