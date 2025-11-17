@@ -64,6 +64,11 @@ def get_settings():
                 'name': 'All Images',
                 'created': time.time(),
                 'interval': 3600  # 60 minutes
+            },
+            'Extras': {
+                'name': 'Extras',
+                'created': time.time(),
+                'interval': 3600  # 60 minutes
             }
         },  # Theme name -> theme info
         'image_themes': {},  # Image name -> list of theme names
@@ -575,9 +580,9 @@ def create_theme():
 @app.route('/api/themes/<theme_name>', methods=['DELETE'])
 def delete_theme(theme_name):
     """Delete a theme."""
-    # Prevent deletion of "All Images" theme
-    if theme_name == 'All Images':
-        return jsonify({'error': 'Cannot delete the "All Images" theme'}), 400
+    # Prevent deletion of "All Images" and "Extras" themes
+    if theme_name in ['All Images', 'Extras']:
+        return jsonify({'error': f'Cannot delete the "{theme_name}" theme'}), 400
 
     settings = get_settings()
     themes = settings.get('themes', {})
@@ -962,11 +967,17 @@ def import_single_extra_image(filename):
 
         shutil.move(str(source), str(dest))
 
-        # Enable the imported image by default
+        # Enable the imported image by default and assign to Extras theme
         settings = get_settings()
         if 'enabled_images' not in settings:
             settings['enabled_images'] = {}
         settings['enabled_images'][dest.name] = True
+
+        # Assign to Extras theme
+        if 'image_themes' not in settings:
+            settings['image_themes'] = {}
+        settings['image_themes'][dest.name] = ['Extras']
+
         save_settings(settings)
 
         socketio.emit('image_list_changed')
@@ -987,6 +998,8 @@ def import_all_extra_images():
         settings = get_settings()
         if 'enabled_images' not in settings:
             settings['enabled_images'] = {}
+        if 'image_themes' not in settings:
+            settings['image_themes'] = {}
 
         imported = 0
         for file in EXTRA_IMAGES_FOLDER.iterdir():
@@ -998,8 +1011,9 @@ def import_all_extra_images():
 
                 shutil.move(str(file), str(dest))
 
-                # Enable the imported image by default
+                # Enable the imported image by default and assign to Extras theme
                 settings['enabled_images'][dest.name] = True
+                settings['image_themes'][dest.name] = ['Extras']
 
                 imported += 1
 
