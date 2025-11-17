@@ -200,25 +200,12 @@
             cursor: not-allowed;
         }
 
-        .cancel-button {
+        .search-button.cancel-mode {
             background: #f44336;
-            color: white;
-            padding: 14px 28px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-            transition: background 0.3s;
-            display: none;
         }
 
-        .cancel-button:hover {
+        .search-button.cancel-mode:hover {
             background: #d32f2f;
-        }
-
-        .cancel-button.show {
-            display: block;
         }
 
         .progress-pane {
@@ -488,7 +475,6 @@
 
                 <div class="button-group">
                     <button type="submit" class="search-button" id="search-btn">🔍 Search Museums</button>
-                    <button type="button" class="cancel-button" id="cancel-btn">✖ Cancel Search</button>
                 </div>
             </form>
         </div>
@@ -531,7 +517,6 @@
         const sliderValue = document.getElementById('slider-value');
         const searchForm = document.getElementById('search-form');
         const searchBtn = document.getElementById('search-btn');
-        const cancelBtn = document.getElementById('cancel-btn');
         const statusMessage = document.getElementById('status-message');
         const resultsSection = document.getElementById('results-section');
         const resultsGrid = document.getElementById('results-grid');
@@ -584,21 +569,25 @@
             if (lastLineIndex === 7) progressLine7.classList.add('highlight');
         }
 
-        // Cancel button handler
-        cancelBtn.addEventListener('click', () => {
+        // Handle search button click (handles both search and cancel)
+        searchBtn.addEventListener('click', (e) => {
             if (searchInProgress) {
+                // Cancel the search
+                e.preventDefault();
                 socket.disconnect();
                 socket.connect();
                 searchInProgress = false;
                 searchBtn.disabled = false;
                 searchBtn.textContent = '🔍 Search Museums';
-                cancelBtn.classList.remove('show');
+                searchBtn.classList.remove('cancel-mode');
+                searchBtn.type = 'submit';
                 updateProgress('❌ Search cancelled by user');
                 showStatus('Search cancelled', 'error');
                 setTimeout(() => {
                     progressPane.classList.remove('show');
                 }, 3000);
             }
+            // Otherwise let the form submit naturally
         });
 
         // WebSocket event handlers
@@ -610,7 +599,8 @@
             searchInProgress = false;
             searchBtn.disabled = false;
             searchBtn.textContent = '🔍 Search Museums';
-            cancelBtn.classList.remove('show');
+            searchBtn.classList.remove('cancel-mode');
+            searchBtn.type = 'submit';
 
             displayResults(data.results);
             showStatus(`Found ${data.results.length} high-resolution artworks`, 'success');
@@ -624,7 +614,8 @@
             searchInProgress = false;
             searchBtn.disabled = false;
             searchBtn.textContent = '🔍 Search Museums';
-            cancelBtn.classList.remove('show');
+            searchBtn.classList.remove('cancel-mode');
+            searchBtn.type = 'submit';
 
             showStatus('Search failed: ' + data.error, 'error');
             resultsSection.style.display = 'none';
@@ -645,9 +636,10 @@
 
             // Show loading state
             searchInProgress = true;
-            searchBtn.disabled = true;
-            searchBtn.textContent = '🔍 Searching...';
-            cancelBtn.classList.add('show');
+            searchBtn.disabled = false;
+            searchBtn.textContent = '✖ Cancel Search';
+            searchBtn.classList.add('cancel-mode');
+            searchBtn.type = 'button';
             progressMessages = [];
             progressPane.classList.add('show');
             emptyState.style.display = 'none';
