@@ -102,6 +102,13 @@ def get_settings():
                     'created': time.time(),
                     'interval': 3600
                 }
+            # Ensure "Extras" theme always exists
+            if 'Extras' not in settings['themes']:
+                settings['themes']['Extras'] = {
+                    'name': 'Extras',
+                    'created': time.time(),
+                    'interval': 3600
+                }
             if 'image_themes' not in settings:
                 settings['image_themes'] = {}
             if 'active_theme' not in settings:
