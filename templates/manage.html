@@ -104,7 +104,7 @@
         .image-card {
             border: 1px solid #333333;
             border-radius: 8px;
-            overflow: hidden;
+            overflow: visible;
             background: #2a2a2a;
             transition: transform 0.2s, box-shadow 0.2s, border 0.2s;
             position: relative;
@@ -114,11 +114,24 @@
             border: 3px solid #FF9800;
         }
 
-        /* Keep image area clipped to rounded corners */
-        .image-card > img,
-        .image-card > div[style*="overflow: hidden"] {
-            border-radius: 8px 8px 0 0;
+        /* Image clipping container */
+        .image-clip-container {
             overflow: hidden;
+            border-radius: 8px 8px 0 0;
+            width: 100%;
+            height: 200px;
+            position: relative;
+        }
+
+        /* Keep image area clipped to rounded corners */
+        .image-card > img {
+            border-radius: 8px 8px 0 0;
+        }
+
+        /* Container div that wraps cropped images */
+        .image-card > div[style*="overflow: hidden"] {
+            overflow: hidden !important;
+            border-radius: 8px 8px 0 0;
         }
 
         .image-card:hover {
@@ -1224,14 +1237,19 @@
                 cropContainer.appendChild(img);
                 card.appendChild(cropContainer);
             } else {
-                // No crop - show normal image
+                // No crop - show normal image in clipping container
+                const clipContainer = document.createElement('div');
+                clipContainer.className = 'image-clip-container';
+                clipContainer.style.cursor = 'pointer';
+                clipContainer.onclick = () => jumpToImage(image.name);
+                clipContainer.title = 'Click to jump to this image in the kiosk display';
+
                 const img = document.createElement('img');
                 img.src = image.url;
                 img.alt = image.name;
-                img.style.cursor = 'pointer';
-                img.onclick = () => jumpToImage(image.name);
-                img.title = 'Click to jump to this image in the kiosk display';
-                card.appendChild(img);
+
+                clipContainer.appendChild(img);
+                card.appendChild(clipContainer);
             }
 
             // Create checkbox container
