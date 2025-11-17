@@ -84,6 +84,7 @@ graph TB
 - **Upload** - File upload interface
 - **Search Art** - Museum collection search
 - **Extra Images** - Downloaded images management
+- **Debug** - Real-time debug console
 - **View Kiosk Display** - Link to kiosk view (green, right-aligned)
 
 **Pages**:
@@ -91,13 +92,8 @@ graph TB
 **A. Manage (manage.html)** - Main management interface
 1. **Remote Control** - Control buttons with LED indicators
 2. **Atmospheres** - Create, delete, select active atmosphere, assign themes to atmospheres (purple badges)
-3. **Themes** - Create, delete, select active theme (includes permanent "All Images" theme, blue badges)
+3. **Themes** - Create, delete, select active theme (includes permanent "All Images" and "Extras" themes, blue badges)
 4. **Current Images** - Grid of thumbnails with controls (filtered by active atmosphere or theme, randomized order)
-5. **Debug Console** - Real-time logs from kiosk display
-   - Toggle visibility with 🐛 DEBUG button
-   - Auto-enable debugging when opened, auto-disable when closed
-   - Copy logs to clipboard with 📋 Clip button (HTTP-compatible fallback)
-   - Clear accumulated messages with Clear Console button
    - Messages stream in real-time via WebSocket
 
 **B. Upload (upload.html)** - Dedicated upload interface
@@ -117,6 +113,12 @@ graph TB
 - Import to main storage (single or bulk)
 - Delete unwanted images
 - Preview before importing
+
+**E. Debug (debug.html)** - Real-time debug console
+- Real-time logs from kiosk display streamed via WebSocket
+- Copy logs to clipboard with 📋 Clip button (HTTP-compatible fallback)
+- Clear accumulated messages with Clear Console button
+- Separate page accessible from navigation menu
 
 **Interactive Features**:
 - **Unified Navigation** - All pages share the same navigation menu for seamless browsing
@@ -800,7 +802,6 @@ flowchart TD
 - Active theme (loaded on page load)
 - Active atmosphere (loaded on page load)
 - LED states (play/pause indicators)
-- Debug console enabled/disabled
 
 ### Server-Side State
 

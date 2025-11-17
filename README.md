@@ -126,6 +126,11 @@ The server will start on `http://0.0.0.0:80` (accessible from any device on your
   - Import images to main storage
   - Bulk operations
 
+- **Debug**: Navigate via menu or `http://<raspberry-pi-ip>/debug`
+  - Real-time debug console
+  - View kiosk display logs
+  - Copy logs to clipboard
+
 - **Kiosk Display**: `http://<raspberry-pi-ip>/view`
   - Main slideshow display
   - Optimized for fullscreen viewing
@@ -426,11 +431,10 @@ Since the kiosk is a remote display without a keyboard, you can control it from 
 
 Monitor your kiosk display in real-time with the built-in debug console:
 
-1. **Open Debug Console** - Click the **🐛 DEBUG** button in the management interface
+1. **Open Debug Console** - Navigate to the **Debug** page from the navigation menu
 2. **Real-time logs** - Messages stream live from the kiosk display via WebSocket
 3. **Copy logs** - Click **📋 Clip** to copy all debug messages to clipboard (works over HTTP)
 4. **Clear logs** - Click **Clear Console** to remove accumulated messages
-5. **Auto-enable** - Debug console automatically starts when opened, stops when closed
 
 The debug console shows:
 - Image change events
@@ -516,7 +520,10 @@ kiosk_images/
 └── templates/
     ├── kiosk.html             # Main kiosk display
     ├── manage.html            # Management interface
-    └── upload.html            # Upload interface
+    ├── upload.html            # Upload interface
+    ├── search.html            # Art search interface
+    ├── extra-images.html      # Extra images management
+    └── debug.html             # Debug console
 ```
 
 ## Supported Image Formats
