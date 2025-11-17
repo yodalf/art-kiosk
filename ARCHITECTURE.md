@@ -260,10 +260,13 @@ graph TB
 - `POST /api/atmospheres/<name>/themes` - Update themes in atmosphere (`{"themes": ["Theme1", "Theme2"]}`)
 
 ### Remote Control
-- `POST /api/control/send` - Send command to kiosk
-  - Commands: `next`, `prev`, `pause`, `play`, `reload`, `jump`
+- WebSocket `send_command` - Send command to kiosk (real-time via Socket.IO)
+  - Commands: `next`, `prev`, `pause`, `play`, `reload`, `jump`, `jump_extra`, `resume_from_extra`, `refresh_extra_crop`
   - Jump requires: `{"command": "jump", "image_name": "photo.jpg"}`
-- `GET /api/control/poll` - Poll for commands (called by kiosk)
+  - Jump extra: `{"command": "jump_extra", "image_name": "extra.jpg"}` - Display extra image overlay
+  - Refresh extra crop: `{"command": "refresh_extra_crop", "image_name": "extra.jpg"}` - Immediately update crop on displayed extra image
+- `POST /api/control/send` - Legacy HTTP endpoint (deprecated, use WebSocket)
+- `GET /api/control/poll` - Legacy polling endpoint (deprecated, use WebSocket)
 
 ### Kiosk State
 - `GET /api/kiosk/current-image` - Get currently displayed image name
@@ -289,20 +292,27 @@ graph TB
 4. Compare interval with previous interval
 5. Compare crop data with previous crop data
 6. Compare shuffle_id with previous shuffle_id
-7. If anything changed:
-   - Log change
-   - Reload slideshow
+7. Check if extra image overlay is active
+8. If anything changed:
+   - If extra image overlay is active: skip reload (preserve extra image state)
+   - Else: reload slideshow
    - If shuffle_id changed: start from index 0 (new order)
    - Update VP = V, previous shuffle_id
-8. Else:
+9. Else:
    - Continue playing
 ```
 
 **Benefits**:
 - No polling overhead on slideshow timing
-- Immediate updates (within 2 seconds)
+- Immediate updates (within 2 seconds for regular images)
 - Smooth playback when stable
+- Extra images remain displayed during crop edits
 - Debug logs show what changed
+
+**Extra Image Behavior**:
+- When viewing extra images from Extra Images page, reload is skipped to preserve the current view
+- Crops are updated via instant `refresh_extra_crop` WebSocket command instead
+- Regular slideshow resumes when leaving Extra Images page via `resume_from_extra` command
 
 ### 2. Real-Time Communication via WebSockets
 
@@ -429,6 +439,32 @@ def list_images(enabled_only=False):
 - Black bars appear on only one dimension (top/bottom OR left/right)
 - Container uses `overflow: hidden` to clip to viewport
 - Same algorithm used for both kiosk display and management thumbnails (different viewport sizes)
+- **Instant crop updates**: Extra images use `refresh_extra_crop` WebSocket command to immediately apply new crops without waiting for periodic check
+
+### 4.5. Fill Mode vs Fit Mode
+
+**Purpose**: Provide different display modes for different contexts.
+
+**Implementation**:
+```javascript
+// Default fillMode values:
+- Main kiosk display (Raspberry Pi): fillMode = false (FILL/cover mode)
+- External web clients: fillMode = true (FIT/contain mode) when using ?fit=true URL parameter
+
+// URL parameter detection:
+const urlParams = new URLSearchParams(window.location.search);
+const fitParam = urlParams.get('fit');
+if (fitParam === 'true') {
+    fillMode = true;  // Override default for external clients
+}
+```
+
+**Behavior**:
+- **FILL mode** (`fillMode = false`): Images fill entire screen, may crop edges
+- **FIT mode** (`fillMode = true`): Complete image is shown, may have black bars
+- **Toggle**: Press 'F' key to toggle between modes
+- **"View Kiosk Display" links**: Include `?fit=true` to start external clients in FIT mode
+- **Extra images**: Respect current fillMode setting when displayed
 
 ### 5. Image Randomization with Shuffle ID
 

@@ -342,19 +342,20 @@ Images are displayed in random order, with the following behavior:
 
 Crop images to display specific regions on the kiosk:
 
-1. **Open crop editor** - Click the "Crop" button on any image card
+1. **Open crop editor** - Click the "Crop" button on any image card (available in Manage and Extra Images pages)
 2. **Select region** - Use the interactive cropper to select the desired area
    - Drag corners to resize the crop region
    - Drag inside the box to move it
    - Free aspect ratio - crop any shape
 3. **Save crop** - Click "Save Crop" to apply (or "Clear Crop" to remove)
-4. **Automatic scaling** - The cropped region automatically scales to fill the entire 2560x2880 display
+4. **Instant refresh** - The kiosk display immediately updates to show the new crop
 5. **Preview** - The management interface shows cropped thumbnails matching what appears on the kiosk
 
 Crop behavior:
 - The selected region is scaled to fill the screen completely (cover mode)
 - Black bars appear on only one dimension (either top/bottom OR left/right, never both)
-- Changes apply automatically within 2 seconds via the smart reload system
+- **Extra Images**: When cropping from the Extra Images page, the kiosk stays on that extra image and immediately shows the updated crop
+- **Regular Images**: Changes apply automatically within 2 seconds via the smart reload system
 - Crops are stored per-image and persist across restarts
 
 ### Auto-Preview on Upload
