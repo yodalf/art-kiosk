@@ -923,12 +923,14 @@
             // Handle refresh_extra_crop command (refresh extra image with updated crop)
             if (typeof command === 'object' && command.command === 'refresh_extra_crop') {
                 const imageName = command.image_name;
+                console.log('Received refresh_extra_crop command for:', imageName);
                 await debugLog(`Refreshing extra image crop: ${imageName}`, 'info');
 
                 // Fetch latest settings to get updated crop data
                 const settingsResponse = await fetch('/api/settings');
                 const settings = await settingsResponse.json();
                 imageCrops = settings.image_crops || {};
+                console.log('Updated imageCrops:', imageCrops);
 
                 // Re-execute jump_extra to recreate the overlay with the new crop
                 await executeCommand({ command: 'jump_extra', image_name: imageName });

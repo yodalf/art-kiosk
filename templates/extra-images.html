@@ -1392,7 +1392,9 @@
 
                     // Immediately refresh the extra image on the kiosk to show the new crop
                     // Use a small delay to ensure settings are propagated
+                    console.log('Sending refresh_extra_crop command for:', currentCropImage);
                     setTimeout(() => {
+                        console.log('Emitting refresh_extra_crop command');
                         socket.emit('send_command', { command: 'refresh_extra_crop', image_name: currentCropImage });
                     }, 100);
                 } else {
