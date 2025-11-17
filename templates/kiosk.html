@@ -236,8 +236,10 @@
                 }
 
                 // Check if crops changed
+                let cropsChanged = false;
                 if (JSON.stringify(newImageCrops) !== JSON.stringify(imageCrops)) {
                     debugLog(`Image crops changed!`, 'info');
+                    cropsChanged = true;
                     imageCrops = newImageCrops;
                     needsReload = true;
                 }
@@ -246,7 +248,19 @@
                 const extraOverlay = document.querySelector('.extra-image-overlay');
                 if (extraOverlay) {
                     debugLog('Extra image overlay active, skipping slideshow reload', 'info');
-                    // Update imageCrops but don't reload
+                    // But if crops changed, we need to refresh the extra image overlay
+                    if (cropsChanged) {
+                        // Extract the image name from the overlay
+                        const bgImage = extraOverlay.style.backgroundImage || '';
+                        const match = bgImage.match(/\/extra-images\/([^')]+)/);
+                        if (match) {
+                            const extraImageName = decodeURIComponent(match[1]);
+                            debugLog(`Refreshing extra image overlay with updated crop: ${extraImageName}`, 'info');
+                            // Re-execute jump_extra to recreate the overlay with the new crop
+                            await executeCommand({ command: 'jump_extra', image_name: extraImageName });
+                        }
+                    }
+                    // Update imageCrops but don't reload slideshow
                     needsReload = false;
                 }
 
@@ -847,11 +861,6 @@
                 // Create a temporary overlay slide for the extra image
                 const extraSlide = document.createElement('div');
                 extraSlide.className = 'slide extra-image-overlay';
-                extraSlide.style.backgroundImage = `url('/extra-images/${encodeURIComponent(imageName)}')`;
-                // Respect current fillMode setting
-                extraSlide.style.backgroundSize = fillMode ? 'contain' : 'cover';
-                extraSlide.style.backgroundPosition = 'center';
-                extraSlide.style.backgroundRepeat = 'no-repeat';
                 extraSlide.style.position = 'absolute';
                 extraSlide.style.top = '0';
                 extraSlide.style.left = '0';
@@ -859,6 +868,45 @@
                 extraSlide.style.height = '100%';
                 extraSlide.style.opacity = '1';
                 extraSlide.style.zIndex = '1000';
+
+                // Check if this extra image has a crop
+                const cropData = imageCrops[imageName];
+
+                if (cropData) {
+                    debugLog(`Applying crop to extra image: ${imageName}`, 'info');
+                    extraSlide.classList.add('has-crop');
+
+                    // Create cropped image using a container (same as regular slides)
+                    const cropContainer = document.createElement('div');
+                    cropContainer.style.width = '100%';
+                    cropContainer.style.height = '100%';
+                    cropContainer.style.overflow = 'hidden';
+                    cropContainer.style.position = 'absolute';
+                    cropContainer.style.top = '0';
+                    cropContainer.style.left = '0';
+
+                    const img = document.createElement('img');
+                    img.src = `/extra-images/${encodeURIComponent(imageName)}`;
+                    img.alt = imageName;
+                    img.className = 'cropped';
+
+                    cropContainer.appendChild(img);
+                    extraSlide.appendChild(cropContainer);
+
+                    // Apply crop when image loads
+                    img.onload = () => applyCrop(img, cropContainer, cropData);
+                } else {
+                    // No crop - use background-image approach
+                    extraSlide.style.backgroundImage = `url('/extra-images/${encodeURIComponent(imageName)}')`;
+                    extraSlide.style.backgroundSize = fillMode ? 'contain' : 'cover';
+                    extraSlide.style.backgroundPosition = 'center';
+                    extraSlide.style.backgroundRepeat = 'no-repeat';
+                }
+
+                // Apply fillMode class if needed (for non-cropped images)
+                if (fillMode && !cropData) {
+                    extraSlide.classList.add('contain-mode');
+                }
 
                 container.appendChild(extraSlide);
 
