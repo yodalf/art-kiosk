@@ -297,6 +297,9 @@
             images.forEach((image, index) => {
                 const slide = document.createElement('div');
                 slide.className = 'slide';
+                if (fillMode) {
+                    slide.classList.add('contain-mode');
+                }
                 slide.dataset.index = index;
 
                 // Check if crop exists for this image
