@@ -254,6 +254,21 @@
 
         // Reload slideshow with new images
         async function reloadSlideshow(shuffleChanged = false) {
+            // Check if an extra image overlay is currently displayed
+            const container = document.getElementById('slideshow-container');
+            const extraOverlay = container.querySelector('.extra-image-overlay');
+            let extraImageName = null;
+
+            if (extraOverlay) {
+                // Extract the image name from the background-image URL
+                const bgImage = extraOverlay.style.backgroundImage;
+                const match = bgImage.match(/\/extra-images\/([^')]+)/);
+                if (match) {
+                    extraImageName = decodeURIComponent(match[1]);
+                    debugLog(`Extra image overlay detected: ${extraImageName}, will restore after reload`, 'info');
+                }
+            }
+
             // Save current image name to restore position after reload
             const currentImageName = images[currentIndex]?.name;
 
@@ -263,7 +278,6 @@
             }
 
             // Clear existing slides
-            const container = document.getElementById('slideshow-container');
             const slides = container.querySelectorAll('.slide');
             slides.forEach(slide => slide.remove());
 
@@ -287,6 +301,13 @@
 
             // Now reload with the correct start index
             await loadImages(startIndex);
+
+            // If an extra image was being displayed, restore it
+            if (extraImageName) {
+                debugLog(`Restoring extra image overlay: ${extraImageName}`, 'info');
+                // Re-execute the jump_extra command to restore the overlay
+                await executeCommand({ command: 'jump_extra', image_name: extraImageName });
+            }
         }
 
         // Initialize slideshow
@@ -751,6 +772,12 @@
                     slide.classList.remove('contain-mode');
                 }
             });
+
+            // Also update extra image overlay if present
+            const extraOverlay = document.querySelector('.extra-image-overlay');
+            if (extraOverlay) {
+                extraOverlay.style.backgroundSize = fillMode ? 'contain' : 'cover';
+            }
         }
 
         // Keyboard controls
@@ -813,7 +840,8 @@
                 const extraSlide = document.createElement('div');
                 extraSlide.className = 'slide extra-image-overlay';
                 extraSlide.style.backgroundImage = `url('/extra-images/${encodeURIComponent(imageName)}')`;
-                extraSlide.style.backgroundSize = 'cover';
+                // Respect current fillMode setting
+                extraSlide.style.backgroundSize = fillMode ? 'contain' : 'cover';
                 extraSlide.style.backgroundPosition = 'center';
                 extraSlide.style.backgroundRepeat = 'no-repeat';
                 extraSlide.style.position = 'absolute';
