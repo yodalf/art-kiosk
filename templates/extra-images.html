@@ -705,9 +705,11 @@
         // Resume slideshow when leaving extra images page
         function resumeSlideshow(event, targetUrl) {
             event.preventDefault();
+            console.log('Resuming slideshow, sending resume_from_extra command');
             try {
                 // Send resume command to restore slideshow
                 socket.emit('send_command', { command: 'resume_from_extra' });
+                console.log('Command sent, navigating to:', targetUrl);
 
                 // Wait a bit for the command to be sent, then navigate
                 setTimeout(() => {
