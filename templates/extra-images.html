@@ -722,10 +722,6 @@
 
         // Import single image to main storage
         async function importSingleImage(filename) {
-            if (!confirm(`Import "${filename}" to main storage? The image will be moved (not copied).`)) {
-                return;
-            }
-
             try {
                 const response = await fetch(`/api/extra-images/${encodeURIComponent(filename)}/import`, {
                     method: 'POST'
