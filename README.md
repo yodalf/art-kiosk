@@ -519,13 +519,19 @@ kiosk_images/
 
 ## Image Naming
 
-All images are automatically renamed to UUID-based filenames to ensure uniqueness and prevent naming conflicts. This:
-- Prevents issues with special characters or spaces in filenames
-- Guarantees unique names across all images
-- Eliminates conflicts when importing images from external sources
-- Preserves file extensions (e.g., `.jpg`, `.png`)
+All images are automatically assigned UUID-based filenames to ensure uniqueness and prevent naming conflicts. This happens automatically for:
+- **Web uploads** - Images uploaded via the upload page
+- **Art search downloads** - Images downloaded from museum APIs
+- **Extra image imports** - Images imported from the extra images folder
+- **Bulk operations** - All import and upload operations
 
-The system automatically updates all references (enabled state, theme assignments, crop data) when renaming occurs.
+Benefits:
+- Prevents issues with special characters or spaces in filenames
+- Guarantees unique names across all images (e.g., `ab4ab3c1-5c16-48ed-86ab-cd769182ea97.jpg`)
+- Eliminates naming conflicts when importing from external sources
+- Preserves file extensions (e.g., `.jpg`, `.png`, `.webp`)
+
+The system automatically updates all references (enabled state, theme assignments, crop data) to track images by their UUID filenames.
 
 ## Troubleshooting
 

@@ -539,10 +539,60 @@ case 'jump':
 
 **Purpose**: Ensure all images have guaranteed unique filenames to prevent conflicts and issues with special characters.
 
-**Implementation**:
+**Automatic UUID Assignment**: All images entering the system are automatically assigned UUID-based filenames at the point of entry:
+
+**1. Upload Function**:
+```python
+@app.route('/api/images', methods=['POST'])
+def upload_image():
+    # Get uploaded file
+    file = request.files['file']
+
+    # Generate UUID-based filename
+    original_filename = file.filename
+    extension = Path(original_filename).suffix
+    filename = f"{uuid.uuid4()}{extension}"
+    filepath = app.config['UPLOAD_FOLDER'] / filename
+    file.save(filepath)
+
+    # Continue with theme assignment, etc.
+```
+
+**2. Import Functions**:
+```python
+@app.route('/api/extra-images/<filename>/import', methods=['POST'])
+def import_single_extra_image(filename):
+    source = EXTRA_IMAGES_FOLDER / filename
+
+    # Generate UUID-based filename
+    extension = source.suffix
+    new_filename = f"{uuid.uuid4()}{extension}"
+    dest = app.config['UPLOAD_FOLDER'] / new_filename
+
+    shutil.move(str(source), str(dest))
+    # Enable and save settings
+```
+
+**3. Art Download Function**:
+```python
+@app.route('/api/download-art', methods=['POST'])
+def api_download_art():
+    # Determine extension from URL
+    extension = '.jpg'
+    if image_url.lower().endswith('.png'):
+        extension = '.png'
+
+    # Generate UUID-based filename
+    filename = f"{uuid.uuid4()}{extension}"
+    filepath = EXTRA_IMAGES_FOLDER / filename
+
+    # Download and save
+```
+
+**4. Bulk Rename Function** (for existing images):
 ```python
 def rename_all_images_to_uuid():
-    """Rename all images to UUID-based names and update settings."""
+    """Rename all existing images to UUID-based names and update settings."""
     settings = get_settings()
     rename_map = {}  # old_name -> new_name
 
@@ -558,51 +608,21 @@ def rename_all_images_to_uuid():
             file.rename(new_path)
             rename_map[old_name] = new_name
 
-    # Rename all extra images
-    for file in EXTRA_IMAGES_FOLDER.iterdir():
-        if file.is_file() and file.suffix.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']:
-            old_name = file.name
-            extension = file.suffix
-            new_name = f"{uuid.uuid4()}{extension}"
-            new_path = EXTRA_IMAGES_FOLDER / new_name
-
-            # Rename the file
-            file.rename(new_path)
-            rename_map[old_name] = new_name
-
-    # Update all settings references
-    if 'enabled_images' in settings:
-        new_enabled = {}
-        for old_name, enabled in settings['enabled_images'].items():
-            new_name = rename_map.get(old_name, old_name)
-            new_enabled[new_name] = enabled
-        settings['enabled_images'] = new_enabled
-
-    if 'image_themes' in settings:
-        new_themes = {}
-        for old_name, themes in settings['image_themes'].items():
-            new_name = rename_map.get(old_name, old_name)
-            new_themes[new_name] = themes
-        settings['image_themes'] = new_themes
-
-    if 'image_crops' in settings:
-        new_crops = {}
-        for old_name, crop_data in settings['image_crops'].items():
-            new_name = rename_map.get(old_name, old_name)
-            new_crops[new_name] = crop_data
-        settings['image_crops'] = new_crops
+    # Update all settings references (enabled_images, image_themes, image_crops)
+    # ... (updates all dictionaries with new names)
 
     save_settings(settings)
     return rename_map
 ```
 
 **Key Points**:
+- **Automatic on entry**: UUIDs assigned when images are uploaded, imported, or downloaded
 - **Guaranteed uniqueness**: UUIDs (e.g., `ab4ab3c1-5c16-48ed-86ab-cd769182ea97.jpg`) are globally unique
 - **Extension preservation**: Original file extension is preserved (`.jpg`, `.png`, etc.)
-- **Comprehensive updates**: All settings references (enabled_images, image_themes, image_crops) are automatically updated
-- **Both folders**: Renames images in both main `images/` and `EXTRA_IMAGES/` folders
-- **Path traversal protection**: Routes use `<path:filename>` to preserve special characters but validate against `..` and `/` for security
-- **No name conflicts**: Eliminates issues with generic names like "Untitled.jpg" or "Unknown - Untitled.jpg"
+- **No conflicts**: Eliminates name collision logic previously needed for imports
+- **Comprehensive updates**: Settings references automatically track UUID filenames
+- **Path traversal protection**: Routes use `<path:filename>` to handle filenames but validate against `..` and `/` for security
+- **Bulk rename available**: Endpoint `/api/images/rename-all-to-uuid` for renaming existing images
 
 ## File Structure
 
