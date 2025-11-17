@@ -9,6 +9,8 @@ import json
 import time
 import random
 import requests
+import hashlib
+import uuid
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
@@ -317,10 +319,14 @@ def delete_image(filename):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/images/<filename>/toggle', methods=['POST'])
+@app.route('/api/images/<path:filename>/toggle', methods=['POST'])
 def toggle_image(filename):
     """Toggle enabled state of an image."""
-    filename = secure_filename(filename)
+    # Don't use secure_filename here as it modifies the filename
+    # Just ensure it doesn't have path traversal
+    if '..' in filename or filename.startswith('/'):
+        return jsonify({'error': 'Invalid filename'}), 400
+
     filepath = app.config['UPLOAD_FOLDER'] / filename
 
     if not filepath.exists():
@@ -662,10 +668,14 @@ def set_active_theme():
     return jsonify({'success': True, 'active_theme': theme_name, 'interval': settings['interval']})
 
 
-@app.route('/api/images/<filename>/themes', methods=['POST'])
+@app.route('/api/images/<path:filename>/themes', methods=['POST'])
 def update_image_themes(filename):
     """Update themes for an image."""
-    filename = secure_filename(filename)
+    # Don't use secure_filename here as it modifies the filename
+    # Just ensure it doesn't have path traversal
+    if '..' in filename or filename.startswith('/'):
+        return jsonify({'error': 'Invalid filename'}), 400
+
     filepath = app.config['UPLOAD_FOLDER'] / filename
 
     if not filepath.exists():
@@ -1256,6 +1266,81 @@ def handle_log_debug(data):
 def notify_image_list_change():
     """Notify all clients that the image list has changed."""
     socketio.emit('image_list_changed', {})
+
+
+def rename_all_images_to_uuid():
+    """Rename all images to UUID-based names and update settings."""
+    settings = get_settings()
+    rename_map = {}  # old_name -> new_name
+
+    # Rename all main images
+    for file in app.config['UPLOAD_FOLDER'].iterdir():
+        if file.is_file() and allowed_file(file.name):
+            old_name = file.name
+            extension = file.suffix
+            new_name = f"{uuid.uuid4()}{extension}"
+            new_path = app.config['UPLOAD_FOLDER'] / new_name
+
+            # Rename the file
+            file.rename(new_path)
+            rename_map[old_name] = new_name
+            print(f"Renamed: {old_name} -> {new_name}")
+
+    # Rename all extra images
+    for file in EXTRA_IMAGES_FOLDER.iterdir():
+        if file.is_file() and file.suffix.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']:
+            old_name = file.name
+            extension = file.suffix
+            new_name = f"{uuid.uuid4()}{extension}"
+            new_path = EXTRA_IMAGES_FOLDER / new_name
+
+            # Rename the file
+            file.rename(new_path)
+            rename_map[old_name] = new_name
+            print(f"Renamed (extra): {old_name} -> {new_name}")
+
+    # Update settings to reflect new names
+    if 'enabled_images' in settings:
+        new_enabled = {}
+        for old_name, enabled in settings['enabled_images'].items():
+            new_name = rename_map.get(old_name, old_name)
+            new_enabled[new_name] = enabled
+        settings['enabled_images'] = new_enabled
+
+    if 'image_themes' in settings:
+        new_themes = {}
+        for old_name, themes in settings['image_themes'].items():
+            new_name = rename_map.get(old_name, old_name)
+            new_themes[new_name] = themes
+        settings['image_themes'] = new_themes
+
+    if 'image_crops' in settings:
+        new_crops = {}
+        for old_name, crop_data in settings['image_crops'].items():
+            new_name = rename_map.get(old_name, old_name)
+            new_crops[new_name] = crop_data
+        settings['image_crops'] = new_crops
+
+    save_settings(settings)
+    return rename_map
+
+
+@app.route('/api/images/rename-all-to-uuid', methods=['POST'])
+def rename_all_to_uuid():
+    """Rename all images to UUID-based names."""
+    try:
+        rename_map = rename_all_images_to_uuid()
+        notify_image_list_change()
+        return jsonify({
+            'success': True,
+            'renamed_count': len(rename_map),
+            'rename_map': rename_map
+        })
+    except Exception as e:
+        print(f"Error renaming images: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
