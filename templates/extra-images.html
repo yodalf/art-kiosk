@@ -1349,7 +1349,9 @@
         }
 
         async function saveCrop() {
+            console.log('saveCrop called, currentCropImage:', currentCropImage);
             if (!currentCropper || !currentCropImage) {
+                console.log('Missing cropper or image name, returning');
                 return;
             }
 
@@ -1378,6 +1380,7 @@
                 settings.image_crops[currentCropImage] = cropInfo;
 
                 // Save settings
+                console.log('Saving settings with crop for:', currentCropImage);
                 const response = await fetch('/api/settings', {
                     method: 'POST',
                     headers: {
@@ -1386,16 +1389,20 @@
                     body: JSON.stringify(settings)
                 });
 
+                console.log('Save response ok:', response.ok);
                 if (response.ok) {
                     showMessage('Crop saved successfully!', 'success');
+
+                    // Save the image name before closing modal (which sets currentCropImage to null)
+                    const savedImageName = currentCropImage;
                     closeCropModal();
 
                     // Immediately refresh the extra image on the kiosk to show the new crop
                     // Use a small delay to ensure settings are propagated
-                    console.log('Sending refresh_extra_crop command for:', currentCropImage);
+                    console.log('Sending refresh_extra_crop command for:', savedImageName);
                     setTimeout(() => {
                         console.log('Emitting refresh_extra_crop command');
-                        socket.emit('send_command', { command: 'refresh_extra_crop', image_name: currentCropImage });
+                        socket.emit('send_command', { command: 'refresh_extra_crop', image_name: savedImageName });
                     }, 100);
                 } else {
                     showMessage('Failed to save crop', 'error');
