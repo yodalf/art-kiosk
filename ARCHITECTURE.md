@@ -207,9 +207,10 @@ graph TB
 ### Images
 - `GET /api/images?enabled_only=true` - List images (filtered by enabled, active atmosphere, and active theme, randomized by shuffle_id)
 - `POST /api/images` - Upload image (multipart/form-data, auto-assigns to active theme and sends jump command for preview)
-- `DELETE /api/images/<filename>` - Delete image
-- `POST /api/images/<filename>/toggle` - Toggle enabled state
-- `POST /api/images/<filename>/themes` - Update theme assignments
+- `DELETE /api/images/<path:filename>` - Delete image (uses path: to preserve special characters)
+- `POST /api/images/<path:filename>/toggle` - Toggle enabled state (uses path: to preserve special characters)
+- `POST /api/images/<path:filename>/themes` - Update theme assignments (uses path: to preserve special characters)
+- `POST /api/images/rename-all-to-uuid` - Rename all images to UUID-based names (ensures uniqueness, updates all settings references)
 
 ### Settings
 - `GET /api/settings` - Get all settings
@@ -534,6 +535,75 @@ case 'jump':
 - **Reload fallback**: If image not in current list, triggers full reload
 - **Prevents duplicates**: loadImages() clears existing slides before rebuilding
 
+### 8. UUID-Based Image Naming
+
+**Purpose**: Ensure all images have guaranteed unique filenames to prevent conflicts and issues with special characters.
+
+**Implementation**:
+```python
+def rename_all_images_to_uuid():
+    """Rename all images to UUID-based names and update settings."""
+    settings = get_settings()
+    rename_map = {}  # old_name -> new_name
+
+    # Rename all main images
+    for file in app.config['UPLOAD_FOLDER'].iterdir():
+        if file.is_file() and allowed_file(file.name):
+            old_name = file.name
+            extension = file.suffix
+            new_name = f"{uuid.uuid4()}{extension}"
+            new_path = app.config['UPLOAD_FOLDER'] / new_name
+
+            # Rename the file
+            file.rename(new_path)
+            rename_map[old_name] = new_name
+
+    # Rename all extra images
+    for file in EXTRA_IMAGES_FOLDER.iterdir():
+        if file.is_file() and file.suffix.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']:
+            old_name = file.name
+            extension = file.suffix
+            new_name = f"{uuid.uuid4()}{extension}"
+            new_path = EXTRA_IMAGES_FOLDER / new_name
+
+            # Rename the file
+            file.rename(new_path)
+            rename_map[old_name] = new_name
+
+    # Update all settings references
+    if 'enabled_images' in settings:
+        new_enabled = {}
+        for old_name, enabled in settings['enabled_images'].items():
+            new_name = rename_map.get(old_name, old_name)
+            new_enabled[new_name] = enabled
+        settings['enabled_images'] = new_enabled
+
+    if 'image_themes' in settings:
+        new_themes = {}
+        for old_name, themes in settings['image_themes'].items():
+            new_name = rename_map.get(old_name, old_name)
+            new_themes[new_name] = themes
+        settings['image_themes'] = new_themes
+
+    if 'image_crops' in settings:
+        new_crops = {}
+        for old_name, crop_data in settings['image_crops'].items():
+            new_name = rename_map.get(old_name, old_name)
+            new_crops[new_name] = crop_data
+        settings['image_crops'] = new_crops
+
+    save_settings(settings)
+    return rename_map
+```
+
+**Key Points**:
+- **Guaranteed uniqueness**: UUIDs (e.g., `ab4ab3c1-5c16-48ed-86ab-cd769182ea97.jpg`) are globally unique
+- **Extension preservation**: Original file extension is preserved (`.jpg`, `.png`, etc.)
+- **Comprehensive updates**: All settings references (enabled_images, image_themes, image_crops) are automatically updated
+- **Both folders**: Renames images in both main `images/` and `EXTRA_IMAGES/` folders
+- **Path traversal protection**: Routes use `<path:filename>` to preserve special characters but validate against `..` and `/` for security
+- **No name conflicts**: Eliminates issues with generic names like "Untitled.jpg" or "Unknown - Untitled.jpg"
+
 ## File Structure
 
 ```
@@ -836,6 +906,7 @@ flowchart TD
 - [x] Server readiness checks before Firefox launch
 - [x] Process cleanup on service start (port 80, Firefox, unclutter)
 - [x] X11/Wayland compatibility considerations
+- [x] UUID-based image naming (prevents conflicts and special character issues)
 
 ### Potential Features
 - [ ] Video support (MP4, WebM)

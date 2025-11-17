@@ -438,6 +438,7 @@ The debug console shows:
 - `POST /api/images/<filename>/toggle` - Toggle enabled state of an image
 - `DELETE /api/images/<filename>` - Delete an image
 - `POST /api/images/<filename>/themes` - Update image themes
+- `POST /api/images/rename-all-to-uuid` - Rename all images to UUID-based names for uniqueness
 
 **Settings:**
 - `GET /api/settings` - Get current settings
@@ -515,6 +516,16 @@ kiosk_images/
 - GIF
 - WebP
 - BMP
+
+## Image Naming
+
+All images are automatically renamed to UUID-based filenames to ensure uniqueness and prevent naming conflicts. This:
+- Prevents issues with special characters or spaces in filenames
+- Guarantees unique names across all images
+- Eliminates conflicts when importing images from external sources
+- Preserves file extensions (e.g., `.jpg`, `.png`)
+
+The system automatically updates all references (enabled state, theme assignments, crop data) when renaming occurs.
 
 ## Troubleshooting
 
