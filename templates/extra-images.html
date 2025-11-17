@@ -1389,6 +1389,12 @@
                 if (response.ok) {
                     showMessage('Crop saved successfully!', 'success');
                     closeCropModal();
+
+                    // Immediately refresh the extra image on the kiosk to show the new crop
+                    // Use a small delay to ensure settings are propagated
+                    setTimeout(() => {
+                        socket.emit('send_command', { command: 'refresh_extra_crop', image_name: currentCropImage });
+                    }, 100);
                 } else {
                     showMessage('Failed to save crop', 'error');
                 }

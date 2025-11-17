@@ -920,6 +920,21 @@
                 return;
             }
 
+            // Handle refresh_extra_crop command (refresh extra image with updated crop)
+            if (typeof command === 'object' && command.command === 'refresh_extra_crop') {
+                const imageName = command.image_name;
+                await debugLog(`Refreshing extra image crop: ${imageName}`, 'info');
+
+                // Fetch latest settings to get updated crop data
+                const settingsResponse = await fetch('/api/settings');
+                const settings = await settingsResponse.json();
+                imageCrops = settings.image_crops || {};
+
+                // Re-execute jump_extra to recreate the overlay with the new crop
+                await executeCommand({ command: 'jump_extra', image_name: imageName });
+                return;
+            }
+
             // Handle jump command (object with command and image_name)
             if (typeof command === 'object' && command.command === 'jump') {
                 const imageName = command.image_name;
