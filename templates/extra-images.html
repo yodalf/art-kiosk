@@ -652,128 +652,6 @@
             margin-right: 8px;
         }
 
-        /* Action menu styles */
-        .action-menu-container {
-            position: absolute;
-            top: 8px;
-            left: 8px;
-            z-index: 10;
-        }
-
-        .action-menu-button {
-            background: rgba(26, 26, 26, 0.9);
-            border: 1px solid #444444;
-            border-radius: 4px;
-            padding: 4px 8px;
-            font-size: 18px;
-            line-height: 1;
-            cursor: pointer;
-            color: #ffffff;
-            transition: background 0.2s;
-        }
-
-        .action-menu-button:hover {
-            background: #2a2a2a;
-            color: #ffffff;
-        }
-
-        .action-menu-dropdown {
-            position: absolute;
-            bottom: 100%;
-            left: 0;
-            margin-bottom: 4px;
-            background: #2a2a2a;
-            border: 1px solid #444444;
-            border-radius: 4px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-            min-width: 180px;
-            z-index: 1000;
-            display: none;
-        }
-
-        .action-menu-dropdown.show {
-            display: block;
-        }
-
-        .menu-item {
-            padding: 10px 16px;
-            cursor: pointer;
-            font-size: 14px;
-            color: #ffffff;
-            transition: background 0.2s;
-            position: relative;
-        }
-
-        .menu-item:hover {
-            background: #3a3a3a;
-        }
-
-        .menu-item:first-child {
-            border-radius: 4px 4px 0 0;
-        }
-
-        .menu-item:last-child {
-            border-radius: 0 0 4px 4px;
-        }
-
-        .menu-item-danger {
-            color: #f44336;
-        }
-
-        .menu-item-danger:hover {
-            background: #ffebee;
-        }
-
-        .menu-item.has-submenu {
-            padding-right: 32px;
-        }
-
-        .submenu-arrow {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #999;
-        }
-
-        .submenu {
-            position: absolute;
-            left: 100%;
-            bottom: 0;
-            margin-left: 4px;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-            min-width: 150px;
-            display: none;
-            z-index: 1001;
-        }
-
-        .submenu.show {
-            display: block;
-        }
-
-        .submenu-item {
-            padding: 8px 16px;
-            cursor: pointer;
-            font-size: 13px;
-            color: #333;
-            transition: background 0.2s;
-        }
-
-        .submenu-item:hover {
-            background: #f5f5f5;
-        }
-
-        .submenu-item:first-child {
-            border-radius: 4px 4px 0 0;
-        }
-
-        .submenu-item:last-child {
-            border-radius: 0 0 4px 4px;
-        }
-
         .crop-image-button:hover {
             background: #1976D2;
         }
@@ -812,43 +690,6 @@
     <script>
         // Initialize Socket.IO connection
         const socket = io();
-
-        // Menu handling functions (define early for use in createImageCard)
-        function toggleMenu(menuContainer) {
-            const dropdown = menuContainer.querySelector('.action-menu-dropdown');
-            const isOpen = dropdown.classList.contains('show');
-
-            // Close all other menus first
-            closeAllMenus();
-
-            // Toggle this menu
-            if (!isOpen) {
-                dropdown.classList.add('show');
-                // Raise the parent card's z-index so dropdown and submenu appear above other cards
-                const card = menuContainer.closest('.image-card');
-                if (card) {
-                    card.style.zIndex = '1002';
-                }
-            }
-        }
-
-        function closeAllMenus() {
-            document.querySelectorAll('.action-menu-dropdown.show').forEach(dropdown => {
-                dropdown.classList.remove('show');
-                // Reset the parent card's z-index
-                const card = dropdown.closest('.image-card');
-                if (card) {
-                    card.style.zIndex = '';
-                }
-            });
-        }
-
-        // Close menus when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.action-menu-container')) {
-                closeAllMenus();
-            }
-        });
 
         // Jump to display extra image on kiosk
         function jumpToExtraImage(imageName) {
@@ -1072,130 +913,52 @@
 
             // No checkbox for extra images - they're managed separately from main images
 
-            const info = document.createElement('div');
-            info.className = 'image-card-info';
+            // Action buttons container
+            const buttonsContainer = document.createElement('div');
+            buttonsContainer.style.display = 'flex';
+            buttonsContainer.style.gap = '8px';
+            buttonsContainer.style.padding = '10px';
+            buttonsContainer.style.justifyContent = 'center';
 
-            // Theme tags
-            const themesDiv = document.createElement('div');
-            themesDiv.className = 'image-themes';
-            (image.themes || []).forEach(themeName => {
-                const tag = document.createElement('span');
-                tag.className = 'image-theme-tag';
-                tag.style.cursor = 'pointer';
-                tag.title = 'Click to remove from theme';
-                tag.textContent = themeName + ' ✕';
-                tag.onclick = async () => {
-                    const newThemes = (image.themes || []).filter(t => t !== themeName);
-                    await updateImageThemes(image.name, newThemes);
-                    await loadImages();
-                };
-                themesDiv.appendChild(tag);
-            });
-
-            // Action menu (three dots)
-            const menuContainer = document.createElement('div');
-            menuContainer.className = 'action-menu-container';
-
-            const menuButton = document.createElement('button');
-            menuButton.className = 'action-menu-button';
-            menuButton.innerHTML = '⋮';
-            menuButton.title = 'Actions';
-            menuButton.onclick = (e) => {
+            // Import button
+            const importButton = document.createElement('button');
+            importButton.textContent = 'Import';
+            importButton.style.flex = '1';
+            importButton.style.padding = '8px 16px';
+            importButton.style.background = '#4CAF50';
+            importButton.style.color = 'white';
+            importButton.style.border = 'none';
+            importButton.style.borderRadius = '4px';
+            importButton.style.cursor = 'pointer';
+            importButton.style.fontSize = '14px';
+            importButton.style.fontWeight = '500';
+            importButton.title = 'Import to main images';
+            importButton.onclick = (e) => {
                 e.stopPropagation();
-                toggleMenu(menuContainer);
-            };
-
-            const menuDropdown = document.createElement('div');
-            menuDropdown.className = 'action-menu-dropdown';
-
-            // Add to theme submenu
-            if (Object.keys(availableThemes).length > 0) {
-                const themeMenuItem = document.createElement('div');
-                themeMenuItem.className = 'menu-item has-submenu';
-                themeMenuItem.innerHTML = 'Add to theme <span class="submenu-arrow">▸</span>';
-
-                const themeSubmenu = document.createElement('div');
-                themeSubmenu.className = 'submenu';
-
-                for (const themeName in availableThemes) {
-                    if (!(image.themes || []).includes(themeName)) {
-                        const themeOption = document.createElement('div');
-                        themeOption.className = 'submenu-item';
-                        themeOption.textContent = themeName;
-                        themeOption.onclick = async (e) => {
-                            e.stopPropagation();
-                            const newThemes = [...(image.themes || []), themeName];
-                            await updateImageThemes(image.name, newThemes);
-                            await loadImages();
-                        };
-                        themeSubmenu.appendChild(themeOption);
-                    }
-                }
-
-                themeMenuItem.appendChild(themeSubmenu);
-
-                // Handle submenu hover interaction
-                themeMenuItem.addEventListener('mouseenter', () => {
-                    themeSubmenu.classList.add('show');
-                });
-
-                themeMenuItem.addEventListener('mouseleave', (e) => {
-                    // Delay hiding to allow mouse movement to submenu
-                    setTimeout(() => {
-                        if (!themeSubmenu.matches(':hover')) {
-                            themeSubmenu.classList.remove('show');
-                        }
-                    }, 100);
-                });
-
-                themeSubmenu.addEventListener('mouseleave', () => {
-                    themeSubmenu.classList.remove('show');
-                });
-
-                menuDropdown.appendChild(themeMenuItem);
-            }
-
-            // Import to Main menu item
-            const importMenuItem = document.createElement('div');
-            importMenuItem.className = 'menu-item';
-            importMenuItem.textContent = '📥 Import to Main';
-            importMenuItem.onclick = (e) => {
-                e.stopPropagation();
-                closeAllMenus();
                 importSingleImage(image.name);
             };
-            menuDropdown.appendChild(importMenuItem);
 
-            // Crop menu item
-            const cropMenuItem = document.createElement('div');
-            cropMenuItem.className = 'menu-item';
-            cropMenuItem.textContent = 'Crop';
-            cropMenuItem.onclick = (e) => {
+            // Delete button
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Delete';
+            deleteButton.style.flex = '1';
+            deleteButton.style.padding = '8px 16px';
+            deleteButton.style.background = '#f44336';
+            deleteButton.style.color = 'white';
+            deleteButton.style.border = 'none';
+            deleteButton.style.borderRadius = '4px';
+            deleteButton.style.cursor = 'pointer';
+            deleteButton.style.fontSize = '14px';
+            deleteButton.style.fontWeight = '500';
+            deleteButton.title = 'Delete this image';
+            deleteButton.onclick = (e) => {
                 e.stopPropagation();
-                closeAllMenus();
-                openCropModal(image.name, image.url);
-            };
-            menuDropdown.appendChild(cropMenuItem);
-
-            // Delete menu item
-            const deleteMenuItem = document.createElement('div');
-            deleteMenuItem.className = 'menu-item menu-item-danger';
-            deleteMenuItem.textContent = 'Delete';
-            deleteMenuItem.onclick = (e) => {
-                e.stopPropagation();
-                closeAllMenus();
                 deleteImage(image.name);
             };
-            menuDropdown.appendChild(deleteMenuItem);
 
-            menuContainer.appendChild(menuButton);
-            menuContainer.appendChild(menuDropdown);
-
-            info.appendChild(themesDiv);
-
-            card.appendChild(menuContainer);
-            // Image or crop container already appended above
-            card.appendChild(info);
+            buttonsContainer.appendChild(importButton);
+            buttonsContainer.appendChild(deleteButton);
+            card.appendChild(buttonsContainer);
 
             return card;
         }
