@@ -108,7 +108,7 @@
         let interval = {{ interval }} * 1000; // Convert to milliseconds (I)
         let checkInterval = {{ check_interval }} * 1000; // Convert to milliseconds (C)
         let slideTimer = null;
-        let fillMode = false; // false = cover mode (fills screen), true = contain mode (shows full image)
+        let fillMode = true; // false = cover mode (fills screen), true = contain mode (shows full image)
         let previousImageVector = []; // VP - previous vector of enabled image names
         let previousShuffleId = null; // Track shuffle_id to detect order changes
 
