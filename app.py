@@ -186,6 +186,12 @@ def extra_images_page():
     return render_template('extra-images.html')
 
 
+@app.route('/debug')
+def debug_page():
+    """Debug console page."""
+    return render_template('debug.html')
+
+
 @app.route('/api/images', methods=['GET'])
 def list_images():
     """Get list of all images."""
