@@ -1222,6 +1222,15 @@ def handle_send_command(data):
         # Broadcast to kiosk display
         socketio.emit('remote_command', {'command': 'jump_extra', 'image_name': image_name})
         emit('command_sent', {'success': True, 'command': command, 'image_name': image_name})
+    # Handle refresh_extra_crop command for refreshing extra image with updated crop
+    elif command == 'refresh_extra_crop':
+        image_name = data.get('image_name')
+        if not image_name:
+            emit('command_error', {'error': 'Missing image_name parameter'})
+            return
+        # Broadcast to kiosk display
+        socketio.emit('remote_command', {'command': 'refresh_extra_crop', 'image_name': image_name})
+        emit('command_sent', {'success': True, 'command': command, 'image_name': image_name})
     elif command in ['next', 'prev', 'pause', 'play', 'reload', 'resume_from_extra']:
         # Broadcast to kiosk display
         socketio.emit('remote_command', command)
