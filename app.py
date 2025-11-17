@@ -249,7 +249,10 @@ def upload_image():
     if not allowed_file(file.filename):
         return jsonify({'error': 'File type not allowed'}), 400
 
-    filename = secure_filename(file.filename)
+    # Generate UUID-based filename
+    original_filename = file.filename
+    extension = Path(original_filename).suffix
+    filename = f"{uuid.uuid4()}{extension}"
     filepath = app.config['UPLOAD_FOLDER'] / filename
     file.save(filepath)
 
@@ -952,16 +955,10 @@ def import_single_extra_image(filename):
         if not source.exists():
             return jsonify({'error': 'Image not found'}), 404
 
-        dest = app.config['UPLOAD_FOLDER'] / filename
-
-        # Handle name conflicts
-        if dest.exists():
-            base = dest.stem
-            ext = dest.suffix
-            counter = 1
-            while dest.exists():
-                dest = app.config['UPLOAD_FOLDER'] / f"{base}_{counter}{ext}"
-                counter += 1
+        # Generate UUID-based filename
+        extension = source.suffix
+        new_filename = f"{uuid.uuid4()}{extension}"
+        dest = app.config['UPLOAD_FOLDER'] / new_filename
 
         shutil.move(str(source), str(dest))
 
@@ -994,16 +991,10 @@ def import_all_extra_images():
         imported = 0
         for file in EXTRA_IMAGES_FOLDER.iterdir():
             if file.is_file() and file.suffix.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']:
-                dest = app.config['UPLOAD_FOLDER'] / file.name
-
-                # Handle name conflicts
-                if dest.exists():
-                    base = dest.stem
-                    ext = dest.suffix
-                    counter = 1
-                    while dest.exists():
-                        dest = app.config['UPLOAD_FOLDER'] / f"{base}_{counter}{ext}"
-                        counter += 1
+                # Generate UUID-based filename
+                extension = file.suffix
+                new_filename = f"{uuid.uuid4()}{extension}"
+                dest = app.config['UPLOAD_FOLDER'] / new_filename
 
                 shutil.move(str(file), str(dest))
 
@@ -1155,10 +1146,6 @@ def api_download_art():
         if not image_url:
             return jsonify({'error': 'Missing image_url'}), 400
 
-        # Create a safe filename
-        safe_artist = "".join(c for c in artist[:30] if c.isalnum() or c in (' ', '-', '_')).strip()
-        safe_title = "".join(c for c in title[:50] if c.isalnum() or c in (' ', '-', '_')).strip()
-
         # Try to determine extension from URL
         extension = '.jpg'
         if image_url.lower().endswith('.png'):
@@ -1166,7 +1153,8 @@ def api_download_art():
         elif image_url.lower().endswith('.jpeg'):
             extension = '.jpeg'
 
-        filename = f"{safe_artist} - {safe_title}{extension}"
+        # Generate UUID-based filename
+        filename = f"{uuid.uuid4()}{extension}"
         filepath = EXTRA_IMAGES_FOLDER / filename
 
         # Download the image
