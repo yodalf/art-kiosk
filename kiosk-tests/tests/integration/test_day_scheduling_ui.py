@@ -15,31 +15,45 @@ def test_req_day_017_dynamic_time_labels_am_cycle(manage_page):
 
     Test that time period labels show AM times when current hour is between 6am-6pm.
     """
-    # Page is already navigated by fixture
-    # Get current hour from JavaScript
-    current_hour = manage_page.evaluate("new Date().getHours()")
+    # Mock the time to 10:00 AM to force AM cycle
+    # Override Date constructor and methods
+    manage_page.evaluate("""
+        window.OriginalDate = Date;
+        window.Date = function(...args) {
+            if (args.length === 0) {
+                // Create a date at 10:00 AM
+                const mockDate = new window.OriginalDate();
+                mockDate.setHours(10, 0, 0, 0);
+                return mockDate;
+            } else {
+                return new window.OriginalDate(...args);
+            }
+        };
+        window.Date.now = function() {
+            const mockDate = new window.OriginalDate();
+            mockDate.setHours(10, 0, 0, 0);
+            return mockDate.getTime();
+        };
+        window.Date.prototype = window.OriginalDate.prototype;
+    """)
 
-    # Determine expected cycle based on current hour
-    is_pm_cycle = current_hour >= 18 or current_hour < 6
+    # Trigger label update by calling the function
+    manage_page.evaluate("updateTimePeriodLabels()")
 
-    if not is_pm_cycle:
-        # AM cycle - verify labels show AM times
-        label1 = manage_page.text_content('.time-period-label[data-time-id="1"]')
-        label2 = manage_page.text_content('.time-period-label[data-time-id="2"]')
-        label3 = manage_page.text_content('.time-period-label[data-time-id="3"]')
-        label4 = manage_page.text_content('.time-period-label[data-time-id="4"]')
-        label5 = manage_page.text_content('.time-period-label[data-time-id="5"]')
-        label6 = manage_page.text_content('.time-period-label[data-time-id="6"]')
+    # AM cycle - verify labels show AM times
+    label1 = manage_page.text_content('.time-period-label[data-time-id="1"]')
+    label2 = manage_page.text_content('.time-period-label[data-time-id="2"]')
+    label3 = manage_page.text_content('.time-period-label[data-time-id="3"]')
+    label4 = manage_page.text_content('.time-period-label[data-time-id="4"]')
+    label5 = manage_page.text_content('.time-period-label[data-time-id="5"]')
+    label6 = manage_page.text_content('.time-period-label[data-time-id="6"]')
 
-        assert '6 AM - 8 AM' in label1
-        assert '8 AM - 10 AM' in label2
-        assert '10 AM - 12 PM' in label3
-        assert '12 PM - 2 PM' in label4
-        assert '2 PM - 4 PM' in label5
-        assert '4 PM - 6 PM' in label6
-    else:
-        # PM cycle - skip this test and run the PM cycle test instead
-        pytest.skip("Current hour is in PM cycle, run test_req_day_017_dynamic_time_labels_pm_cycle instead")
+    assert '6 AM - 8 AM' in label1
+    assert '8 AM - 10 AM' in label2
+    assert '10 AM - 12 PM' in label3
+    assert '12 PM - 2 PM' in label4
+    assert '2 PM - 4 PM' in label5
+    assert '4 PM - 6 PM' in label6
 
 
 @pytest.mark.integration
@@ -50,31 +64,45 @@ def test_req_day_017_dynamic_time_labels_pm_cycle(manage_page):
 
     Test that time period labels show PM times when current hour is between 6pm-6am.
     """
-    # Page is already navigated by fixture
-    # Get current hour from JavaScript
-    current_hour = manage_page.evaluate("new Date().getHours()")
+    # Mock the time to 22:00 (10:00 PM) to force PM cycle
+    # Override Date constructor and methods
+    manage_page.evaluate("""
+        window.OriginalDate = Date;
+        window.Date = function(...args) {
+            if (args.length === 0) {
+                // Create a date at 10:00 PM (22:00)
+                const mockDate = new window.OriginalDate();
+                mockDate.setHours(22, 0, 0, 0);
+                return mockDate;
+            } else {
+                return new window.OriginalDate(...args);
+            }
+        };
+        window.Date.now = function() {
+            const mockDate = new window.OriginalDate();
+            mockDate.setHours(22, 0, 0, 0);
+            return mockDate.getTime();
+        };
+        window.Date.prototype = window.OriginalDate.prototype;
+    """)
 
-    # Determine expected cycle based on current hour
-    is_pm_cycle = current_hour >= 18 or current_hour < 6
+    # Trigger label update by calling the function
+    manage_page.evaluate("updateTimePeriodLabels()")
 
-    if is_pm_cycle:
-        # PM cycle - verify labels show PM times
-        label1 = manage_page.text_content('.time-period-label[data-time-id="1"]')
-        label2 = manage_page.text_content('.time-period-label[data-time-id="2"]')
-        label3 = manage_page.text_content('.time-period-label[data-time-id="3"]')
-        label4 = manage_page.text_content('.time-period-label[data-time-id="4"]')
-        label5 = manage_page.text_content('.time-period-label[data-time-id="5"]')
-        label6 = manage_page.text_content('.time-period-label[data-time-id="6"]')
+    # PM cycle - verify labels show PM times
+    label1 = manage_page.text_content('.time-period-label[data-time-id="1"]')
+    label2 = manage_page.text_content('.time-period-label[data-time-id="2"]')
+    label3 = manage_page.text_content('.time-period-label[data-time-id="3"]')
+    label4 = manage_page.text_content('.time-period-label[data-time-id="4"]')
+    label5 = manage_page.text_content('.time-period-label[data-time-id="5"]')
+    label6 = manage_page.text_content('.time-period-label[data-time-id="6"]')
 
-        assert '6 PM - 8 PM' in label1
-        assert '8 PM - 10 PM' in label2
-        assert '10 PM - 12 AM' in label3
-        assert '12 AM - 2 AM' in label4
-        assert '2 AM - 4 AM' in label5
-        assert '4 AM - 6 AM' in label6
-    else:
-        # AM cycle - skip this test and run the AM cycle test instead
-        pytest.skip("Current hour is in AM cycle, run test_req_day_017_dynamic_time_labels_am_cycle instead")
+    assert '6 PM - 8 PM' in label1
+    assert '8 PM - 10 PM' in label2
+    assert '10 PM - 12 AM' in label3
+    assert '12 AM - 2 AM' in label4
+    assert '2 AM - 4 AM' in label5
+    assert '4 AM - 6 AM' in label6
 
 
 @pytest.mark.integration
