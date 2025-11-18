@@ -747,10 +747,10 @@
                 </p>
 
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                    <!-- Time 1: 6:00 AM - 8:00 AM -->
+                    <!-- Time 1 -->
                     <div class="time-period-card" data-time-id="1">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <h4 style="color: #ffffff; margin: 0;">Time 1: 6 AM - 8 AM</h4>
+                            <h4 class="time-period-label" style="color: #ffffff; margin: 0;" data-time-id="1">Time 1: 6 AM - 8 AM</h4>
                             <button onclick="editTimePeriodAtmospheres('1')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Edit</button>
                         </div>
                         <div class="time-atmospheres" id="time-1-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
@@ -758,10 +758,10 @@
                         </div>
                     </div>
 
-                    <!-- Time 2: 8:00 AM - 10:00 AM -->
+                    <!-- Time 2 -->
                     <div class="time-period-card" data-time-id="2">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <h4 style="color: #ffffff; margin: 0;">Time 2: 8 AM - 10 AM</h4>
+                            <h4 class="time-period-label" style="color: #ffffff; margin: 0;" data-time-id="2">Time 2: 8 AM - 10 AM</h4>
                             <button onclick="editTimePeriodAtmospheres('2')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Edit</button>
                         </div>
                         <div class="time-atmospheres" id="time-2-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
@@ -769,10 +769,10 @@
                         </div>
                     </div>
 
-                    <!-- Time 3: 10:00 AM - 12:00 PM -->
+                    <!-- Time 3 -->
                     <div class="time-period-card" data-time-id="3">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <h4 style="color: #ffffff; margin: 0;">Time 3: 10 AM - 12 PM</h4>
+                            <h4 class="time-period-label" style="color: #ffffff; margin: 0;" data-time-id="3">Time 3: 10 AM - 12 PM</h4>
                             <button onclick="editTimePeriodAtmospheres('3')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Edit</button>
                         </div>
                         <div class="time-atmospheres" id="time-3-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
@@ -780,10 +780,10 @@
                         </div>
                     </div>
 
-                    <!-- Time 4: 12:00 PM - 2:00 PM -->
+                    <!-- Time 4 -->
                     <div class="time-period-card" data-time-id="4">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <h4 style="color: #ffffff; margin: 0;">Time 4: 12 PM - 2 PM</h4>
+                            <h4 class="time-period-label" style="color: #ffffff; margin: 0;" data-time-id="4">Time 4: 12 PM - 2 PM</h4>
                             <button onclick="editTimePeriodAtmospheres('4')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Edit</button>
                         </div>
                         <div class="time-atmospheres" id="time-4-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
@@ -791,10 +791,10 @@
                         </div>
                     </div>
 
-                    <!-- Time 5: 2:00 PM - 4:00 PM -->
+                    <!-- Time 5 -->
                     <div class="time-period-card" data-time-id="5">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <h4 style="color: #ffffff; margin: 0;">Time 5: 2 PM - 4 PM</h4>
+                            <h4 class="time-period-label" style="color: #ffffff; margin: 0;" data-time-id="5">Time 5: 2 PM - 4 PM</h4>
                             <button onclick="editTimePeriodAtmospheres('5')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Edit</button>
                         </div>
                         <div class="time-atmospheres" id="time-5-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
@@ -802,10 +802,10 @@
                         </div>
                     </div>
 
-                    <!-- Time 6: 4:00 PM - 6:00 PM -->
+                    <!-- Time 6 -->
                     <div class="time-period-card" data-time-id="6">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <h4 style="color: #ffffff; margin: 0;">Time 6: 4 PM - 6 PM</h4>
+                            <h4 class="time-period-label" style="color: #ffffff; margin: 0;" data-time-id="6">Time 6: 4 PM - 6 PM</h4>
                             <button onclick="editTimePeriodAtmospheres('6')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Edit</button>
                         </div>
                         <div class="time-atmospheres" id="time-6-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
@@ -1640,6 +1640,9 @@
         }
 
         function updateTimePeriodDisplays() {
+            // Update time labels based on current hour
+            updateTimePeriodLabels();
+
             // Update all 6 time periods (times 7-12 mirror these)
             for (let i = 1; i <= 6; i++) {
                 const timeId = i.toString();
@@ -1654,6 +1657,31 @@
                     displayElement.style.color = '#ffffff';
                 }
             }
+        }
+
+        function updateTimePeriodLabels() {
+            // Determine if we're in AM cycle (6am-6pm) or PM cycle (6pm-6am)
+            const now = new Date();
+            const hour = now.getHours();
+            const isPMCycle = hour >= 18 || hour < 6;
+
+            // Time period definitions: [start_hour, end_hour, label]
+            const timeRanges = [
+                { id: 1, amLabel: '6 AM - 8 AM', pmLabel: '6 PM - 8 PM' },
+                { id: 2, amLabel: '8 AM - 10 AM', pmLabel: '8 PM - 10 PM' },
+                { id: 3, amLabel: '10 AM - 12 PM', pmLabel: '10 PM - 12 AM' },
+                { id: 4, amLabel: '12 PM - 2 PM', pmLabel: '12 AM - 2 AM' },
+                { id: 5, amLabel: '2 PM - 4 PM', pmLabel: '2 AM - 4 AM' },
+                { id: 6, amLabel: '4 PM - 6 PM', pmLabel: '4 AM - 6 AM' }
+            ];
+
+            timeRanges.forEach(range => {
+                const label = isPMCycle ? range.pmLabel : range.amLabel;
+                const labelElement = document.querySelector(`.time-period-label[data-time-id="${range.id}"]`);
+                if (labelElement) {
+                    labelElement.textContent = `Time ${range.id}: ${label}`;
+                }
+            });
         }
 
         function highlightCurrentTimePeriod() {
