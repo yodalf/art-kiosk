@@ -770,6 +770,7 @@ def create_theme():
     """Create a new theme."""
     data = request.json
     theme_name = data.get('name')
+    interval = data.get('interval', 3600)  # Default: 60 minutes in seconds
 
     if not theme_name:
         return jsonify({'error': 'Theme name is required'}), 400
@@ -783,7 +784,7 @@ def create_theme():
     themes[theme_name] = {
         'name': theme_name,
         'created': time.time(),
-        'interval': 3600  # Default: 60 minutes in seconds
+        'interval': interval
     }
     settings['themes'] = themes
     save_settings(settings)
