@@ -49,7 +49,7 @@ def test_req_atm_003_atmosphere_themes_many_to_many(api_client, server_state):
 
     # Verify
     settings = api_client.get('/api/settings').json()
-    atm_themes = settings['atmospheres']['MultiTheme'].get('themes', [])
+    atm_themes = settings['atmosphere_themes'].get('MultiTheme', [])
 
     assert 'Theme1' in atm_themes
     assert 'Theme2' in atm_themes

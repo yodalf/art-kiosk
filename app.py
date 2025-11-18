@@ -936,6 +936,7 @@ def create_atmosphere():
     """Create a new atmosphere."""
     data = request.json
     atmosphere_name = data.get('name')
+    interval = data.get('interval', 3600)  # Default: 60 minutes in seconds
 
     if not atmosphere_name:
         return jsonify({'error': 'Atmosphere name is required'}), 400
@@ -949,7 +950,7 @@ def create_atmosphere():
     atmospheres[atmosphere_name] = {
         'name': atmosphere_name,
         'created': time.time(),
-        'interval': 3600  # Default: 60 minutes in seconds
+        'interval': interval
     }
     settings['atmospheres'] = atmospheres
     save_settings(settings)
