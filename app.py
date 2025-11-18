@@ -1125,6 +1125,34 @@ def toggle_day_scheduling():
     })
 
 
+@app.route('/api/day/enable', methods=['POST'])
+def enable_day_scheduling():
+    """Enable Day scheduling."""
+    settings = get_settings()
+    settings['day_scheduling_enabled'] = True
+    settings['shuffle_id'] = random.random()
+    save_settings(settings)
+    return jsonify({
+        'success': True,
+        'enabled': True,
+        'current_time_period': get_current_time_period()
+    })
+
+
+@app.route('/api/day/disable', methods=['POST'])
+def disable_day_scheduling():
+    """Disable Day scheduling."""
+    settings = get_settings()
+    settings['day_scheduling_enabled'] = False
+    settings['active_atmosphere'] = None  # Clear atmosphere when disabling
+    settings['shuffle_id'] = random.random()
+    save_settings(settings)
+    return jsonify({
+        'success': True,
+        'enabled': False
+    })
+
+
 @app.route('/api/day/times/<time_id>/atmospheres', methods=['POST'])
 def update_time_atmospheres(time_id):
     """Update atmospheres for a specific time period."""
