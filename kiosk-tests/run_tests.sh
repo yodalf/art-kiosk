@@ -22,8 +22,22 @@ fi
 # Activate virtual environment
 source venv/bin/activate
 
-# Get target URL (default to localhost, or use environment variable)
-TARGET_URL="${KIOSK_BASE_URL:-http://localhost}"
+# Determine target URL
+# Priority: 1. KIOSK_BASE_URL env var, 2. device.txt, 3. localhost
+if [ -n "$KIOSK_BASE_URL" ]; then
+    TARGET_URL="$KIOSK_BASE_URL"
+elif [ -f "../device.txt" ]; then
+    # Parse hostname from device.txt
+    HOSTNAME=$(grep "^hostname=" ../device.txt | cut -d'=' -f2)
+    if [ -n "$HOSTNAME" ]; then
+        TARGET_URL="http://${HOSTNAME}"
+        echo -e "${GREEN}Using device from device.txt: ${HOSTNAME}${NC}"
+    else
+        TARGET_URL="http://localhost"
+    fi
+else
+    TARGET_URL="http://localhost"
+fi
 
 # Check if server is running
 echo -e "${YELLOW}Checking if kiosk server is running at ${TARGET_URL}...${NC}"

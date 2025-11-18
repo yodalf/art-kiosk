@@ -36,6 +36,15 @@ source venv/bin/activate
 
 The kiosk server must be running and accessible.
 
+**Automatic device detection:**
+
+Tests automatically read from `../device.txt` if it exists:
+```
+hostname=raspberrypi.local
+username=realo
+password=toto
+```
+
 **For local testing:**
 ```bash
 # In the main kiosk directory
@@ -43,33 +52,32 @@ cd ..
 sudo ./venv/bin/python app.py
 ```
 
-**For remote testing (e.g., Raspberry Pi):**
+**For remote testing (manual override):**
 ```bash
-# Set the target URL via environment variable
+# Set the target URL via environment variable (overrides device.txt)
 export KIOSK_BASE_URL=http://art-kiosk.local
 # Or use IP address
 export KIOSK_BASE_URL=http://192.168.1.100
 ```
 
+**Priority order:**
+1. `KIOSK_BASE_URL` environment variable (highest priority)
+2. `hostname` from `../device.txt`
+3. `http://localhost` (default)
+
 ### Run All Tests
 
-**Local testing:**
+**Using device.txt (automatic):**
 ```bash
-pytest
-```
-
-**Remote testing:**
-```bash
-export KIOSK_BASE_URL=http://art-kiosk.local
-pytest
-```
-
-**Using the test runner script:**
-```bash
-# Local
+# Tests automatically use hostname from ../device.txt
 ./run_tests.sh
+# Or
+pytest
+```
 
-# Remote
+**Manual URL override:**
+```bash
+# Override device.txt with environment variable
 export KIOSK_BASE_URL=http://art-kiosk.local
 ./run_tests.sh
 ```

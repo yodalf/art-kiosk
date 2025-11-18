@@ -19,9 +19,39 @@ import hashlib
 
 
 # Configuration
-# Allow override via environment variable for remote testing
+# Load device configuration from ../device.txt if available
 import os
-BASE_URL = os.getenv("KIOSK_BASE_URL", "http://localhost")
+
+
+def load_device_config():
+    """Load device configuration from device.txt in parent directory."""
+    device_file = Path(__file__).parent.parent / "device.txt"
+    if device_file.exists():
+        config = {}
+        with open(device_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and '=' in line:
+                    key, value = line.split('=', 1)
+                    config[key.strip()] = value.strip()
+        return config
+    return {}
+
+
+# Load device config
+device_config = load_device_config()
+
+# Determine base URL:
+# 1. Environment variable KIOSK_BASE_URL takes precedence
+# 2. device.txt hostname if available
+# 3. Default to localhost
+if os.getenv("KIOSK_BASE_URL"):
+    BASE_URL = os.getenv("KIOSK_BASE_URL")
+elif device_config.get('hostname'):
+    BASE_URL = f"http://{device_config['hostname']}"
+else:
+    BASE_URL = "http://localhost"
+
 KIOSK_URL = f"{BASE_URL}/view"
 MANAGE_URL = f"{BASE_URL}/"
 SCREENSHOTS_DIR = Path(__file__).parent / "screenshots"
