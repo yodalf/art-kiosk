@@ -1027,7 +1027,7 @@ def update_atmosphere_interval(atmosphere_name):
 def set_active_atmosphere():
     """Set the active atmosphere."""
     data = request.json
-    atmosphere_name = data.get('atmosphere_name')
+    atmosphere_name = data.get('atmosphere') or data.get('atmosphere_name')
 
     settings = get_settings()
     atmospheres = settings.get('atmospheres', {})
