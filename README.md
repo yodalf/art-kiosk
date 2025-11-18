@@ -574,6 +574,19 @@ kiosk_images/
 ├── README.md                  # This file
 ├── ARCHITECTURE.md            # Architecture documentation
 ├── QUICKSTART.md              # Quick start guide
+├── REQUIREMENTS.md            # Requirements specification
+├── TEST.md                    # Test report
+├── TEST_MODE.md               # Test mode documentation
+├── CLAUDE.md                  # Claude Code guidance
+├── kiosk-tests/               # Test suite
+│   ├── conftest.py            # Test fixtures
+│   ├── pytest.ini             # Test configuration
+│   ├── requirements.txt       # Test dependencies
+│   ├── device.txt             # Device credentials (gitignored)
+│   └── tests/
+│       ├── unit/              # Unit tests
+│       ├── integration/       # Integration tests
+│       └── e2e/               # End-to-end tests
 └── templates/
     ├── kiosk.html             # Main kiosk display
     ├── manage.html            # Management interface
@@ -606,6 +619,49 @@ Benefits:
 - Preserves file extensions (e.g., `.jpg`, `.png`, `.webp`)
 
 The system automatically updates all references (enabled state, theme assignments, crop data) to track images by their UUID filenames.
+
+## Testing
+
+The project includes a comprehensive test suite with 54 automated tests covering all functionality.
+
+### Running Tests
+
+```bash
+cd kiosk-tests
+
+# Install test dependencies
+pip install -r requirements.txt
+
+# Run all tests
+pytest
+
+# Run specific test categories
+pytest tests/unit/           # Unit tests only
+pytest tests/integration/    # Integration tests only
+pytest tests/e2e/            # End-to-end tests only
+
+# Run with verbose output
+pytest -v
+```
+
+### Test Coverage
+
+**Total:** 54 tests with 100% pass rate
+- **Unit Tests (14):** API endpoints, cleanup safety
+- **Integration Tests (40):** Image management, themes, atmospheres, day scheduling
+
+See `TEST.md` for detailed test report and requirements traceability.
+
+### Test Configuration
+
+Tests connect to the Raspberry Pi device specified in `kiosk-tests/device.txt`:
+```
+hostname=raspberrypi.local
+username=<your-username>
+password=<your-password>
+```
+
+**Note:** The `device.txt` file is gitignored and should never be committed to version control.
 
 ## Troubleshooting
 

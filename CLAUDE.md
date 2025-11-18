@@ -17,20 +17,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Device Credentials**: ALWAYS read from `device.txt` file (gitignored) before deploying. This file contains the hostname, username, and password needed for SSH/SCP commands.
 
 ```bash
-# 1. Stop both services first
-sshpass -p '<password>' ssh <username>@<hostname> "sudo systemctl stop kiosk-display.service && sudo systemctl stop kiosk-firefox.service"
+# 1. Stop the kiosk-display service (Firefox will stop automatically due to BindsTo)
+sshpass -p '<password>' ssh <username>@<hostname> "sudo systemctl stop kiosk-display.service"
 
 # 2. Copy updated files
 sshpass -p '<password>' scp /path/to/local/file <username>@<hostname>:/home/<username>/kiosk_images/path/to/file
 
-# 3. Start both services
-sshpass -p '<password>' ssh <username>@<hostname> "sudo systemctl start kiosk-display.service && sudo systemctl start kiosk-firefox.service"
+# 3. Start the kiosk-display service (Firefox will start automatically)
+sshpass -p '<password>' ssh <username>@<hostname> "sudo systemctl start kiosk-display.service"
 
 # 4. Verify services are running (optional)
-sshpass -p '<password>' ssh <username>@<hostname> "sudo systemctl status kiosk-display.service"
+sshpass -p '<password>' ssh <username>@<hostname> "sudo systemctl status kiosk-display.service kiosk-firefox.service"
 ```
 
-**Why this matters**: Updating files while services are running can confuse the system and cause race conditions. Always stop both services before updating any files, then restart both after deployment.
+**Why this matters**:
+- Updating files while services are running can cause race conditions
+- The Firefox service is bound to kiosk-display via `PartOf` and `BindsTo` directives
+- Stopping kiosk-display automatically stops Firefox
+- Starting kiosk-display automatically starts Firefox
+- This ensures both services restart in the correct order
 
 **Note**: The `device.txt` file is gitignored and should never be committed to version control. Read it at the start of every deployment.
 
