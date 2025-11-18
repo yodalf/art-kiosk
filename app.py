@@ -861,7 +861,7 @@ def update_theme_interval(theme_name):
 def set_active_theme():
     """Set the active theme."""
     data = request.json
-    theme_name = data.get('theme_name')
+    theme_name = data.get('theme') or data.get('theme_name')
 
     if not theme_name:
         return jsonify({'error': 'Theme name is required'}), 400
