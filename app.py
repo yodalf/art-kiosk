@@ -1097,11 +1097,13 @@ def get_day_status():
     """Get Day scheduling status and current time period."""
     settings = get_settings()
     current_time = get_current_time_period()
+    day_times_data = settings.get('day_times', {})
 
     return jsonify({
         'enabled': settings.get('day_scheduling_enabled', False),
         'current_time_period': current_time,
-        'day_times': settings.get('day_times', {})
+        'day_times': day_times_data,
+        'time_periods': day_times_data  # Alias for backward compatibility
     })
 
 
@@ -1159,6 +1161,7 @@ def disable_day_scheduling():
 
 
 @app.route('/api/day/times/<time_id>/atmospheres', methods=['POST'])
+@app.route('/api/day/time-periods/<time_id>', methods=['POST'])
 def update_time_atmospheres(time_id):
     """Update atmospheres for a specific time period."""
     try:
