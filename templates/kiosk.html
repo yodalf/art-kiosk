@@ -108,10 +108,13 @@
         let interval = {{ interval }} * 1000; // Convert to milliseconds (I)
         let checkInterval = {{ check_interval }} * 1000; // Convert to milliseconds (C)
         let slideTimer = null;
+        let hourCheckTimer = null; // Timer for checking hour boundaries in day scheduling
         let fillMode = false; // false = cover mode (fills screen), true = contain mode (shows full image)
         let previousImageVector = []; // VP - previous vector of enabled image names
         let previousShuffleId = null; // Track shuffle_id to detect order changes
         let previousTimePeriod = null; // Track time period to detect Day scheduling transitions
+        let daySchedulingEnabled = false; // Track if day scheduling is enabled
+        let lastCheckHour = null; // Track last hour we checked for day scheduling transitions
 
         // Debug logging function - sends to both console and server
         function debugLog(message, level = 'info') {
@@ -195,6 +198,51 @@
             }
         }
 
+        // Check if we've crossed an hour boundary (for day scheduling transitions)
+        async function checkHourBoundary() {
+            if (!daySchedulingEnabled) {
+                return; // Not in day scheduling mode
+            }
+
+            const now = new Date();
+            const currentHour = now.getHours();
+
+            if (lastCheckHour === null) {
+                // First check, just initialize
+                lastCheckHour = currentHour;
+                return;
+            }
+
+            if (currentHour !== lastCheckHour) {
+                debugLog(`Hour boundary crossed! ${lastCheckHour}:00 -> ${currentHour}:00`, 'info');
+                debugLog(`Day scheduling active - forcing immediate image transition`, 'info');
+                lastCheckHour = currentHour;
+
+                // Force immediate transition to next image
+                nextSlide();
+            }
+        }
+
+        // Start/stop hour boundary checking based on day scheduling status
+        function updateHourBoundaryCheck() {
+            if (daySchedulingEnabled) {
+                if (!hourCheckTimer) {
+                    debugLog('Starting hour boundary checker (60 second intervals)', 'info');
+                    // Check every 60 seconds for hour changes
+                    hourCheckTimer = setInterval(checkHourBoundary, 60000);
+                    // Also check immediately to initialize lastCheckHour
+                    checkHourBoundary();
+                }
+            } else {
+                if (hourCheckTimer) {
+                    debugLog('Stopping hour boundary checker', 'info');
+                    clearInterval(hourCheckTimer);
+                    hourCheckTimer = null;
+                    lastCheckHour = null;
+                }
+            }
+        }
+
         // Check if enabled images or settings have changed
         async function checkForImageChanges() {
             try {
@@ -214,6 +262,14 @@
                 const dayResponse = await fetch('/api/day/status');
                 const dayStatus = await dayResponse.json();
                 const newTimePeriod = dayStatus.current_time_period;
+
+                // Update day scheduling state and hour boundary checker
+                const previousDayScheduling = daySchedulingEnabled;
+                daySchedulingEnabled = dayStatus.enabled;
+                if (previousDayScheduling !== daySchedulingEnabled) {
+                    debugLog(`Day scheduling ${daySchedulingEnabled ? 'enabled' : 'disabled'}`, 'info');
+                    updateHourBoundaryCheck();
+                }
 
                 let needsReload = false;
 

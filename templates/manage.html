@@ -979,8 +979,18 @@
                 const heading = document.getElementById('current-images-heading');
                 grid.innerHTML = '';
 
-                // Update heading based on active atmosphere or theme
-                if (activeAtmosphere) {
+                // Update heading based on day scheduling, active atmosphere, or theme
+                if (daySchedulingEnabled && currentTimePeriod) {
+                    // Day scheduling is active - show current time period's atmospheres
+                    const currentTimeAtmospheres = get_active_atmospheres_for_time(currentTimePeriod);
+                    if (currentTimeAtmospheres.length === 1) {
+                        heading.textContent = `Current Images - Atmosphere: ${currentTimeAtmospheres[0]}`;
+                    } else if (currentTimeAtmospheres.length > 1) {
+                        heading.textContent = `Current Images - Atmospheres: ${currentTimeAtmospheres.join(', ')}`;
+                    } else {
+                        heading.textContent = 'Current Images - All Images';
+                    }
+                } else if (activeAtmosphere) {
                     heading.textContent = `Current Images - Atmosphere: ${activeAtmosphere}`;
                 } else if (activeTheme && activeTheme !== 'All Images') {
                     heading.textContent = `Current Images - Theme: ${activeTheme}`;
