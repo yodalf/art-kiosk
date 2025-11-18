@@ -335,6 +335,7 @@ Automatically rotate atmospheres throughout the day based on time periods:
 4. **Automatic Switching** - The system automatically switches to the current time period's atmospheres
 5. **Cadence Priority** - Atmosphere cadence (interval) always takes precedence over theme cadence
 6. **Green Border Highlighting** - The current time period is highlighted with a green border
+7. **Dynamic Time Labels** - Time period labels automatically update to show AM (6am-6pm) or PM (6pm-6am) cycle based on current hour
 
 When Day Scheduling is enabled:
 - Manual atmosphere selection is disabled
@@ -651,6 +652,15 @@ pytest -v
 - **Integration Tests (40):** Image management, themes, atmospheres, day scheduling
 
 See `TEST.md` for detailed test report and requirements traceability.
+
+### Test Infrastructure
+
+The test suite includes several important features:
+
+- **Session-scoped fixtures**: Day scheduling state is saved once at the start of the test session and restored once at the end, preventing race conditions
+- **Automatic cleanup**: All test resources (images, themes, atmospheres) are automatically cleaned up after each test
+- **State isolation**: Tests run independently without interfering with each other or leaving the server in a modified state
+- **Test mode API**: Allows deterministic testing of time-dependent features with mock time control
 
 ### Test Configuration
 

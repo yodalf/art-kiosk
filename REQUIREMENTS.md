@@ -249,6 +249,11 @@ This document defines testable requirements for the Art Kiosk system. Requiremen
 **REQ-DAY-016**: Green border SHALL highlight current time period
 - **Test**: Verify current time period div has green border CSS
 
+**REQ-DAY-017**: Time period labels SHALL dynamically display AM or PM cycle based on current hour
+- **AM cycle (6am-6pm)**: Labels show "6 AM - 8 AM", "8 AM - 10 AM", etc.
+- **PM cycle (6pm-6am)**: Labels show "6 PM - 8 PM", "8 PM - 10 PM", etc.
+- **Test**: Mock browser time to 10:00, verify AM labels; mock to 22:00, verify PM labels
+
 ---
 
 ## 5. Image Cropping

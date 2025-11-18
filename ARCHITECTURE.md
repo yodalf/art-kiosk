@@ -286,6 +286,12 @@ graph TB
 
 **Hour Boundary Transitions**: When day scheduling is enabled, the kiosk automatically transitions images when crossing hour boundaries (e.g., 8:00 AM), overriding atmosphere/theme cadence settings. This ensures time period changes happen exactly on schedule.
 
+**Dynamic Time Labels**: The management interface displays time period labels that automatically adapt based on the current hour:
+- AM cycle (6am-6pm): Shows "6 AM - 8 AM", "8 AM - 10 AM", etc.
+- PM cycle (6pm-6am): Shows "6 PM - 8 PM", "8 PM - 10 PM", etc.
+- Labels update on page load via `updateTimePeriodLabels()` function
+- Determined by checking if current hour >= 18 or < 6
+
 ### Remote Control
 - WebSocket `send_command` - Send command to kiosk (real-time via Socket.IO)
   - Commands: `next`, `prev`, `pause`, `play`, `reload`, `jump`, `jump_extra`, `resume_from_extra`, `refresh_extra_crop`
@@ -974,7 +980,33 @@ flowchart TD
 - Theme-specific intervals (already implemented)
 - Nested atmospheres (atmosphere hierarchies)
 
-## Testing Recommendations
+## Testing
+
+### Automated Test Suite
+
+The project includes 54 automated tests covering all functionality:
+
+**Test Infrastructure**:
+- **Session-scoped fixtures**: Day scheduling state managed at session level (saved once at start, restored once at end)
+  - Prevents race condition where multiple tests independently save/restore state
+  - Uses `@pytest.fixture(scope="session", autouse=True)` in conftest.py
+  - Guarantees server state is properly restored after all tests complete
+- **Per-test fixtures**: Individual test resources (images, themes, atmospheres) cleaned up after each test
+- **State isolation**: Tests run independently without interfering with each other
+- **Test mode API**: Mock time control, interval overrides, manual triggers for deterministic testing
+
+**Fixture Architecture**:
+- `api_client` (session): HTTP client for API requests
+- `manage_day_scheduling` (session, autouse): Saves/restores day scheduling state once for entire session
+- `server_state` (function): Manages themes, atmospheres, images per test
+- `test_mode` (function): Enables test mode with mock time and interval overrides
+- `image_uploader` (function): Simplifies image upload with automatic cleanup
+
+**Test Categories**:
+- Unit tests (14): API endpoints, cleanup safety
+- Integration tests (40): Image management, themes, atmospheres, day scheduling
+
+See `TEST.md` for detailed test report and requirements traceability.
 
 ### Manual Testing
 1. **Image Management**: Upload, enable/disable, delete, crop
@@ -988,6 +1020,7 @@ flowchart TD
 9. **Smart Reload**: Change images, interval, dissolve, shuffle_id - verify reload
 10. **Click-to-Jump**: Click thumbnails, verify immediate switch
 11. **Autostart**: Reboot, verify services start correctly
+12. **Dynamic Time Labels**: Verify time period labels show correct AM/PM cycle based on current hour
 
 ### Browser Compatibility
 - Primary: Firefox (kiosk mode)
