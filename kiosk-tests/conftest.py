@@ -339,9 +339,9 @@ def server_state(api_client):
                 self.created_themes.append(name)
             return response.json()
 
-        def create_atmosphere(self, name: str, cadence: int = 3600):
+        def create_atmosphere(self, name: str, interval: int = 3600):
             """Create an atmosphere."""
-            response = self.client.post('/api/atmospheres', json={'name': name, 'cadence': cadence})
+            response = self.client.post('/api/atmospheres', json={'name': name, 'interval': interval})
             if response.status_code == 200:
                 self.created_atmospheres.append(name)
             return response.json()

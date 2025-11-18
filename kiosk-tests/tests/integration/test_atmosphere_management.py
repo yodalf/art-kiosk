@@ -13,7 +13,7 @@ def test_req_atm_001_create_atmosphere(api_client, server_state):
     """REQ-ATM-001: POST /api/atmospheres SHALL create new atmosphere."""
     response = api_client.post('/api/atmospheres', json={
         'name': 'SunnyDay',
-        'cadence': 7200
+        'interval': 7200
     })
     assert response.status_code == 200
 
@@ -24,13 +24,13 @@ def test_req_atm_001_create_atmosphere(api_client, server_state):
 @pytest.mark.integration
 @pytest.mark.atmospheres
 def test_req_atm_002_default_cadence(api_client, server_state):
-    """REQ-ATM-002: New atmospheres SHALL have default cadence of 3600 seconds."""
+    """REQ-ATM-002: New atmospheres SHALL have default interval of 3600 seconds."""
     server_state.create_atmosphere('DefaultCadence')
 
     settings = api_client.get('/api/settings').json()
     atmosphere = settings['atmospheres']['DefaultCadence']
 
-    assert atmosphere['cadence'] == 3600
+    assert atmosphere['interval'] == 3600
 
 
 @pytest.mark.integration
@@ -107,17 +107,17 @@ def test_req_atm_005_atmosphere_combines_themes(api_client, image_uploader, serv
 @pytest.mark.integration
 @pytest.mark.atmospheres
 def test_req_atm_006_update_cadence(api_client, server_state):
-    """REQ-ATM-006: POST /api/atmospheres/<name>/cadence SHALL update cadence."""
+    """REQ-ATM-006: POST /api/atmospheres/<name>/interval SHALL update interval."""
     server_state.create_atmosphere('CadenceUpdate')
 
-    response = api_client.post('/api/atmospheres/CadenceUpdate/cadence', json={
-        'cadence': 1800
+    response = api_client.post('/api/atmospheres/CadenceUpdate/interval', json={
+        'interval': 1800
     })
     assert response.status_code == 200
 
     # Verify
     settings = api_client.get('/api/settings').json()
-    assert settings['atmospheres']['CadenceUpdate']['cadence'] == 1800
+    assert settings['atmospheres']['CadenceUpdate']['interval'] == 1800
 
 
 @pytest.mark.integration
@@ -156,8 +156,8 @@ def test_req_atm_008_delete_resets_if_active(api_client, server_state):
 @pytest.mark.integration
 @pytest.mark.atmospheres
 def test_req_atm_009_cadence_controls_transitions(test_mode, api_client, server_state):
-    """REQ-ATM-009: Atmosphere cadence SHALL control theme transition timing."""
-    server_state.create_atmosphere('FastCadence', cadence=5)
+    """REQ-ATM-009: Atmosphere interval SHALL control theme transition timing."""
+    server_state.create_atmosphere('FastCadence', interval=5)
     server_state.create_theme('FastTheme1')
     server_state.create_theme('FastTheme2')
 
@@ -169,9 +169,9 @@ def test_req_atm_009_cadence_controls_transitions(test_mode, api_client, server_
     # Activate atmosphere
     api_client.post('/api/atmospheres/active', json={'atmosphere': 'FastCadence'})
 
-    # Get the cadence value
+    # Get the interval value
     settings = api_client.get('/api/settings').json()
-    cadence = settings['atmospheres']['FastCadence']['cadence']
+    interval = settings['atmospheres']['FastCadence']['interval']
 
-    # Verify cadence is set
-    assert cadence == 5
+    # Verify interval is set
+    assert interval == 5
