@@ -815,9 +815,12 @@ def delete_theme(theme_name):
             image_themes[img_name].remove(theme_name)
     settings['image_themes'] = image_themes
 
-    # Clear active theme if it was the deleted one
+    # Switch to 'All Images' if deleting the active theme
     if settings.get('active_theme') == theme_name:
-        settings['active_theme'] = None
+        settings['active_theme'] = 'All Images'
+        # Update interval to All Images' interval
+        if 'All Images' in themes:
+            settings['interval'] = themes['All Images'].get('interval', 3600)
 
     save_settings(settings)
     return jsonify({'success': True})
