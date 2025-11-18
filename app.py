@@ -506,14 +506,15 @@ def toggle_image(filename):
     if not filepath.exists():
         return jsonify({'error': 'File not found'}), 404
 
-    data = request.json
-    enabled = data.get('enabled', True)
-    set_image_enabled(filename, enabled)
+    # Get current state and toggle it
+    current_state = is_image_enabled(filename)
+    new_state = not current_state
+    set_image_enabled(filename, new_state)
 
     # Notify clients that image list changed
     notify_image_list_change()
 
-    return jsonify({'success': True, 'enabled': enabled})
+    return jsonify({'success': True, 'enabled': new_state})
 
 
 def get_current_interval(settings):
