@@ -21,9 +21,15 @@ ExecStartPre=-/usr/bin/xset s noblank
 # Wait for server to respond before launching Firefox
 ExecStartPre=/bin/bash -c 'until curl -s http://localhost/view > /dev/null; do sleep 1; done'
 ExecStart=/home/realo/kiosk_images/start-firefox-kiosk.sh
+# Ensure all Firefox processes are killed on stop
+ExecStop=/usr/bin/pkill -u realo firefox
+ExecStopPost=/usr/bin/pkill -u realo unclutter
+ExecStopPost=/bin/sleep 2
+ExecStopPost=/usr/bin/pkill -9 -u realo firefox
 Restart=always
 RestartSec=10
 KillMode=control-group
+TimeoutStopSec=10
 
 [Install]
 WantedBy=graphical.target

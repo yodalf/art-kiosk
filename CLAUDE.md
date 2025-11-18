@@ -10,6 +10,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Wait for explicit "push" or "push to github" instruction before running `git push`
 - This applies to all future sessions and conversations
 
+## Deployment to Raspberry Pi
+
+**CRITICAL**: When deploying file changes to the Raspberry Pi kiosk, ALWAYS follow this process:
+
+```bash
+# 1. Stop both services first
+sshpass -p "toto" ssh -o StrictHostKeyChecking=no realo@raspberrypi.local "sudo systemctl stop kiosk-display.service && sudo systemctl stop kiosk-firefox.service"
+
+# 2. Copy updated files
+sshpass -p "toto" scp -o StrictHostKeyChecking=no /path/to/local/file realo@raspberrypi.local:/home/realo/kiosk_images/path/to/file
+
+# 3. Start both services
+sshpass -p "toto" ssh -o StrictHostKeyChecking=no realo@raspberrypi.local "sudo systemctl start kiosk-display.service && sudo systemctl start kiosk-firefox.service"
+
+# 4. Verify services are running
+sshpass -p "toto" ssh -o StrictHostKeyChecking=no realo@raspberrypi.local "sudo systemctl status kiosk-display.service"
+```
+
+**Why this matters**: Updating files while services are running can confuse the system and cause race conditions. Always stop both services before updating any files, then restart both after deployment.
+
 ## Project Overview
 
 Art Kiosk is a web-based image display system for Raspberry Pi with a 2560x2880 portrait monitor. It provides:

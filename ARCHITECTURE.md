@@ -188,6 +188,15 @@ graph TB
     "Morning": ["Nature"]
   },
   "active_atmosphere": null,
+  "day_scheduling_enabled": false,
+  "day_times": {
+    "1": {"start_hour": 6, "atmospheres": ["Morning"]},
+    "2": {"start_hour": 8, "atmospheres": []},
+    "3": {"start_hour": 10, "atmospheres": []},
+    "4": {"start_hour": 12, "atmospheres": ["Evening"]},
+    "5": {"start_hour": 14, "atmospheres": []},
+    "6": {"start_hour": 16, "atmospheres": []}
+  },
   "shuffle_id": 0.123456789,
   "image_crops": {
     "photo1.jpg": {
@@ -203,17 +212,24 @@ graph TB
 ```
 
 **Fields**:
-- `interval` (I): Current slideshow transition interval in seconds (synced with active theme/atmosphere interval)
+- `interval` (I): Current slideshow cadence in seconds (dynamically determined: Day scheduling atmosphere > active atmosphere > active theme)
 - `check_interval` (C): How often to check for changes (always 2)
 - `enabled_images`: Per-image enabled/disabled state
 - `dissolve_enabled`: Enable smooth fade transitions (always true)
-- `themes`: Dictionary of theme definitions, each theme has its own `interval` in seconds (default: 3600 = 60 minutes)
+- `themes`: Dictionary of theme definitions, each theme has its own `interval` (cadence) in seconds (default: 3600 = 60 minutes)
   - **"All Images"**: Permanent theme that cannot be deleted, shows all enabled images regardless of theme assignments
 - `image_themes`: Image-to-theme mappings (many-to-many)
-- `active_theme`: Currently selected theme (always set, defaults to "All Images"). Active theme's interval is used for slideshow when no atmosphere is active.
-- `atmospheres`: Dictionary of atmosphere definitions, each with its own `interval` in seconds
-- `atmosphere_themes`: Atmosphere-to-theme mappings (one-to-many, atmospheres contain themes)
-- `active_atmosphere`: Currently selected atmosphere (null if none active). Takes priority over active_theme for filtering and interval.
+- `active_theme`: Currently selected theme (always set, defaults to "All Images"). Active theme's cadence is used when no atmosphere or Day scheduling is active.
+- `atmospheres`: Dictionary of atmosphere definitions, each with its own `interval` (cadence) in seconds
+  - **"All Images"**: Permanent atmosphere that cannot be deleted, shows all enabled images (empty themes list)
+- `atmosphere_themes`: Atmosphere-to-theme mappings (one-to-many, atmospheres contain themes). Empty list for "All Images" means show all images.
+- `active_atmosphere`: Currently selected atmosphere (null if none active). Takes priority over active_theme for filtering and cadence. Atmosphere cadence always takes precedence over theme cadence.
+- `day_scheduling_enabled`: Boolean flag enabling time-based atmosphere rotation
+- `day_times`: 6 configurable time periods (2 hours each, repeating every 12 hours):
+  - Times 1-6 are source times; times 7-12 mirror them (e.g., time 1 at 6 AM mirrors at 6 PM)
+  - Each has `start_hour` and `atmospheres` list
+  - Empty atmospheres list defaults to `["All Images"]`
+  - When Day scheduling is enabled, overrides manual atmosphere selection
 - `shuffle_id`: Random seed for consistent image ordering. Regenerates on theme/atmosphere change to create new random order.
 - `image_crops`: Per-image crop data containing x, y, width, height coordinates in original image space, plus original imageWidth and imageHeight for scaling calculations
 
@@ -254,12 +270,19 @@ graph TB
 - `POST /api/themes/active` - Set active theme (clears active_atmosphere, updates global interval, regenerates shuffle_id)
 
 ### Atmospheres
-- `GET /api/atmospheres` - List all atmospheres
-- `POST /api/atmospheres` - Create atmosphere (`{"name": "Atmosphere Name"}`, default interval: 3600 seconds)
-- `DELETE /api/atmospheres/<name>` - Delete atmosphere
-- `POST /api/atmospheres/<name>/interval` - Update atmosphere interval (seconds)
+- `GET /api/atmospheres` - List all atmospheres (includes "All Images" permanent atmosphere)
+- `POST /api/atmospheres` - Create atmosphere (`{"name": "Atmosphere Name"}`, default cadence: 3600 seconds)
+- `DELETE /api/atmospheres/<name>` - Delete atmosphere (cannot delete "All Images")
+- `POST /api/atmospheres/<name>/interval` - Update atmosphere cadence (seconds)
 - `POST /api/atmospheres/active` - Set active atmosphere (`{"atmosphere_name": "Name"}` or null, clears active_theme, regenerates shuffle_id)
 - `POST /api/atmospheres/<name>/themes` - Update themes in atmosphere (`{"themes": ["Theme1", "Theme2"]}`)
+
+### Day Scheduling
+- `GET /api/day/status` - Get Day scheduling status, current time period, and day_times configuration
+- `POST /api/day/toggle` - Enable/disable Day scheduling (`{"enabled": true}`, clears active_atmosphere when disabled)
+- `POST /api/day/times/<time_id>/atmospheres` - Update atmospheres for time period (`{"atmospheres": ["Atm1", "Atm2"]}`)
+  - Automatically mirrors changes to corresponding time periods (times 7-12 mirror times 1-6)
+  - Regenerates shuffle_id when changing time atmospheres
 
 ### Remote Control
 - WebSocket `send_command` - Send command to kiosk (real-time via Socket.IO)

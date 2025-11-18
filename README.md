@@ -7,8 +7,10 @@ A web-based kiosk system for displaying images in slideshow mode, optimized for 
 - **Single-Page App** - Unified navigation across all sections without opening new tabs
 - Web-based image upload and management
 - **Dark theme interface** - Professional black background across all pages
-- **Atmospheres** - Hierarchical organization layer above themes for complex content management
-- **Themes** - Organize images into multiple themes with per-theme intervals; images can belong to multiple themes
+- **Day Scheduling** - Automatically switch atmospheres throughout the day based on time periods (12-hour repeating pattern with 6 configurable 2-hour slots)
+- **Atmospheres** - Hierarchical organization layer above themes with configurable cadence (slideshow interval); atmosphere cadence always takes precedence over theme cadence
+- **Themes** - Organize images into multiple themes with per-theme cadence; images can belong to multiple themes
+- **"All Images" atmosphere and theme** - Permanent defaults that show all enabled images regardless of assignments (cannot be deleted)
 - **Randomized ordering** - Images display in random order that changes with each theme/atmosphere switch
 - **Image cropping** - Crop images to select specific regions that fill the entire kiosk display
 - **Enable/disable individual images** - Control which images appear in the slideshow with checkboxes
@@ -16,7 +18,7 @@ A web-based kiosk system for displaying images in slideshow mode, optimized for 
 - **Remote control** - Control the kiosk from any device on your network
 - **Click-to-jump** - Click any image thumbnail to immediately display it on the kiosk
 - **Smooth dissolve transitions** - Optional fade effect between images
-- Automatic slideshow with configurable intervals
+- Automatic slideshow with configurable cadence (intervals)
 - Real-time image scaling optimized for 2560x2880 portrait displays
 - Firefox fullscreen/kiosk mode support
 - Hidden mouse cursor for clean display
@@ -186,12 +188,14 @@ This installs two systemd services:
 - **kiosk-display.service** - Flask server (starts first)
   - Automatically kills any process using port 80 before starting
   - Binds to port 80 using Linux capabilities (no root required)
+  - Ensures clean port cleanup on service stop/restart
 - **kiosk-firefox.service** - Firefox in kiosk mode (starts after server is ready)
   - Uses **start-firefox-kiosk.sh** for automatic Firefox profile management
   - Automatically cleans up old Firefox processes and profiles to prevent corruption
   - Creates fresh Firefox profile on each start with kiosk-optimized settings
   - Waits for server to respond before launching Firefox
   - Disables screen blanking and hides cursor
+  - **Multi-stage cleanup on stop**: Graceful termination → wait → force kill to ensure all Firefox instances are destroyed
 
 **Manual Installation** (if you prefer to install manually):
 
@@ -264,14 +268,25 @@ Configure settings through the management interface at `/`, or edit `settings.js
   },
   "active_theme": "All Images",
   "atmospheres": {
+    "All Images": {"name": "All Images", "created": 1234567890, "interval": 3600},
     "Evening": {"name": "Evening", "created": 1234567893, "interval": 1800},
     "Morning": {"name": "Morning", "created": 1234567894, "interval": 3600}
   },
   "atmosphere_themes": {
+    "All Images": [],
     "Evening": ["Nature", "Urban"],
     "Morning": ["Nature"]
   },
   "active_atmosphere": null,
+  "day_scheduling_enabled": false,
+  "day_times": {
+    "1": {"start_hour": 6, "atmospheres": ["Morning"]},
+    "2": {"start_hour": 8, "atmospheres": []},
+    "3": {"start_hour": 10, "atmospheres": []},
+    "4": {"start_hour": 12, "atmospheres": ["Evening"]},
+    "5": {"start_hour": 14, "atmospheres": []},
+    "6": {"start_hour": 16, "atmospheres": []}
+  },
   "shuffle_id": 0.123456789,
   "image_crops": {
     "photo1.jpg": {
@@ -286,33 +301,65 @@ Configure settings through the management interface at `/`, or edit `settings.js
 }
 ```
 
-- **interval** (I): Current slideshow interval in seconds (synced with active theme/atmosphere interval)
+- **interval** (I): Current slideshow cadence in seconds (dynamically determined based on active atmosphere/theme)
 - **check_interval** (C): Time in seconds between checks for changes (default: 2)
 - **dissolve_enabled**: Smooth dissolve transition between images (always true)
-- **themes**: Dictionary of defined themes, each with its own interval in seconds
+- **themes**: Dictionary of defined themes, each with its own cadence (interval) in seconds
   - **"All Images"**: Permanent default theme (cannot be deleted), shows all enabled images
 - **image_themes**: Mapping of image names to their theme lists
 - **active_theme**: Currently active theme (defaults to "All Images")
-- **atmospheres**: Dictionary of defined atmospheres, each with its own interval
-- **atmosphere_themes**: Mapping of atmosphere names to theme lists
+- **atmospheres**: Dictionary of defined atmospheres, each with its own cadence (interval)
+  - **"All Images"**: Permanent default atmosphere (cannot be deleted), shows all enabled images
+- **atmosphere_themes**: Mapping of atmosphere names to theme lists (empty list for "All Images")
 - **active_atmosphere**: Currently active atmosphere (null if none active)
+- **day_scheduling_enabled**: Whether Day scheduling is active (overrides manual atmosphere selection)
+- **day_times**: 6 time periods (2 hours each, repeating every 12 hours) with atmosphere assignments
+  - Times 1-6 are source times; times 7-12 mirror them automatically
+  - Empty atmospheres list defaults to "All Images" atmosphere
 - **shuffle_id**: Random seed for image ordering (regenerates on theme/atmosphere change)
 - **image_crops**: Mapping of image names to crop regions (x, y, width, height in original image coordinates)
+
+### Day Scheduling
+
+Automatically rotate atmospheres throughout the day based on time periods:
+
+1. **Enable Day Scheduling** - Toggle the "Day Scheduling" switch in the management interface
+2. **Configure Time Periods** - 6 configurable 2-hour time slots that repeat every 12 hours:
+   - Time 1: 6 AM - 8 AM (mirrors at 6 PM - 8 PM)
+   - Time 2: 8 AM - 10 AM (mirrors at 8 PM - 10 PM)
+   - Time 3: 10 AM - 12 PM (mirrors at 10 PM - 12 AM)
+   - Time 4: 12 PM - 2 PM (mirrors at 12 AM - 2 AM)
+   - Time 5: 2 PM - 4 PM (mirrors at 2 AM - 4 AM)
+   - Time 6: 4 PM - 6 PM (mirrors at 4 AM - 6 AM)
+3. **Assign Atmospheres** - Drag atmospheres to time slots or use the dropdown
+4. **Automatic Switching** - The system automatically switches to the current time period's atmospheres
+5. **Cadence Priority** - Atmosphere cadence (interval) always takes precedence over theme cadence
+6. **Green Border Highlighting** - The current time period is highlighted with a green border
+
+When Day Scheduling is enabled:
+- Manual atmosphere selection is disabled
+- The system displays images from the current time period's atmospheres
+- If a time period has multiple atmospheres, all their themes are combined
+- If a time period has no atmospheres, it defaults to "All Images" atmosphere
+- The cadence is determined by the first atmosphere in the current time period
+- Switching between time periods automatically updates the cadence
 
 ### Atmospheres
 
 Atmospheres provide a hierarchical organization layer above themes (Atmospheres → Themes → Images):
 
-1. **Create atmospheres** - Click "New Atmosphere", enter name, press Enter
-2. **Assign themes** - Click the "Themes" button on an atmosphere badge to select which themes belong to it
-3. **Set interval** - Click the interval display to edit the slideshow duration for that atmosphere
-4. **Activate atmosphere** - Click the atmosphere name to activate it and display all images from all its themes
-5. **Mutual exclusivity** - Activating an atmosphere deselects any active theme, and vice versa
-6. **Random ordering** - Each atmosphere displays images in a random order that changes every time you switch
+1. **Default atmosphere** - "All Images" is a permanent atmosphere that shows all enabled images (cannot be deleted)
+2. **Create atmospheres** - Click "New Atmosphere", enter name, press Enter
+3. **Assign themes** - Click the "Themes" button on an atmosphere badge to select which themes belong to it
+4. **Set cadence** - Click the cadence display to edit the slideshow interval for that atmosphere
+5. **Activate atmosphere** - Click the atmosphere name to activate it and display all images from all its themes (disabled when Day Scheduling is active)
+6. **Mutual exclusivity** - Activating an atmosphere deselects any active theme, and vice versa
+7. **Random ordering** - Each atmosphere displays images in a random order that changes every time you switch
 
 When an atmosphere is active:
 - All images from all themes in that atmosphere are shown
-- The atmosphere's interval setting is used for the slideshow
+- The atmosphere's cadence (interval) is used for the slideshow
+- Atmosphere cadence always takes precedence over theme cadence
 - Images display in randomized order
 
 ### Themes
@@ -483,10 +530,15 @@ The debug console shows:
 **Atmospheres:**
 - `GET /api/atmospheres` - List all atmospheres
 - `POST /api/atmospheres` - Create a new atmosphere (`{"name": "Atmosphere Name"}`)
-- `DELETE /api/atmospheres/<atmosphere_name>` - Delete an atmosphere
+- `DELETE /api/atmospheres/<atmosphere_name>` - Delete an atmosphere (cannot delete "All Images")
 - `POST /api/atmospheres/active` - Set active atmosphere (`{"atmosphere_name": "Atmosphere Name"}` or null)
-- `POST /api/atmospheres/<atmosphere_name>/interval` - Update atmosphere interval (seconds)
+- `POST /api/atmospheres/<atmosphere_name>/interval` - Update atmosphere cadence in seconds
 - `POST /api/atmospheres/<atmosphere_name>/themes` - Update themes in atmosphere (`{"themes": ["Theme1", "Theme2"]}`)
+
+**Day Scheduling:**
+- `GET /api/day/status` - Get Day scheduling status and current time period
+- `POST /api/day/toggle` - Enable/disable Day scheduling (`{"enabled": true}`)
+- `POST /api/day/times/<time_id>/atmospheres` - Update atmospheres for a time period (`{"atmospheres": ["Atmosphere1", "Atmosphere2"]}`)
 
 ## Convenience Scripts
 

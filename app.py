@@ -73,8 +73,16 @@ def get_settings():
         },  # Theme name -> theme info
         'image_themes': {},  # Image name -> list of theme names
         'active_theme': 'All Images',  # Default to All Images theme
-        'atmospheres': {},  # Atmosphere name -> atmosphere info
-        'atmosphere_themes': {},  # Atmosphere name -> list of theme names
+        'atmospheres': {
+            'All Images': {
+                'name': 'All Images',
+                'created': time.time(),
+                'interval': 3600  # 60 minutes
+            }
+        },  # Atmosphere name -> atmosphere info
+        'atmosphere_themes': {
+            'All Images': []  # All Images atmosphere shows all themes
+        },  # Atmosphere name -> list of theme names
         'active_atmosphere': None,  # No atmosphere active by default
         'day_scheduling_enabled': False,  # Enable/disable Day scheduling
         'day_times': {
@@ -132,8 +140,18 @@ def get_settings():
                 settings['active_theme'] = 'All Images'
             if 'atmospheres' not in settings:
                 settings['atmospheres'] = {}
+            # Ensure "All Images" atmosphere always exists
+            if 'All Images' not in settings['atmospheres']:
+                settings['atmospheres']['All Images'] = {
+                    'name': 'All Images',
+                    'created': time.time(),
+                    'interval': 3600
+                }
             if 'atmosphere_themes' not in settings:
                 settings['atmosphere_themes'] = {}
+            # Ensure "All Images" atmosphere has empty themes list (shows all)
+            if 'All Images' not in settings['atmosphere_themes']:
+                settings['atmosphere_themes']['All Images'] = []
             if 'active_atmosphere' not in settings:
                 settings['active_atmosphere'] = None
             if 'shuffle_id' not in settings:
@@ -224,6 +242,7 @@ def get_current_time_period():
 def get_active_atmospheres_for_time(time_period, settings):
     """Get atmospheres for a time period, handling mirroring.
     Times 7-12 mirror times 1-6 (12-hour repeat pattern).
+    If no atmospheres are assigned, returns ['All Images'].
     """
     day_times = settings.get('day_times', {})
 
@@ -238,7 +257,13 @@ def get_active_atmospheres_for_time(time_period, settings):
     }
 
     source_time = mirror_map.get(time_period, time_period)
-    return day_times.get(source_time, {}).get('atmospheres', [])
+    atmospheres = day_times.get(source_time, {}).get('atmospheres', [])
+
+    # If no atmospheres assigned, default to "All Images"
+    if not atmospheres:
+        return ['All Images']
+
+    return atmospheres
 
 
 @app.route('/')
@@ -313,7 +338,12 @@ def list_images():
                 allowed_themes = None  # None means show all images (like "All Images" theme)
         elif active_atmosphere:
             # If atmosphere is active (no day scheduling), get all themes in that atmosphere
-            allowed_themes = set(atmosphere_themes.get(active_atmosphere, []))
+            atm_themes = atmosphere_themes.get(active_atmosphere, [])
+            # Special case: "All Images" atmosphere or empty themes list means show all images
+            if active_atmosphere == 'All Images' or not atm_themes:
+                allowed_themes = None
+            else:
+                allowed_themes = set(atm_themes)
         elif active_theme and active_theme != 'All Images':
             # If only a theme is active (no atmosphere), use that theme
             allowed_themes = {active_theme}
@@ -467,10 +497,57 @@ def toggle_image(filename):
     return jsonify({'success': True, 'enabled': enabled})
 
 
+def get_current_interval(settings):
+    """
+    Determine the current interval (cadence) based on priority:
+    1. Day scheduling enabled → use first atmosphere's interval from current time period
+    2. Active atmosphere set → use atmosphere's interval
+    3. Active theme set → use theme's interval
+    4. Default → use settings['interval']
+
+    Atmosphere cadence always takes precedence over theme cadence.
+    """
+    day_scheduling_enabled = settings.get('day_scheduling_enabled', False)
+
+    if day_scheduling_enabled:
+        # Day scheduling is active - use current time period's first atmosphere interval
+        current_time = get_current_time_period()
+        time_atmospheres = get_active_atmospheres_for_time(current_time, settings)
+
+        if time_atmospheres:
+            # Use the first atmosphere's interval
+            atmospheres = settings.get('atmospheres', {})
+            first_atm = time_atmospheres[0]
+            if first_atm in atmospheres:
+                return atmospheres[first_atm].get('interval', 3600)
+
+    # If no day scheduling or no atmospheres in time period, check active atmosphere
+    active_atmosphere = settings.get('active_atmosphere')
+    if active_atmosphere:
+        atmospheres = settings.get('atmospheres', {})
+        if active_atmosphere in atmospheres:
+            return atmospheres[active_atmosphere].get('interval', 3600)
+
+    # Fall back to active theme interval
+    active_theme = settings.get('active_theme')
+    if active_theme:
+        themes = settings.get('themes', {})
+        if active_theme in themes:
+            return themes[active_theme].get('interval', 3600)
+
+    # Final fallback to settings interval
+    return settings.get('interval', 3600)
+
+
 @app.route('/api/settings', methods=['GET'])
 def get_settings_api():
-    """Get current settings."""
-    return jsonify(get_settings())
+    """Get current settings with dynamically calculated interval."""
+    settings = get_settings()
+
+    # Override interval with the correct current interval based on atmosphere/theme precedence
+    settings['interval'] = get_current_interval(settings)
+
+    return jsonify(settings)
 
 
 @app.route('/api/settings', methods=['POST'])
@@ -864,6 +941,10 @@ def create_atmosphere():
 @app.route('/api/atmospheres/<atmosphere_name>', methods=['DELETE'])
 def delete_atmosphere(atmosphere_name):
     """Delete an atmosphere."""
+    # Prevent deletion of "All Images" atmosphere
+    if atmosphere_name == 'All Images':
+        return jsonify({'error': 'Cannot delete "All Images" atmosphere'}), 400
+
     settings = get_settings()
     atmospheres = settings.get('atmospheres', {})
 
@@ -1046,41 +1127,43 @@ def update_time_atmospheres(time_id):
         # Update atmospheres for this time
         day_times[time_id]['atmospheres'] = atmospheres
 
-    # Handle mirroring: update all mirrored times
-    # Times 1-6 are the source, times 7-12 mirror them
-    mirror_groups = {
-        '1': ['7'],   # 6 AM mirrors at 6 PM
-        '2': ['8'],   # 8 AM mirrors at 8 PM
-        '3': ['9'],   # 10 AM mirrors at 10 PM
-        '4': ['10'],  # 12 PM mirrors at 12 AM
-        '5': ['11'],  # 2 PM mirrors at 2 AM
-        '6': ['12']   # 4 PM mirrors at 4 AM
-    }
-
-    mirrored_ids = []
-
-    # If updating a source time (1-6), update its mirror
-    if time_id in mirror_groups:
-        for mirror_id in mirror_groups[time_id]:
-            day_times[mirror_id]['atmospheres'] = atmospheres
-            mirrored_ids.append(mirror_id)
-    # If updating a mirror time (7-12), update the source
-    else:
-        # Find which source this mirrors
-        source_map = {
-            '7': '1', '8': '2', '9': '3',
-            '10': '4', '11': '5', '12': '6'
+        # Handle mirroring: update all mirrored times
+        # Times 1-6 are the source, times 7-12 mirror them
+        mirror_groups = {
+            '1': ['7'],   # 6 AM mirrors at 6 PM
+            '2': ['8'],   # 8 AM mirrors at 8 PM
+            '3': ['9'],   # 10 AM mirrors at 10 PM
+            '4': ['10'],  # 12 PM mirrors at 12 AM
+            '5': ['11'],  # 2 PM mirrors at 2 AM
+            '6': ['12']   # 4 PM mirrors at 4 AM
         }
-        source_id = source_map.get(time_id)
-        if source_id:
-            # Update source
-            day_times[source_id]['atmospheres'] = atmospheres
-            mirrored_ids.append(source_id)
-            # Update the mirror (if not self)
-            for mirror_id in mirror_groups[source_id]:
-                if mirror_id != time_id:  # Don't update self again
+
+        mirrored_ids = []
+
+        # If updating a source time (1-6), update its mirror
+        if time_id in mirror_groups:
+            for mirror_id in mirror_groups[time_id]:
+                if mirror_id in day_times:  # Only update if mirror exists
                     day_times[mirror_id]['atmospheres'] = atmospheres
                     mirrored_ids.append(mirror_id)
+        # If updating a mirror time (7-12), update the source
+        else:
+            # Find which source this mirrors
+            source_map = {
+                '7': '1', '8': '2', '9': '3',
+                '10': '4', '11': '5', '12': '6'
+            }
+            source_id = source_map.get(time_id)
+            if source_id:
+                # Update source
+                if source_id in day_times:  # Only update if source exists
+                    day_times[source_id]['atmospheres'] = atmospheres
+                    mirrored_ids.append(source_id)
+                # Update the mirror (if not self)
+                for mirror_id in mirror_groups[source_id]:
+                    if mirror_id != time_id and mirror_id in day_times:  # Only update if mirror exists
+                        day_times[mirror_id]['atmospheres'] = atmospheres
+                        mirrored_ids.append(mirror_id)
 
         settings['day_times'] = day_times
 
