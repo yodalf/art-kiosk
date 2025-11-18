@@ -445,29 +445,29 @@
                 const imgW = cropData.imageWidth;
                 const imgH = cropData.imageHeight;
 
-                // Calculate scale to make crop region fill viewport completely (cover behavior)
-                // Use Math.max to ensure the crop region fills the entire viewport
+                // Calculate scale to make crop region fill viewport EXACTLY with non-uniform scaling
+                // This allows distortion to show the entire crop zone with no black bars
                 const scaleX = viewportW / cropW;
                 const scaleY = viewportH / cropH;
-                const scale = Math.max(scaleX, scaleY);
 
-                // Calculate scaled image dimensions
-                const scaledImgW = imgW * scale;
-                const scaledImgH = imgH * scale;
+                debugLog(`  Using non-uniform scale: scaleX=${scaleX.toFixed(2)}, scaleY=${scaleY.toFixed(2)}`, 'info');
 
-                // Calculate scaled crop dimensions
-                const scaledCropW = cropW * scale;
-                const scaledCropH = cropH * scale;
+                // Calculate scaled image dimensions using different scales for X and Y
+                const scaledImgW = imgW * scaleX;
+                const scaledImgH = imgH * scaleY;
+
+                // Calculate scaled crop dimensions - should match viewport exactly
+                const scaledCropW = cropW * scaleX;  // Should equal viewportW
+                const scaledCropH = cropH * scaleY;  // Should equal viewportH
 
                 // Calculate position to place crop region
-                // Move image so crop region starts at correct position
-                const offsetX = -cropX * scale;
-                const offsetY = -cropY * scale;
+                // Move image so crop region starts at correct position (using non-uniform scales)
+                const offsetX = -cropX * scaleX;
+                const offsetY = -cropY * scaleY;
 
-                // Center the crop region in viewport ONLY if crop is smaller than viewport
-                // If crop is larger than viewport, align to top-left (0,0) to show the actual crop
-                const centerX = scaledCropW < viewportW ? (viewportW - scaledCropW) / 2 : 0;
-                const centerY = scaledCropH < viewportH ? (viewportH - scaledCropH) / 2 : 0;
+                // No centering needed - crop should exactly match viewport dimensions
+                const centerX = 0;
+                const centerY = 0;
 
                 // Apply styles with !important to override any CSS
                 // First, explicitly remove any problematic CSS properties
@@ -499,7 +499,7 @@
                 debugLog(`  Original Image: ${imgW}x${imgH}`, 'info');
                 debugLog(`  Crop Region: ${cropW.toFixed(0)}x${cropH.toFixed(0)} (aspect ${cropAspect.toFixed(2)})`, 'info');
                 debugLog(`  Crop Position in Original: x=${cropX.toFixed(0)}, y=${cropY.toFixed(0)}`, 'info');
-                debugLog(`  Scale X: ${scaleX.toFixed(2)}, Scale Y: ${scaleY.toFixed(2)} -> Using: ${scale.toFixed(2)}`, 'info');
+                debugLog(`  Scale X: ${scaleX.toFixed(2)}, Scale Y: ${scaleY.toFixed(2)} (non-uniform scaling)`, 'info');
                 debugLog(`  Scaled Image: ${scaledImgW.toFixed(0)}x${scaledImgH.toFixed(0)}`, 'info');
                 debugLog(`  Scaled Crop: ${scaledCropW.toFixed(0)}x${scaledCropH.toFixed(0)}`, 'info');
                 debugLog(`  Offset (from crop position): x=${offsetX.toFixed(0)}, y=${offsetY.toFixed(0)}`, 'info');
