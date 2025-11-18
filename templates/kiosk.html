@@ -116,6 +116,14 @@
         let daySchedulingEnabled = false; // Track if day scheduling is enabled
         let lastCheckHour = null; // Track last hour we checked for day scheduling transitions
 
+        // Test mode support (for automated testing)
+        let testMode = {
+            enabled: false,  // Test mode active flag
+            mockTime: null,  // Override time for hour boundary checks
+            checkIntervalTimer: null,  // Store reference to check interval timer (for polling in test mode)
+            forceInterval: null  // Override slideshow interval (milliseconds)
+        };
+
         // Debug logging function - sends to both console and server
         function debugLog(message, level = 'info') {
             console.log(message);
@@ -204,7 +212,8 @@
                 return; // Not in day scheduling mode
             }
 
-            const now = new Date();
+            // Use mock time if in test mode, otherwise use real time
+            const now = testMode.mockTime !== null ? new Date(testMode.mockTime * 1000) : new Date();
             const currentHour = now.getHours();
 
             if (lastCheckHour === null) {
@@ -1163,6 +1172,67 @@
         socket.on('image_list_changed', () => {
             debugLog('Image list changed via WebSocket', 'info');
             checkForImageChanges();
+        });
+
+        // Test mode event listeners
+        socket.on('test_mode_enabled', (data) => {
+            debugLog('TEST MODE: Enabled', 'info');
+            testMode.enabled = true;
+        });
+
+        socket.on('test_mode_disabled', () => {
+            debugLog('TEST MODE: Disabled - resetting all overrides', 'info');
+            testMode.enabled = false;
+            testMode.mockTime = null;
+            testMode.forceInterval = null;
+
+            // Stop check interval timer if running
+            if (testMode.checkIntervalTimer) {
+                clearInterval(testMode.checkIntervalTimer);
+                testMode.checkIntervalTimer = null;
+                debugLog('TEST MODE: Check interval polling stopped', 'info');
+            }
+        });
+
+        socket.on('test_time_changed', (data) => {
+            testMode.mockTime = data.timestamp;
+            debugLog(`TEST MODE: Mock time set to ${new Date(testMode.mockTime * 1000).toLocaleString()}`, 'info');
+            // Force hour boundary check with new time
+            checkHourBoundary();
+        });
+
+        socket.on('test_intervals_changed', (data) => {
+            debugLog(`TEST MODE: Intervals changed - slideshow: ${data.slideshow_interval}ms, check: ${data.check_interval}ms`, 'info');
+
+            if (data.slideshow_interval !== null && data.slideshow_interval !== undefined) {
+                testMode.forceInterval = data.slideshow_interval;
+                interval = data.slideshow_interval;
+                debugLog(`  Slideshow interval updated to ${interval}ms`, 'info');
+                // Restart slideshow with new interval
+                if (slideTimer) {
+                    clearInterval(slideTimer);
+                    startSlideshow();
+                }
+            }
+
+            if (data.check_interval !== null && data.check_interval !== undefined) {
+                checkInterval = data.check_interval;
+                debugLog(`  Check interval updated to ${checkInterval}ms`, 'info');
+                // In test mode, we use polling instead of WebSocket events
+                // Restart check timer with new interval
+                if (testMode.checkIntervalTimer) {
+                    clearInterval(testMode.checkIntervalTimer);
+                }
+                if (testMode.enabled) {
+                    testMode.checkIntervalTimer = setInterval(checkForImageChanges, checkInterval);
+                    debugLog(`  Check interval polling started (${checkInterval}ms)`, 'info');
+                }
+            }
+        });
+
+        socket.on('test_trigger_hour_check', () => {
+            debugLog('TEST MODE: Manual hour boundary check triggered', 'info');
+            checkHourBoundary();
         });
 
         // Send initial debug message

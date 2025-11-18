@@ -45,6 +45,14 @@ current_kiosk_image = None
 from collections import deque
 debug_messages = deque(maxlen=500)
 
+# Test mode controls (for automated testing)
+test_mode = {
+    'enabled': False,
+    'mock_time': None,  # Unix timestamp to use instead of real time
+    'force_interval': None,  # Override slideshow interval (milliseconds)
+    'force_check_interval': None,  # Override smart reload check interval (milliseconds)
+}
+
 
 def allowed_file(filename):
     """Check if file extension is allowed."""
@@ -210,7 +218,12 @@ def get_current_time_period():
     Times 4-6 mirror 1-3, times 7-9 mirror 1-3, times 10-12 mirror 1-3.
     """
     from datetime import datetime
-    current_hour = datetime.now().hour
+
+    # Use mock time if in test mode
+    if test_mode['enabled'] and test_mode['mock_time'] is not None:
+        current_hour = datetime.fromtimestamp(test_mode['mock_time']).hour
+    else:
+        current_hour = datetime.now().hour
 
     # Map hours to time periods (2-hour blocks)
     if 6 <= current_hour < 8:
@@ -1674,6 +1687,103 @@ def rename_all_to_uuid():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+### Test Mode API Endpoints (for automated testing)
+
+@app.route('/api/test/enable', methods=['POST'])
+def enable_test_mode():
+    """Enable test mode for automated testing."""
+    test_mode['enabled'] = True
+    socketio.emit('test_mode_enabled', test_mode)
+    return jsonify({
+        'success': True,
+        'test_mode': test_mode
+    })
+
+
+@app.route('/api/test/disable', methods=['POST'])
+def disable_test_mode():
+    """Disable test mode and reset all overrides."""
+    test_mode['enabled'] = False
+    test_mode['mock_time'] = None
+    test_mode['force_interval'] = None
+    test_mode['force_check_interval'] = None
+    socketio.emit('test_mode_disabled')
+    return jsonify({
+        'success': True,
+        'test_mode': test_mode
+    })
+
+
+@app.route('/api/test/time', methods=['POST'])
+def set_mock_time():
+    """Set mock time for testing time-dependent features.
+    Request: {"timestamp": 1234567890} (Unix timestamp)
+    """
+    data = request.get_json()
+    test_mode['mock_time'] = data.get('timestamp')
+
+    # Broadcast time change to trigger kiosk updates
+    socketio.emit('test_time_changed', {
+        'timestamp': test_mode['mock_time']
+    })
+
+    return jsonify({
+        'success': True,
+        'mock_time': test_mode['mock_time'],
+        'current_time_period': get_current_time_period()
+    })
+
+
+@app.route('/api/test/intervals', methods=['POST'])
+def set_test_intervals():
+    """Override slideshow and check intervals for faster testing.
+    Request: {
+        "slideshow_interval": 1000,  // milliseconds
+        "check_interval": 500         // milliseconds
+    }
+    """
+    data = request.get_json()
+    test_mode['force_interval'] = data.get('slideshow_interval')
+    test_mode['force_check_interval'] = data.get('check_interval')
+
+    # Broadcast interval change to kiosk
+    socketio.emit('test_intervals_changed', {
+        'slideshow_interval': test_mode['force_interval'],
+        'check_interval': test_mode['force_check_interval']
+    })
+
+    return jsonify({
+        'success': True,
+        'force_interval': test_mode['force_interval'],
+        'force_check_interval': test_mode['force_check_interval']
+    })
+
+
+@app.route('/api/test/status', methods=['GET'])
+def get_test_status():
+    """Get current test mode status."""
+    return jsonify({
+        'test_mode': test_mode,
+        'current_time_period': get_current_time_period() if test_mode['enabled'] else None
+    })
+
+
+@app.route('/api/test/trigger-hour-boundary', methods=['POST'])
+def trigger_hour_boundary():
+    """Manually trigger hour boundary check (for testing).
+    Broadcasts event to kiosk to check hour boundary immediately.
+    """
+    socketio.emit('test_trigger_hour_check')
+    return jsonify({'success': True})
+
+
+@app.route('/api/test/trigger-slideshow-advance', methods=['POST'])
+def trigger_slideshow_advance():
+    """Manually advance slideshow to next image (for testing)."""
+    socketio.emit('remote_command', {'command': 'next'})
+    return jsonify({'success': True})
 
 
 if __name__ == '__main__':
