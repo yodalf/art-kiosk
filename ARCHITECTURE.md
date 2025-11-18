@@ -284,6 +284,8 @@ graph TB
   - Automatically mirrors changes to corresponding time periods (times 7-12 mirror times 1-6)
   - Regenerates shuffle_id when changing time atmospheres
 
+**Hour Boundary Transitions**: When day scheduling is enabled, the kiosk automatically transitions images when crossing hour boundaries (e.g., 8:00 AM), overriding atmosphere/theme cadence settings. This ensures time period changes happen exactly on schedule.
+
 ### Remote Control
 - WebSocket `send_command` - Send command to kiosk (real-time via Socket.IO)
   - Commands: `next`, `prev`, `pause`, `play`, `reload`, `jump`, `jump_extra`, `resume_from_extra`, `refresh_extra_crop`
@@ -500,7 +502,68 @@ if (fitParam === 'true') {
 - **"View Kiosk Display" links**: Include `?fit=true` to start external clients in FIT mode
 - **Extra images**: Respect current fillMode setting when displayed
 
-### 5. Image Randomization with Shuffle ID
+### 5. Hour Boundary Checking for Day Scheduling
+
+**Purpose**: Force immediate image transitions when crossing hour boundaries during day scheduling, ensuring time period changes happen exactly on schedule.
+
+**Implementation**:
+```javascript
+// Track day scheduling state
+let daySchedulingEnabled = false;
+let lastCheckHour = null;
+let hourCheckTimer = null;
+
+// Check every 60 seconds for hour changes
+async function checkHourBoundary() {
+    if (!daySchedulingEnabled) return;
+
+    const now = new Date();
+    const currentHour = now.getHours();
+
+    if (lastCheckHour === null) {
+        lastCheckHour = currentHour;
+        return;
+    }
+
+    if (currentHour !== lastCheckHour) {
+        debugLog(`Hour boundary crossed! ${lastCheckHour}:00 -> ${currentHour}:00`);
+        debugLog(`Day scheduling active - forcing immediate image transition`);
+        lastCheckHour = currentHour;
+        nextSlide(); // Force immediate transition
+    }
+}
+
+// Start/stop checker based on day scheduling status
+function updateHourBoundaryCheck() {
+    if (daySchedulingEnabled) {
+        if (!hourCheckTimer) {
+            hourCheckTimer = setInterval(checkHourBoundary, 60000); // Check every 60s
+            checkHourBoundary(); // Initialize immediately
+        }
+    } else {
+        if (hourCheckTimer) {
+            clearInterval(hourCheckTimer);
+            hourCheckTimer = null;
+            lastCheckHour = null;
+        }
+    }
+}
+```
+
+**Key Points**:
+- **60-second check interval**: Balances accuracy with resource usage
+- **Hour boundary detection**: Compares current hour with previous hour
+- **Immediate transition**: Calls `nextSlide()` to advance to next image instantly
+- **Overrides cadence**: Hour transitions ignore atmosphere/theme interval settings
+- **Auto-start/stop**: Enabled only when day scheduling is active
+- **Debug logging**: Reports hour crossings for troubleshooting
+
+**Behavior**:
+- When crossing from 7:59 to 8:00, the kiosk immediately shows the next image
+- Normal cadence continues between hour boundaries
+- Time period changes are guaranteed to occur within 60 seconds of the hour
+
+### 6. Image Randomization with Shuffle ID
 
 **Purpose**: Provide randomized image order that stays consistent between kiosk and management, but changes with each theme/atmosphere switch.
 

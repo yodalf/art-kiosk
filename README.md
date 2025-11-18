@@ -341,8 +341,9 @@ When Day Scheduling is enabled:
 - The system displays images from the current time period's atmospheres
 - If a time period has multiple atmospheres, all their themes are combined
 - If a time period has no atmospheres, it defaults to "All Images" atmosphere
-- The cadence is determined by the first atmosphere in the current time period
-- Switching between time periods automatically updates the cadence
+- **Hour boundary transitions**: Images automatically transition when crossing into a new hour (e.g., 8:00 AM), overriding cadence settings
+- The cadence controls transitions between hour boundaries
+- "Current Images" heading displays the actual atmosphere(s) from the current time period
 
 ### Atmospheres
 
