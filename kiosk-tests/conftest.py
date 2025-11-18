@@ -295,11 +295,13 @@ def server_state(api_client):
     """
     Helper for managing server state (images, themes, settings).
 
+    IMPORTANT: Saves and restores original state to prevent data loss.
+
     Usage:
         def test_themes(server_state):
             server_state.create_theme('TestTheme')
             # ... test ...
-            server_state.cleanup()
+            # Automatic cleanup on fixture teardown
     """
     class ServerState:
         def __init__(self, client):
@@ -307,6 +309,23 @@ def server_state(api_client):
             self.created_themes = []
             self.created_atmospheres = []
             self.uploaded_images = []
+            self.modified_images = {}  # Track original state of toggled images
+
+            # Save original state
+            self._save_original_state()
+
+        def _save_original_state(self):
+            """Save current server state for restoration."""
+            try:
+                settings = self.client.get('/api/settings').json()
+                self.original_active_theme = settings.get('active_theme')
+                self.original_active_atmosphere = settings.get('active_atmosphere')
+                self.original_day_scheduling = False
+
+                day_status = self.client.get('/api/day/status').json()
+                self.original_day_scheduling = day_status.get('enabled', False)
+            except:
+                pass
 
         def create_theme(self, name: str, interval: int = 3600):
             """Create a theme."""
@@ -329,7 +348,14 @@ def server_state(api_client):
             return response.json()
 
         def toggle_image(self, filename: str):
-            """Toggle image enabled state."""
+            """Toggle image enabled state - SAVES ORIGINAL STATE."""
+            # Save original state before toggling
+            if filename not in self.modified_images:
+                images = self.get_images()
+                img = next((i for i in images if i['name'] == filename), None)
+                if img:
+                    self.modified_images[filename] = img.get('enabled', True)
+
             response = self.client.post(f'/api/images/{filename}/toggle')
             return response.json()
 
@@ -344,7 +370,18 @@ def server_state(api_client):
             return response.json()
 
         def cleanup(self):
-            """Clean up created resources."""
+            """Clean up created resources and restore original state."""
+            # Restore toggled images to original state
+            for filename, original_enabled in self.modified_images.items():
+                try:
+                    images = self.get_images()
+                    current_img = next((i for i in images if i['name'] == filename), None)
+                    if current_img and current_img.get('enabled') != original_enabled:
+                        # Toggle back to original state
+                        self.client.post(f'/api/images/{filename}/toggle')
+                except:
+                    pass
+
             # Delete created themes
             for theme in self.created_themes:
                 try:
@@ -359,9 +396,34 @@ def server_state(api_client):
                 except:
                     pass
 
+            # Restore original active theme
+            try:
+                if hasattr(self, 'original_active_theme') and self.original_active_theme:
+                    self.client.post('/api/themes/active', json={'theme': self.original_active_theme})
+            except:
+                pass
+
+            # Restore original active atmosphere
+            try:
+                if hasattr(self, 'original_active_atmosphere') and self.original_active_atmosphere:
+                    self.client.post('/api/atmospheres/active', json={'atmosphere': self.original_active_atmosphere})
+            except:
+                pass
+
+            # Restore day scheduling state
+            try:
+                if hasattr(self, 'original_day_scheduling'):
+                    if self.original_day_scheduling:
+                        self.client.post('/api/day/enable')
+                    else:
+                        self.client.post('/api/day/disable')
+            except:
+                pass
+
             # Reset lists
             self.created_themes = []
             self.created_atmospheres = []
+            self.modified_images = {}
 
     state = ServerState(api_client)
     yield state
@@ -523,18 +585,22 @@ def websocket_monitor(kiosk_page):
 @pytest.fixture
 def image_uploader(api_client, test_image_generator):
     """
-    Helper for uploading test images.
+    Helper for uploading test images with GUARANTEED cleanup.
+
+    CRITICAL: All uploaded images are tracked and deleted after test.
+    Uses try/finally to ensure cleanup even if test fails.
 
     Usage:
         def test_upload(image_uploader):
             filename = image_uploader.upload_test_image()
-            # Image is automatically cleaned up after test
+            # Image is AUTOMATICALLY deleted after test
     """
     class ImageUploader:
         def __init__(self, client, generator):
             self.client = client
             self.generator = generator
             self.uploaded_files = []
+            self._cleanup_registered = False
 
         def upload_test_image(self, width=100, height=100, color=(255, 0, 0)):
             """Upload a test image and return the server filename."""
@@ -553,13 +619,41 @@ def image_uploader(api_client, test_image_generator):
             raise Exception(f"Upload failed: {response.status_code}")
 
         def cleanup(self):
-            """Delete all uploaded images."""
-            for filename in self.uploaded_files:
+            """
+            Delete ALL uploaded images - GUARANTEED.
+
+            CRITICAL: This MUST run to prevent polluting production database.
+            """
+            deleted_count = 0
+            failed_deletes = []
+
+            for filename in self.uploaded_files[:]:  # Copy list to avoid modification during iteration
                 try:
-                    self.client.delete(f'/api/images/{filename}')
-                except:
-                    pass
+                    response = self.client.delete(f'/api/images/{filename}')
+                    if response.status_code == 200:
+                        deleted_count += 1
+                        self.uploaded_files.remove(filename)
+                    else:
+                        failed_deletes.append(filename)
+                except Exception as e:
+                    failed_deletes.append(filename)
+
+            # Log cleanup results
+            if deleted_count > 0:
+                print(f"\n✓ Cleaned up {deleted_count} test images")
+
+            if failed_deletes:
+                print(f"\n⚠ WARNING: Failed to delete {len(failed_deletes)} test images: {failed_deletes}")
+                # Try one more time
+                for filename in failed_deletes:
+                    try:
+                        self.client.delete(f'/api/images/{filename}')
+                    except:
+                        pass
 
     uploader = ImageUploader(api_client, test_image_generator)
-    yield uploader
-    uploader.cleanup()
+    try:
+        yield uploader
+    finally:
+        # CRITICAL: Cleanup ALWAYS runs, even if test fails
+        uploader.cleanup()
