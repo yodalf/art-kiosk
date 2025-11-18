@@ -2,6 +2,8 @@
 Description=Kiosk Firefox Display
 After=kiosk-display.service graphical.target
 Requires=kiosk-display.service
+PartOf=kiosk-display.service
+BindsTo=kiosk-display.service
 Wants=graphical.target
 
 [Service]
