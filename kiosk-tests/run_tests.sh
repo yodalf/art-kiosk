@@ -22,16 +22,24 @@ fi
 # Activate virtual environment
 source venv/bin/activate
 
+# Get target URL (default to localhost, or use environment variable)
+TARGET_URL="${KIOSK_BASE_URL:-http://localhost}"
+
 # Check if server is running
-echo -e "${YELLOW}Checking if kiosk server is running...${NC}"
-if ! curl -s http://localhost/api/settings > /dev/null 2>&1; then
-    echo -e "${RED}Error: Kiosk server is not running on http://localhost${NC}"
-    echo "Please start the server first:"
+echo -e "${YELLOW}Checking if kiosk server is running at ${TARGET_URL}...${NC}"
+if ! curl -s ${TARGET_URL}/api/settings > /dev/null 2>&1; then
+    echo -e "${RED}Error: Kiosk server is not running at ${TARGET_URL}${NC}"
+    echo ""
+    echo "For local testing:"
     echo "  cd .."
     echo "  sudo ./venv/bin/python app.py"
+    echo ""
+    echo "For remote testing (e.g., Raspberry Pi):"
+    echo "  export KIOSK_BASE_URL=http://art-kiosk.local"
+    echo "  ./run_tests.sh"
     exit 1
 fi
-echo -e "${GREEN}✓ Server is running${NC}"
+echo -e "${GREEN}✓ Server is running at ${TARGET_URL}${NC}"
 
 # Parse command line arguments
 TEST_TYPE="${1:-all}"

@@ -34,18 +34,44 @@ source venv/bin/activate
 
 ### Prerequisites
 
-The kiosk server must be running on `http://localhost`:
+The kiosk server must be running and accessible.
 
+**For local testing:**
 ```bash
 # In the main kiosk directory
 cd ..
 sudo ./venv/bin/python app.py
 ```
 
+**For remote testing (e.g., Raspberry Pi):**
+```bash
+# Set the target URL via environment variable
+export KIOSK_BASE_URL=http://art-kiosk.local
+# Or use IP address
+export KIOSK_BASE_URL=http://192.168.1.100
+```
+
 ### Run All Tests
 
+**Local testing:**
 ```bash
 pytest
+```
+
+**Remote testing:**
+```bash
+export KIOSK_BASE_URL=http://art-kiosk.local
+pytest
+```
+
+**Using the test runner script:**
+```bash
+# Local
+./run_tests.sh
+
+# Remote
+export KIOSK_BASE_URL=http://art-kiosk.local
+./run_tests.sh
 ```
 
 ### Run Specific Test Categories

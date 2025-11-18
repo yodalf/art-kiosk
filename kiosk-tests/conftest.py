@@ -19,7 +19,9 @@ import hashlib
 
 
 # Configuration
-BASE_URL = "http://localhost"
+# Allow override via environment variable for remote testing
+import os
+BASE_URL = os.getenv("KIOSK_BASE_URL", "http://localhost")
 KIOSK_URL = f"{BASE_URL}/view"
 MANAGE_URL = f"{BASE_URL}/"
 SCREENSHOTS_DIR = Path(__file__).parent / "screenshots"
