@@ -1776,16 +1776,25 @@
                 });
 
                 if (response.ok) {
+                    const result = await response.json();
+                    console.log('Time period atmospheres updated:', result);
                     closeTimePeriodAtmospheresModal();
+
+                    // Reload all data to update highlighting
                     await loadDayScheduling();
+                    await loadAtmospheres();
+                    await loadThemes();
                     await loadImages();
+
                     showMessage(`Atmospheres updated for Time ${timeId}`, 'success');
                 } else {
-                    showMessage('Error updating time period atmospheres', 'error');
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    console.error('Error response:', errorData);
+                    showMessage(`Error: ${errorData.error || 'Failed to update time period'}`, 'error');
                 }
             } catch (error) {
                 console.error('Error updating time period atmospheres:', error);
-                showMessage('Error updating time period atmospheres', 'error');
+                showMessage(`Error updating time period atmospheres: ${error.message}`, 'error');
             }
         }
 

@@ -1027,20 +1027,24 @@ def toggle_day_scheduling():
 @app.route('/api/day/times/<time_id>/atmospheres', methods=['POST'])
 def update_time_atmospheres(time_id):
     """Update atmospheres for a specific time period."""
-    if time_id not in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']:
-        return jsonify({'error': 'Invalid time ID'}), 400
+    try:
+        if time_id not in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']:
+            return jsonify({'error': 'Invalid time ID'}), 400
 
-    data = request.json
-    atmospheres = data.get('atmospheres', [])
+        data = request.json
+        if data is None:
+            return jsonify({'error': 'No JSON data provided'}), 400
 
-    settings = get_settings()
-    day_times = settings.get('day_times', {})
+        atmospheres = data.get('atmospheres', [])
 
-    if time_id not in day_times:
-        return jsonify({'error': 'Time period not found'}), 404
+        settings = get_settings()
+        day_times = settings.get('day_times', {})
 
-    # Update atmospheres for this time
-    day_times[time_id]['atmospheres'] = atmospheres
+        if time_id not in day_times:
+            return jsonify({'error': 'Time period not found'}), 404
+
+        # Update atmospheres for this time
+        day_times[time_id]['atmospheres'] = atmospheres
 
     # Handle mirroring: update all mirrored times
     # Times 1-6 are the source, times 7-12 mirror them
@@ -1078,19 +1082,24 @@ def update_time_atmospheres(time_id):
                     day_times[mirror_id]['atmospheres'] = atmospheres
                     mirrored_ids.append(mirror_id)
 
-    settings['day_times'] = day_times
+        settings['day_times'] = day_times
 
-    # Regenerate shuffle_id when changing time atmospheres
-    settings['shuffle_id'] = random.random()
+        # Regenerate shuffle_id when changing time atmospheres
+        settings['shuffle_id'] = random.random()
 
-    save_settings(settings)
+        save_settings(settings)
 
-    return jsonify({
-        'success': True,
-        'time_id': time_id,
-        'atmospheres': atmospheres,
-        'mirrored_ids': mirrored_ids
-    })
+        return jsonify({
+            'success': True,
+            'time_id': time_id,
+            'atmospheres': atmospheres,
+            'mirrored_ids': mirrored_ids
+        })
+    except Exception as e:
+        import traceback
+        print(f"Error in update_time_atmospheres: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 
 @app.route('/images/<filename>')
