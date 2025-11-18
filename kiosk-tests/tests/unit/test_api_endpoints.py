@@ -56,7 +56,8 @@ def test_api_day_status(api_client):
     data = response.json()
     assert 'enabled' in data
     assert 'current_time_period' in data
-    assert 'time_periods' in data
+    # API returns 'day_times' (not 'time_periods')
+    assert 'day_times' in data
 
 
 @pytest.mark.unit
