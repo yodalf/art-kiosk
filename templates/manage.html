@@ -1593,7 +1593,14 @@
                 '10': '4', '11': '5', '12': '6'
             };
             const sourceTime = mirrorMap[timePeriod] || timePeriod;
-            return dayTimes[sourceTime]?.atmospheres || [];
+            const atmospheres = dayTimes[sourceTime]?.atmospheres || [];
+
+            // If no atmospheres assigned, return 'All Images' as default
+            if (atmospheres.length === 0) {
+                return ['All Images'];
+            }
+
+            return atmospheres;
         }
 
         async function loadDayScheduling() {
@@ -1838,6 +1845,11 @@
                 const currentTimeAtmospheres = get_active_atmospheres_for_time(currentTimePeriod);
                 // Check if this theme is in any of those atmospheres
                 for (const atmName of currentTimeAtmospheres) {
+                    // "All Images" atmosphere only displays "All Images" theme
+                    if (atmName === 'All Images') {
+                        isCurrentlyDisplayed = (themeName === 'All Images');
+                        break;
+                    }
                     const atmThemes = atmosphereThemes[atmName] || [];
                     if (atmThemes.includes(themeName)) {
                         isCurrentlyDisplayed = true;
@@ -1846,10 +1858,48 @@
                 }
             }
 
+            // Determine if theme should be shown as active
+            let isActiveTheme = false;
+
+            // When day scheduling is enabled, check if this theme is in the current time period's atmospheres
+            if (daySchedulingEnabled && currentTimePeriod) {
+                const currentTimeAtmospheres = get_active_atmospheres_for_time(currentTimePeriod);
+                for (const atmName of currentTimeAtmospheres) {
+                    if (atmName === 'All Images') {
+                        // "All Images" atmosphere only shows "All Images" theme as active
+                        isActiveTheme = (themeName === 'All Images');
+                        break;
+                    } else {
+                        // Other atmospheres show their assigned themes as active
+                        const atmThemes = atmosphereThemes[atmName] || [];
+                        if (atmThemes.includes(themeName)) {
+                            isActiveTheme = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            // When day scheduling is disabled
+            else if (!daySchedulingEnabled) {
+                if (activeAtmosphere) {
+                    if (activeAtmosphere === 'All Images') {
+                        // "All Images" atmosphere only shows "All Images" theme as active
+                        isActiveTheme = (themeName === 'All Images');
+                    } else {
+                        // Other atmospheres show their assigned themes as active
+                        const atmThemes = atmosphereThemes[activeAtmosphere] || [];
+                        isActiveTheme = atmThemes.includes(themeName);
+                    }
+                } else {
+                    // No atmosphere active, show theme as active if it's the active theme
+                    isActiveTheme = (themeName === activeTheme);
+                }
+            }
+
             // Show green border if currently displayed, otherwise show as active if selected
             if (isCurrentlyDisplayed) {
                 badge.classList.add('currently-displayed');
-            } else if (themeName === activeTheme && !activeAtmosphere && !daySchedulingEnabled) {
+            } else if (isActiveTheme) {
                 badge.classList.add('active');
             }
 

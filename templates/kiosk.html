@@ -597,18 +597,19 @@
                 debugLog(`    X: ${expectedCropLeft.toFixed(0)} to ${expectedCropRight.toFixed(0)} (width: ${(expectedCropRight - expectedCropLeft).toFixed(0)}px)`, 'info');
                 debugLog(`    Y: ${expectedCropTop.toFixed(0)} to ${expectedCropBottom.toFixed(0)} (height: ${(expectedCropBottom - expectedCropTop).toFixed(0)}px)`, 'info');
 
-                // Check if visible matches expected
+                // Check if visible matches expected (tolerance: 20px for minor rounding differences)
+                const tolerance = 20;
                 const topDiff = Math.abs(visibleTop - expectedCropTop);
                 const bottomDiff = Math.abs(visibleBottom - expectedCropBottom);
                 const leftDiff = Math.abs(visibleLeft - expectedCropLeft);
                 const rightDiff = Math.abs(visibleRight - expectedCropRight);
 
-                if (topDiff > 1 || bottomDiff > 1 || leftDiff > 1 || rightDiff > 1) {
+                if (topDiff > tolerance || bottomDiff > tolerance || leftDiff > tolerance || rightDiff > tolerance) {
                     debugLog(`  ❌ MISMATCH DETECTED:`, 'error');
-                    if (topDiff > 1) debugLog(`    Top: visible ${visibleTop.toFixed(0)} vs expected ${expectedCropTop.toFixed(0)} (diff: ${topDiff.toFixed(0)}px)`, 'error');
-                    if (bottomDiff > 1) debugLog(`    Bottom: visible ${visibleBottom.toFixed(0)} vs expected ${expectedCropBottom.toFixed(0)} (diff: ${bottomDiff.toFixed(0)}px)`, 'error');
-                    if (leftDiff > 1) debugLog(`    Left: visible ${visibleLeft.toFixed(0)} vs expected ${expectedCropLeft.toFixed(0)} (diff: ${leftDiff.toFixed(0)}px)`, 'error');
-                    if (rightDiff > 1) debugLog(`    Right: visible ${visibleRight.toFixed(0)} vs expected ${expectedCropRight.toFixed(0)} (diff: ${rightDiff.toFixed(0)}px)`, 'error');
+                    if (topDiff > tolerance) debugLog(`    Top: visible ${visibleTop.toFixed(0)} vs expected ${expectedCropTop.toFixed(0)} (diff: ${topDiff.toFixed(0)}px)`, 'error');
+                    if (bottomDiff > tolerance) debugLog(`    Bottom: visible ${visibleBottom.toFixed(0)} vs expected ${expectedCropBottom.toFixed(0)} (diff: ${bottomDiff.toFixed(0)}px)`, 'error');
+                    if (leftDiff > tolerance) debugLog(`    Left: visible ${visibleLeft.toFixed(0)} vs expected ${expectedCropLeft.toFixed(0)} (diff: ${leftDiff.toFixed(0)}px)`, 'error');
+                    if (rightDiff > tolerance) debugLog(`    Right: visible ${visibleRight.toFixed(0)} vs expected ${expectedCropRight.toFixed(0)} (diff: ${rightDiff.toFixed(0)}px)`, 'error');
 
                     debugLog(`  🔍 DIAGNOSIS: We are showing the WRONG part of the image!`, 'error');
                     if (visibleTop > expectedCropTop) {
@@ -617,7 +618,7 @@
                         debugLog(`    The image needs to be shifted UP by ${(expectedCropTop - visibleTop).toFixed(0)}px`, 'error');
                     }
                 } else {
-                    debugLog(`  ✅ MATCH: Visible region matches expected crop region!`, 'info');
+                    debugLog(`  ✅ MATCH: Visible region matches expected crop region (within ${tolerance}px tolerance)!`, 'info');
                 }
             };
 

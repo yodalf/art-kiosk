@@ -227,27 +227,43 @@
             updateLEDs(command);
         }
 
+        // Track current play/pause state
+        let currentPlayState = 'play'; // Default to play
+
         // Update LED indicators
         function updateLEDs(command) {
-            // Clear all LEDs
-            document.querySelectorAll('.led-indicator').forEach(led => {
-                led.classList.remove('active');
-            });
+            // Handle play/pause state changes
+            if (command === 'play' || command === 'pause') {
+                currentPlayState = command;
 
-            // Light up the appropriate LED
-            const ledId = 'led-' + command;
-            const led = document.getElementById(ledId);
-            if (led) {
-                led.classList.add('active');
+                // Clear play/pause LEDs
+                document.getElementById('led-play').classList.remove('active');
+                document.getElementById('led-pause').classList.remove('active');
 
-                // Auto-clear LED after 1 second (except play/pause which are states)
-                if (command !== 'play' && command !== 'pause') {
+                // Set the appropriate play/pause LED
+                document.getElementById('led-' + command).classList.add('active');
+            } else {
+                // For other commands (reload, prev, next), briefly blink the LED
+                const led = document.getElementById('led-' + command);
+                if (led) {
+                    led.classList.add('active');
+
+                    // Auto-clear LED after 500ms and restore play/pause state
                     setTimeout(() => {
                         led.classList.remove('active');
-                    }, 1000);
+                    }, 500);
                 }
             }
         }
+
+        // Initialize LED state on page load
+        function initializeLEDs() {
+            // Default to play state
+            document.getElementById('led-play').classList.add('active');
+        }
+
+        // Call initialization when page loads
+        initializeLEDs();
 
         // Show message
         function showMessage(msg, type) {

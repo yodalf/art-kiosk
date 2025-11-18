@@ -548,13 +548,16 @@
         async function loadImages() {
             try {
                 const response = await fetch('/api/images');
-                const images = await response.json();
+                const allImages = await response.json();
+
+                // Filter to only show images without any themes (newly uploaded, untagged)
+                const images = allImages.filter(img => !img.themes || img.themes.length === 0);
 
                 const grid = document.getElementById('image-grid');
                 grid.innerHTML = '';
 
                 if (images.length === 0) {
-                    grid.innerHTML = '<p style="color: #999;">No images uploaded yet</p>';
+                    grid.innerHTML = '<p style="color: #999;">No newly uploaded images (all images have been tagged)</p>';
                     return;
                 }
 
@@ -870,6 +873,67 @@
                 showMessage('Error clearing crop', 'error');
             }
         }
+
+        // Auto-tag untagged images with "Extras" theme when leaving the page
+        async function autoTagUntaggedImages() {
+            try {
+                const response = await fetch('/api/images');
+                const allImages = await response.json();
+
+                // Find images without any themes
+                const untaggedImages = allImages.filter(img => !img.themes || img.themes.length === 0);
+
+                // Tag each untagged image with "Extras" theme
+                for (const image of untaggedImages) {
+                    try {
+                        await fetch(`/api/images/${image.name}/themes`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ themes: ['Extras'] })
+                        });
+                    } catch (error) {
+                        console.error(`Error tagging ${image.name}:`, error);
+                    }
+                }
+            } catch (error) {
+                console.error('Error auto-tagging images:', error);
+            }
+        }
+
+        // Add beforeunload handler to auto-tag images when leaving the page
+        window.addEventListener('beforeunload', (event) => {
+            // Use sendBeacon for reliable delivery even when page is unloading
+            // First, we need to get the untagged images synchronously
+            fetch('/api/images')
+                .then(response => response.json())
+                .then(allImages => {
+                    const untaggedImages = allImages.filter(img => !img.themes || img.themes.length === 0);
+
+                    // Tag each untagged image
+                    untaggedImages.forEach(image => {
+                        fetch(`/api/images/${image.name}/themes`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ themes: ['Extras'] }),
+                            keepalive: true  // Ensure request completes even if page is unloading
+                        }).catch(err => console.error(`Error tagging ${image.name}:`, err));
+                    });
+                });
+        });
+
+        // Also handle navigation link clicks to ensure tagging happens
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const href = link.getAttribute('href');
+
+                // Auto-tag images before navigation
+                await autoTagUntaggedImages();
+
+                // Navigate after tagging
+                window.location.href = href;
+            });
+        });
 
         // Load themes and images on page load
         loadThemes().then(() => loadImages());

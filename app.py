@@ -41,9 +41,9 @@ command_timestamp = 0
 # Current image being displayed on kiosk
 current_kiosk_image = None
 
-# Debug message queue (stores last 100 messages)
+# Debug message queue (stores last 500 messages)
 from collections import deque
-debug_messages = deque(maxlen=100)
+debug_messages = deque(maxlen=500)
 
 
 def allowed_file(filename):
@@ -1095,9 +1095,9 @@ def toggle_day_scheduling():
     settings = get_settings()
     settings['day_scheduling_enabled'] = enabled
 
-    # If disabling, clear active atmosphere
+    # If disabling, revert to "All Images" atmosphere
     if not enabled:
-        settings['active_atmosphere'] = None
+        settings['active_atmosphere'] = 'All Images'
 
     # Regenerate shuffle_id when toggling
     settings['shuffle_id'] = random.random()

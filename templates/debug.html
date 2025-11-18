@@ -95,9 +95,10 @@
             color: #aed581;
             font-family: 'Courier New', monospace;
             font-size: 12px;
+            line-height: 16px;
             padding: 15px;
             border-radius: 4px;
-            height: 800px;
+            height: 400px;
             overflow-y: auto;
             margin-top: 10px;
         }
@@ -105,6 +106,7 @@
         .debug-console-line {
             margin-bottom: 4px;
             word-wrap: break-word;
+            line-height: 16px;
         }
 
         .debug-console-line.error {
@@ -211,6 +213,7 @@
                     return;
                 }
 
+                // Display ALL messages (up to 500 kept by backend)
                 messages.forEach(msg => {
                     const line = document.createElement('div');
                     line.className = `debug-console-line ${msg.level}`;
@@ -226,8 +229,16 @@
                     console.appendChild(line);
                 });
 
-                // Auto-scroll to bottom
-                console.scrollTop = console.scrollHeight;
+                // Calculate scroll position to show only last 20 lines
+                const lines = console.querySelectorAll('.debug-console-line');
+                if (lines.length > 20) {
+                    // Scroll to position where only last 20 lines are visible
+                    const line21FromEnd = lines[lines.length - 20];
+                    line21FromEnd.scrollIntoView({ block: 'start' });
+                } else {
+                    // If 20 or fewer lines, scroll to bottom
+                    console.scrollTop = console.scrollHeight;
+                }
             } catch (error) {
                 console.error('Error fetching debug messages:', error);
             }
@@ -329,6 +340,12 @@
             line.appendChild(document.createTextNode(msg.message));
 
             consoleEl.appendChild(line);
+
+            // Limit to 500 lines in UI (matching backend limit) - remove oldest if we exceed
+            const lines = consoleEl.querySelectorAll('.debug-console-line');
+            if (lines.length > 500) {
+                lines[0].remove();
+            }
 
             // Auto-scroll to bottom
             consoleEl.scrollTop = consoleEl.scrollHeight;
