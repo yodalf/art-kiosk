@@ -93,6 +93,70 @@ def api_client():
     return APIClient(BASE_URL)
 
 
+@pytest.fixture(scope="session", autouse=True)
+def manage_day_scheduling(api_client):
+    """
+    Session-scoped fixture that saves and restores day scheduling state.
+    This runs ONCE at the start of the test session and ONCE at the end.
+    autouse=True means it runs automatically for all tests.
+    """
+    import copy
+
+    # Save original day scheduling state at session start
+    try:
+        day_status = api_client.get('/api/day/status').json()
+        original_day_scheduling = day_status.get('enabled', False)
+
+        settings = api_client.get('/api/settings').json()
+        original_day_times = copy.deepcopy(settings.get('day_times', {}))
+
+        if original_day_scheduling:
+            print(f"\n⚠ SESSION START: Day scheduling was ON - disabling for all tests")
+            api_client.post('/api/day/disable')
+    except Exception as e:
+        print(f"\n⚠ Warning: Could not save day scheduling state: {e}")
+        original_day_scheduling = False
+        original_day_times = {}
+
+    # Run all tests
+    yield
+
+    # Restore original day scheduling state at session end
+    try:
+        # Restore day_times first
+        current_settings = api_client.get('/api/settings').json()
+        current_day_times = current_settings.get('day_times', {})
+
+        for time_id, original_config in original_day_times.items():
+            original_atmospheres = original_config.get('atmospheres', [])
+            current_config = current_day_times.get(time_id, {})
+            current_atmospheres = current_config.get('atmospheres', [])
+
+            if original_atmospheres != current_atmospheres:
+                api_client.post(f'/api/day/time-periods/{time_id}',
+                              json={'atmospheres': original_atmospheres})
+
+        # Restore day scheduling state
+        if original_day_scheduling:
+            print(f"\n✓ SESSION END: Restoring day scheduling to ON")
+            response = api_client.post('/api/day/enable')
+            if response.status_code != 200:
+                print(f"⚠ ERROR: Failed to enable day scheduling: {response.status_code}")
+            else:
+                # Verify and wait
+                import time
+                time.sleep(0.2)
+                verify = api_client.get('/api/day/status').json()
+                if not verify.get('enabled'):
+                    print(f"⚠ ERROR: Day scheduling enable succeeded but status shows disabled!")
+                time.sleep(0.3)
+
+                # Send reload command to kiosk
+                api_client.post('/api/control/send', json={'command': 'reload'})
+    except Exception as e:
+        print(f"\n⚠ ERROR restoring day scheduling at session end: {e}")
+
+
 @pytest.fixture
 def test_mode(api_client):
     """
@@ -315,25 +379,13 @@ def server_state(api_client):
             self._save_original_state()
 
         def _save_original_state(self):
-            """Save current server state for restoration AND disable day scheduling."""
+            """Save current server state for restoration (themes, atmospheres, images)."""
             try:
                 settings = self.client.get('/api/settings').json()
                 self.original_active_theme = settings.get('active_theme')
                 self.original_active_atmosphere = settings.get('active_atmosphere')
-                self.original_day_scheduling = False
-
-                # Save day_times (time period atmosphere assignments)
-                import copy
-                self.original_day_times = copy.deepcopy(settings.get('day_times', {}))
-
-                day_status = self.client.get('/api/day/status').json()
-                self.original_day_scheduling = day_status.get('enabled', False)
-
-                # CRITICAL: Disable day scheduling for tests to prevent interference
-                if self.original_day_scheduling:
-                    print(f"\n⚠ Day scheduling was ON - disabling for tests")
-                    self.client.post('/api/day/disable')
-            except:
+            except Exception as e:
+                print(f"⚠ Warning: Error saving original state: {e}")
                 pass
 
         def create_theme(self, name: str, interval: int = 3600):
@@ -405,49 +457,17 @@ def server_state(api_client):
                 except:
                     pass
 
-            # Restore original active theme
+            # Restore theme and atmosphere (only if day scheduling is OFF)
+            # Note: Day scheduling state is managed by the session-scoped manage_day_scheduling fixture
             try:
-                if hasattr(self, 'original_active_theme') and self.original_active_theme:
-                    self.client.post('/api/themes/active', json={'theme': self.original_active_theme})
-            except:
-                pass
+                day_status = self.client.get('/api/day/status').json()
+                if not day_status.get('enabled', False):
+                    # Day scheduling is off - restore theme and atmosphere manually
+                    if hasattr(self, 'original_active_theme') and self.original_active_theme:
+                        self.client.post('/api/themes/active', json={'theme': self.original_active_theme})
 
-            # Restore original active atmosphere
-            try:
-                if hasattr(self, 'original_active_atmosphere') and self.original_active_atmosphere:
-                    self.client.post('/api/atmospheres/active', json={'atmosphere': self.original_active_atmosphere})
-            except:
-                pass
-
-            # Restore day_times (time period atmosphere assignments)
-            try:
-                if hasattr(self, 'original_day_times'):
-                    current_settings = self.client.get('/api/settings').json()
-                    current_day_times = current_settings.get('day_times', {})
-
-                    # Restore each time period's atmospheres
-                    for time_id, original_config in self.original_day_times.items():
-                        original_atmospheres = original_config.get('atmospheres', [])
-                        current_config = current_day_times.get(time_id, {})
-                        current_atmospheres = current_config.get('atmospheres', [])
-
-                        # Only restore if it changed
-                        if original_atmospheres != current_atmospheres:
-                            self.client.post(f'/api/day/time-periods/{time_id}',
-                                           json={'atmospheres': original_atmospheres})
-            except Exception as e:
-                print(f"\n⚠ Warning: Could not restore day_times: {e}")
-                pass
-
-            # Restore day scheduling state
-            try:
-                if hasattr(self, 'original_day_scheduling'):
-                    if self.original_day_scheduling:
-                        print(f"\n✓ Restoring day scheduling to ON")
-                        self.client.post('/api/day/enable')
-                    else:
-                        # Already disabled, no need to restore
-                        pass
+                    if hasattr(self, 'original_active_atmosphere') and self.original_active_atmosphere:
+                        self.client.post('/api/atmospheres/active', json={'atmosphere': self.original_active_atmosphere})
             except:
                 pass
 
