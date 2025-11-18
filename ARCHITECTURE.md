@@ -426,45 +426,54 @@ def list_images(enabled_only=False):
 
 ### 4. Crop Scaling Algorithm
 
-**Purpose**: Scale cropped image regions to fill the entire kiosk display (2560x2880).
+**Purpose**: Scale cropped image regions to fill the entire kiosk display (2560x2880) with no black bars.
 
-**Implementation**:
+**Non-Uniform Scaling Implementation**:
 ```javascript
 // Given: crop region (x, y, width, height) in original image coordinates
-// Goal: Display only the crop region, scaled to fill the viewport
+// Goal: Display entire crop region, scaled to fill the viewport exactly (no black bars)
 
-1. Calculate scale to make crop fill viewport (cover behavior):
+1. Calculate independent X and Y scales:
    scaleX = viewportWidth / cropWidth
    scaleY = viewportHeight / cropHeight
-   scale = Math.max(scaleX, scaleY)  // Ensures crop fills entire screen
+   // Use BOTH scales independently (non-uniform scaling)
 
 2. Calculate scaled image dimensions:
-   scaledImageWidth = originalImageWidth * scale
-   scaledImageHeight = originalImageHeight * scale
+   scaledImageWidth = originalImageWidth * scaleX
+   scaledImageHeight = originalImageHeight * scaleY
 
 3. Calculate position to show crop region:
-   offsetX = -(cropX * scale)  // Shift image left to show crop
-   offsetY = -(cropY * scale)  // Shift image up to show crop
+   offsetX = -(cropX * scaleX)  // Shift image left to show crop
+   offsetY = -(cropY * scaleY)  // Shift image up to show crop
 
-4. Center any overflow:
-   centerX = (viewportWidth - (cropWidth * scale)) / 2
-   centerY = (viewportHeight - (cropHeight * scale)) / 2
+4. No centering needed (crop fills viewport exactly):
+   centerX = 0
+   centerY = 0
 
 5. Apply to image element:
    img.style.width = scaledImageWidth + 'px'
    img.style.height = scaledImageHeight + 'px'
-   img.style.left = (offsetX + centerX) + 'px'
-   img.style.top = (offsetY + centerY) + 'px'
-   img.style.objectFit = 'fill'  // Critical: allows scaling
+   img.style.left = offsetX + 'px'
+   img.style.top = offsetY + 'px'
+   img.style.objectFit = 'fill'  // Critical: allows non-uniform scaling
 ```
 
 **Key Points**:
-- Uses `Math.max(scaleX, scaleY)` to ensure crop region fills entire screen
-- `object-fit: fill` is essential - `none` would prevent scaling
-- Black bars appear on only one dimension (top/bottom OR left/right)
+- Uses **non-uniform scaling** (independent X/Y scales) to eliminate black bars completely
+- Entire crop zone is visible with no black bars on any dimension
+- Slight distortion may occur if crop aspect ratio doesn't match viewport (2560/2880 = 0.889)
+- `object-fit: fill` allows the browser to apply different width/height scales
 - Container uses `overflow: hidden` to clip to viewport
 - Same algorithm used for both kiosk display and management thumbnails (different viewport sizes)
 - **Instant crop updates**: Extra images use `refresh_extra_crop` WebSocket command to immediately apply new crops without waiting for periodic check
+
+**Crop Tool Features**:
+- **Default crop**: Initializes with display aspect ratio (2560/2880) for new images
+- **Aspect ratio lock**: Toggle checkbox to lock/unlock aspect ratio during cropping
+  - Locked (default): Maintains 2560/2880 aspect ratio, eliminates distortion
+  - Unlocked: Free-form cropping, allows non-uniform scaling
+- **Clear Crop**: Resets crop to default aspect ratio visually (does not save)
+- **Save Crop**: Persists the current crop configuration
 
 ### 4.5. Fill Mode vs Fit Mode
 

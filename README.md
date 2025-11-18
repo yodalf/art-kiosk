@@ -398,14 +398,18 @@ Crop images to display specific regions on the kiosk:
 2. **Select region** - Use the interactive cropper to select the desired area
    - Drag corners to resize the crop region
    - Drag inside the box to move it
-   - Free aspect ratio - crop any shape
-3. **Save crop** - Click "Save Crop" to apply (or "Clear Crop" to remove)
-4. **Instant refresh** - The kiosk display immediately updates to show the new crop
-5. **Preview** - The management interface shows cropped thumbnails matching what appears on the kiosk
+   - **Aspect ratio lock** - Toggle checkbox to lock crop to display aspect ratio (2560/2880 = 0.889)
+     - Locked (default): Maintains display proportions, eliminates distortion
+     - Unlocked: Free-form cropping, allows non-uniform scaling
+3. **Clear crop** - Click "Clear Crop" to reset to default display aspect ratio (does not save)
+4. **Save crop** - Click "Save Crop" to apply and persist the crop
+5. **Instant refresh** - The kiosk display immediately updates to show the new crop
+6. **Preview** - The management interface shows cropped thumbnails matching what appears on the kiosk
 
 Crop behavior:
-- The selected region is scaled to fill the screen completely (cover mode)
-- Black bars appear on only one dimension (either top/bottom OR left/right, never both)
+- **Default crop**: When opening the crop tool for an image without existing crop data, it initializes with the display aspect ratio (2560/2880)
+- **Non-uniform scaling**: Crops with unlocked aspect ratios use independent X/Y scaling to fill the viewport exactly
+- **No black bars**: The crop zone is scaled to fill the entire screen with no black bars
 - **Extra Images**: When cropping from the Extra Images page, the kiosk stays on that extra image and immediately shows the updated crop
 - **Regular Images**: Changes apply automatically within 2 seconds via the smart reload system
 - Crops are stored per-image and persist across restarts
