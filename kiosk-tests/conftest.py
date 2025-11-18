@@ -410,3 +410,156 @@ def assert_slideshow_running(page: Page, interval_ms: int):
     # Check that image changed
     current = page.locator('.slide.active').get_attribute('data-index')
     assert initial != current, "Slideshow did not advance"
+
+
+@pytest.fixture
+def test_image_generator():
+    """
+    Generator for creating test images.
+
+    Usage:
+        def test_upload(test_image_generator):
+            img_path = test_image_generator.create_png(100, 100, (255, 0, 0))
+            # Upload img_path
+    """
+    from PIL import Image
+    import tempfile
+
+    class ImageGenerator:
+        def __init__(self):
+            self.temp_files = []
+
+        def create_png(self, width: int, height: int, color=(255, 255, 255)):
+            """Create a solid color PNG image."""
+            img = Image.new('RGB', (width, height), color)
+            fd, path = tempfile.mkstemp(suffix='.png')
+            img.save(path)
+            self.temp_files.append(path)
+            return Path(path)
+
+        def create_jpg(self, width: int, height: int, color=(255, 255, 255)):
+            """Create a solid color JPG image."""
+            img = Image.new('RGB', (width, height), color)
+            fd, path = tempfile.mkstemp(suffix='.jpg')
+            img.save(path, 'JPEG')
+            self.temp_files.append(path)
+            return Path(path)
+
+        def create_large_file(self, size_mb: int, extension='.jpg'):
+            """Create a large file of specified size."""
+            fd, path = tempfile.mkstemp(suffix=extension)
+            with open(path, 'wb') as f:
+                f.write(b'0' * (size_mb * 1024 * 1024))
+            self.temp_files.append(path)
+            return Path(path)
+
+        def cleanup(self):
+            """Remove all temporary files."""
+            for path in self.temp_files:
+                try:
+                    Path(path).unlink()
+                except:
+                    pass
+
+    generator = ImageGenerator()
+    yield generator
+    generator.cleanup()
+
+
+@pytest.fixture
+def websocket_monitor(kiosk_page):
+    """
+    Monitor WebSocket messages on the kiosk page.
+
+    Usage:
+        def test_ws(kiosk_page, websocket_monitor):
+            messages = websocket_monitor.get_messages('remote_command')
+            assert len(messages) > 0
+    """
+    class WebSocketMonitor:
+        def __init__(self, page):
+            self.page = page
+            self.messages = []
+
+            # Inject monitoring script
+            page.evaluate("""
+                window.__ws_messages = [];
+                if (window.socket) {
+                    const originalOn = window.socket.on.bind(window.socket);
+                    window.socket.on = function(event, handler) {
+                        const wrappedHandler = function(...args) {
+                            window.__ws_messages.push({event, args, timestamp: Date.now()});
+                            return handler(...args);
+                        };
+                        return originalOn(event, wrappedHandler);
+                    };
+                }
+            """)
+
+        def get_messages(self, event_name=None):
+            """Get all captured WebSocket messages, optionally filtered by event name."""
+            messages = self.page.evaluate("window.__ws_messages || []")
+            if event_name:
+                return [m for m in messages if m['event'] == event_name]
+            return messages
+
+        def clear(self):
+            """Clear all captured messages."""
+            self.page.evaluate("window.__ws_messages = []")
+
+        def wait_for_message(self, event_name, timeout_ms=5000):
+            """Wait for a specific WebSocket message."""
+            start = time.time()
+            while (time.time() - start) * 1000 < timeout_ms:
+                messages = self.get_messages(event_name)
+                if messages:
+                    return messages[-1]
+                time.sleep(0.1)
+            raise TimeoutError(f"WebSocket message '{event_name}' not received within {timeout_ms}ms")
+
+    return WebSocketMonitor(kiosk_page)
+
+
+@pytest.fixture
+def image_uploader(api_client, test_image_generator):
+    """
+    Helper for uploading test images.
+
+    Usage:
+        def test_upload(image_uploader):
+            filename = image_uploader.upload_test_image()
+            # Image is automatically cleaned up after test
+    """
+    class ImageUploader:
+        def __init__(self, client, generator):
+            self.client = client
+            self.generator = generator
+            self.uploaded_files = []
+
+        def upload_test_image(self, width=100, height=100, color=(255, 0, 0)):
+            """Upload a test image and return the server filename."""
+            img_path = self.generator.create_png(width, height, color)
+
+            with open(img_path, 'rb') as f:
+                response = self.client.post('/api/images', files={'file': f})
+
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('success'):
+                    filename = data['filename']
+                    self.uploaded_files.append(filename)
+                    return filename
+
+            raise Exception(f"Upload failed: {response.status_code}")
+
+        def cleanup(self):
+            """Delete all uploaded images."""
+            for filename in self.uploaded_files:
+                try:
+                    self.client.delete(f'/api/images/{filename}')
+                except:
+                    pass
+
+    uploader = ImageUploader(api_client, test_image_generator)
+    yield uploader
+    uploader.cleanup()
