@@ -111,6 +111,7 @@
         let fillMode = false; // false = cover mode (fills screen), true = contain mode (shows full image)
         let previousImageVector = []; // VP - previous vector of enabled image names
         let previousShuffleId = null; // Track shuffle_id to detect order changes
+        let previousTimePeriod = null; // Track time period to detect Day scheduling transitions
 
         // Debug logging function - sends to both console and server
         function debugLog(message, level = 'info') {
@@ -209,6 +210,11 @@
                 const newImageCrops = settings.image_crops || {};
                 const newShuffleId = settings.shuffle_id;
 
+                // Check for day scheduling and current time period
+                const dayResponse = await fetch('/api/day/status');
+                const dayStatus = await dayResponse.json();
+                const newTimePeriod = dayStatus.current_time_period;
+
                 let needsReload = false;
 
                 // Check if images changed
@@ -226,6 +232,17 @@
                     previousShuffleId = newShuffleId;
                     shuffleChanged = true;
                     needsReload = true;
+                }
+
+                // Check if time period changed (Day scheduling time transition)
+                if (newTimePeriod !== previousTimePeriod && previousTimePeriod !== null) {
+                    debugLog(`Time period changed! ${previousTimePeriod} -> ${newTimePeriod}`, 'info');
+                    previousTimePeriod = newTimePeriod;
+                    shuffleChanged = true; // Treat as shuffle change to get new images
+                    needsReload = true;
+                } else if (previousTimePeriod === null) {
+                    // Initialize on first check
+                    previousTimePeriod = newTimePeriod;
                 }
 
                 // Check if interval changed

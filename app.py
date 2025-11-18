@@ -76,6 +76,19 @@ def get_settings():
         'atmospheres': {},  # Atmosphere name -> atmosphere info
         'atmosphere_themes': {},  # Atmosphere name -> list of theme names
         'active_atmosphere': None,  # No atmosphere active by default
+        'day_scheduling_enabled': False,  # Enable/disable Day scheduling
+        'day_times': {
+            # 8 time periods of 3 hours each, starting at 5:00 AM
+            # Times 5-8 mirror times 1-4 automatically
+            '1': {'start_hour': 5, 'atmospheres': []},   # 5:00 AM - 8:00 AM
+            '2': {'start_hour': 8, 'atmospheres': []},   # 8:00 AM - 11:00 AM
+            '3': {'start_hour': 11, 'atmospheres': []},  # 11:00 AM - 2:00 PM
+            '4': {'start_hour': 14, 'atmospheres': []},  # 2:00 PM - 5:00 PM
+            '5': {'start_hour': 17, 'atmospheres': []},  # 5:00 PM - 8:00 PM (mirrors 1)
+            '6': {'start_hour': 20, 'atmospheres': []},  # 8:00 PM - 11:00 PM (mirrors 2)
+            '7': {'start_hour': 23, 'atmospheres': []},  # 11:00 PM - 2:00 AM (mirrors 3)
+            '8': {'start_hour': 2, 'atmospheres': []}    # 2:00 AM - 5:00 AM (mirrors 4)
+        },
         'shuffle_id': random.random(),  # Random ID for consistent shuffling
         'image_crops': {}  # Image name -> crop data
     }
@@ -123,6 +136,19 @@ def get_settings():
                 settings['shuffle_id'] = random.random()
             if 'image_crops' not in settings:
                 settings['image_crops'] = {}
+            if 'day_scheduling_enabled' not in settings:
+                settings['day_scheduling_enabled'] = False
+            if 'day_times' not in settings:
+                settings['day_times'] = {
+                    '1': {'start_hour': 5, 'atmospheres': []},
+                    '2': {'start_hour': 8, 'atmospheres': []},
+                    '3': {'start_hour': 11, 'atmospheres': []},
+                    '4': {'start_hour': 14, 'atmospheres': []},
+                    '5': {'start_hour': 17, 'atmospheres': []},
+                    '6': {'start_hour': 20, 'atmospheres': []},
+                    '7': {'start_hour': 23, 'atmospheres': []},
+                    '8': {'start_hour': 2, 'atmospheres': []}
+                }
             return settings
 
     return defaults
@@ -150,6 +176,50 @@ def set_image_enabled(filename, enabled):
         settings['enabled_images'] = {}
     settings['enabled_images'][filename] = enabled
     save_settings(settings)
+
+
+def get_current_time_period():
+    """Get the current time period (1-8) based on current hour.
+    Times 5-8 mirror times 1-4.
+    """
+    from datetime import datetime
+    current_hour = datetime.now().hour
+
+    # Map hours to time periods
+    if 5 <= current_hour < 8:
+        return '1'
+    elif 8 <= current_hour < 11:
+        return '2'
+    elif 11 <= current_hour < 14:
+        return '3'
+    elif 14 <= current_hour < 17:
+        return '4'
+    elif 17 <= current_hour < 20:
+        return '5'
+    elif 20 <= current_hour < 23:
+        return '6'
+    elif 23 <= current_hour or current_hour < 2:
+        return '7'
+    else:  # 2 <= current_hour < 5
+        return '8'
+
+
+def get_active_atmospheres_for_time(time_period, settings):
+    """Get atmospheres for a time period, handling mirroring.
+    Times 5-8 mirror times 1-4 respectively.
+    """
+    day_times = settings.get('day_times', {})
+
+    # Handle mirroring
+    mirror_map = {
+        '5': '1',
+        '6': '2',
+        '7': '3',
+        '8': '4'
+    }
+
+    source_time = mirror_map.get(time_period, time_period)
+    return day_times.get(source_time, {}).get('atmospheres', [])
 
 
 @app.route('/')
@@ -199,6 +269,7 @@ def list_images():
     enabled_only = request.args.get('enabled_only', 'false').lower() == 'true'
 
     settings = get_settings()
+    day_scheduling_enabled = settings.get('day_scheduling_enabled', False)
     active_atmosphere = settings.get('active_atmosphere')
     active_theme = settings.get('active_theme')
     image_themes = settings.get('image_themes', {})
@@ -207,8 +278,22 @@ def list_images():
     # Determine which themes to filter by
     allowed_themes = None
     if enabled_only:
-        if active_atmosphere:
-            # If atmosphere is active, get all themes in that atmosphere
+        if day_scheduling_enabled:
+            # Day scheduling is active - use current time period's atmospheres
+            current_time = get_current_time_period()
+            time_atmospheres = get_active_atmospheres_for_time(current_time, settings)
+
+            # Collect all themes from all atmospheres in current time period
+            allowed_themes = set()
+            for atm_name in time_atmospheres:
+                atm_themes = atmosphere_themes.get(atm_name, [])
+                allowed_themes.update(atm_themes)
+
+            # If no atmospheres assigned to this time, no images shown
+            if not allowed_themes:
+                allowed_themes = set()  # Empty set means no images match
+        elif active_atmosphere:
+            # If atmosphere is active (no day scheduling), get all themes in that atmosphere
             allowed_themes = set(atmosphere_themes.get(active_atmosphere, []))
         elif active_theme and active_theme != 'All Images':
             # If only a theme is active (no atmosphere), use that theme
@@ -880,6 +965,93 @@ def update_atmosphere_themes(atmosphere_name):
     save_settings(settings)
 
     return jsonify({'success': True, 'themes': themes})
+
+
+@app.route('/api/day/status', methods=['GET'])
+def get_day_status():
+    """Get Day scheduling status and current time period."""
+    settings = get_settings()
+    current_time = get_current_time_period()
+
+    return jsonify({
+        'enabled': settings.get('day_scheduling_enabled', False),
+        'current_time_period': current_time,
+        'day_times': settings.get('day_times', {})
+    })
+
+
+@app.route('/api/day/toggle', methods=['POST'])
+def toggle_day_scheduling():
+    """Toggle Day scheduling on/off."""
+    data = request.json
+    enabled = data.get('enabled', False)
+
+    settings = get_settings()
+    settings['day_scheduling_enabled'] = enabled
+
+    # If disabling, clear active atmosphere
+    if not enabled:
+        settings['active_atmosphere'] = None
+
+    # Regenerate shuffle_id when toggling
+    settings['shuffle_id'] = random.random()
+
+    save_settings(settings)
+
+    return jsonify({
+        'success': True,
+        'enabled': enabled,
+        'current_time_period': get_current_time_period()
+    })
+
+
+@app.route('/api/day/times/<time_id>/atmospheres', methods=['POST'])
+def update_time_atmospheres(time_id):
+    """Update atmospheres for a specific time period."""
+    if time_id not in ['1', '2', '3', '4', '5', '6', '7', '8']:
+        return jsonify({'error': 'Invalid time ID'}), 400
+
+    data = request.json
+    atmospheres = data.get('atmospheres', [])
+
+    settings = get_settings()
+    day_times = settings.get('day_times', {})
+
+    if time_id not in day_times:
+        return jsonify({'error': 'Time period not found'}), 404
+
+    # Update atmospheres for this time
+    day_times[time_id]['atmospheres'] = atmospheres
+
+    # Handle mirroring: update mirrored time as well
+    mirror_map = {
+        '1': '5',
+        '2': '6',
+        '3': '7',
+        '4': '8',
+        '5': '1',
+        '6': '2',
+        '7': '3',
+        '8': '4'
+    }
+
+    mirrored_id = mirror_map.get(time_id)
+    if mirrored_id:
+        day_times[mirrored_id]['atmospheres'] = atmospheres
+
+    settings['day_times'] = day_times
+
+    # Regenerate shuffle_id when changing time atmospheres
+    settings['shuffle_id'] = random.random()
+
+    save_settings(settings)
+
+    return jsonify({
+        'success': True,
+        'time_id': time_id,
+        'atmospheres': atmospheres,
+        'mirrored_id': mirrored_id
+    })
 
 
 @app.route('/images/<filename>')

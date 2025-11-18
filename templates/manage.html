@@ -408,6 +408,18 @@
             box-shadow: 0 0 8px #2196F3;
         }
 
+        .time-period-card {
+            padding: 15px;
+            background: #2a2a2a;
+            border: 1px solid #444444;
+            border-radius: 8px;
+        }
+
+        .time-period-card.active {
+            border-color: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+        }
+
         .theme-badge {
             display: inline-flex;
             align-items: center;
@@ -739,6 +751,72 @@
 
         <div class="section">
             <div style="border-bottom: 2px solid #333333; margin-bottom: 15px;"></div>
+
+            <h3 style="margin-bottom: 15px; color: #ffffff; display: flex; align-items: center; gap: 10px;">
+                Day Scheduling
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: normal; cursor: pointer;">
+                    <input type="checkbox" id="day-scheduling-toggle" style="cursor: pointer; width: 18px; height: 18px;">
+                    <span style="color: #aaaaaa;">Enable</span>
+                </label>
+            </h3>
+
+            <div id="day-times-container" style="display: none;">
+                <p style="color: #aaaaaa; margin-bottom: 15px; font-size: 14px;">
+                    Configure atmospheres for each 3-hour time period. Times 5-8 (evening/night) mirror times 1-4 (morning/afternoon).
+                </p>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <!-- Time 1: 5:00 AM - 8:00 AM -->
+                    <div class="time-period-card" data-time-id="1">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="color: #ffffff; margin: 0;">Time 1: 5:00 AM - 8:00 AM</h4>
+                            <button onclick="editTimePeriodAtmospheres('1')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Edit</button>
+                        </div>
+                        <div class="time-atmospheres" id="time-1-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
+                            No atmospheres assigned
+                        </div>
+                    </div>
+
+                    <!-- Time 2: 8:00 AM - 11:00 AM -->
+                    <div class="time-period-card" data-time-id="2">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="color: #ffffff; margin: 0;">Time 2: 8:00 AM - 11:00 AM</h4>
+                            <button onclick="editTimePeriodAtmospheres('2')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Edit</button>
+                        </div>
+                        <div class="time-atmospheres" id="time-2-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
+                            No atmospheres assigned
+                        </div>
+                    </div>
+
+                    <!-- Time 3: 11:00 AM - 2:00 PM -->
+                    <div class="time-period-card" data-time-id="3">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="color: #ffffff; margin: 0;">Time 3: 11:00 AM - 2:00 PM</h4>
+                            <button onclick="editTimePeriodAtmospheres('3')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Edit</button>
+                        </div>
+                        <div class="time-atmospheres" id="time-3-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
+                            No atmospheres assigned
+                        </div>
+                    </div>
+
+                    <!-- Time 4: 2:00 PM - 5:00 PM -->
+                    <div class="time-period-card" data-time-id="4">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="color: #ffffff; margin: 0;">Time 4: 2:00 PM - 5:00 PM</h4>
+                            <button onclick="editTimePeriodAtmospheres('4')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Edit</button>
+                        </div>
+                        <div class="time-atmospheres" id="time-4-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
+                            No atmospheres assigned
+                        </div>
+                    </div>
+                </div>
+
+                <p style="color: #888; font-size: 12px; font-style: italic;">
+                    Note: Evening/night periods (5:00 PM - 5:00 AM) automatically mirror the settings above.
+                </p>
+            </div>
+
+            <div style="margin-bottom: 30px;"></div>
 
             <h3 style="margin-bottom: 15px; color: #ffffff;">Atmospheres</h3>
             <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
@@ -1487,6 +1565,184 @@
             }
         }
 
+        // Day scheduling management functions
+        let daySchedulingEnabled = false;
+        let dayTimes = {};
+        let currentTimePeriod = null;
+
+        async function loadDayScheduling() {
+            try {
+                const response = await fetch('/api/day/status');
+                const data = await response.json();
+                daySchedulingEnabled = data.enabled;
+                dayTimes = data.day_times;
+                currentTimePeriod = data.current_time_period;
+
+                // Update toggle checkbox
+                const toggle = document.getElementById('day-scheduling-toggle');
+                toggle.checked = daySchedulingEnabled;
+
+                // Show/hide day times container
+                const container = document.getElementById('day-times-container');
+                container.style.display = daySchedulingEnabled ? 'block' : 'none';
+
+                // Update time period displays
+                updateTimePeriodDisplays();
+
+                // Highlight current time period
+                highlightCurrentTimePeriod();
+            } catch (error) {
+                console.error('Error loading day scheduling:', error);
+            }
+        }
+
+        function updateTimePeriodDisplays() {
+            // Only update times 1-4 (times 5-8 mirror these)
+            for (let i = 1; i <= 4; i++) {
+                const timeId = i.toString();
+                const atmospheres = dayTimes[timeId]?.atmospheres || [];
+                const displayElement = document.getElementById(`time-${timeId}-atmospheres`);
+
+                if (atmospheres.length === 0) {
+                    displayElement.textContent = 'No atmospheres assigned';
+                    displayElement.style.color = '#aaaaaa';
+                } else {
+                    displayElement.textContent = atmospheres.join(', ');
+                    displayElement.style.color = '#ffffff';
+                }
+            }
+        }
+
+        function highlightCurrentTimePeriod() {
+            // Remove active class from all cards
+            document.querySelectorAll('.time-period-card').forEach(card => {
+                card.classList.remove('active');
+            });
+
+            if (!daySchedulingEnabled || !currentTimePeriod) return;
+
+            // Map time periods 5-8 to their mirrored 1-4
+            const displayMap = {
+                '1': '1', '2': '2', '3': '3', '4': '4',
+                '5': '1', '6': '2', '7': '3', '8': '4'
+            };
+
+            const displayTime = displayMap[currentTimePeriod];
+            const card = document.querySelector(`.time-period-card[data-time-id="${displayTime}"]`);
+            if (card) {
+                card.classList.add('active');
+            }
+        }
+
+        async function toggleDayScheduling() {
+            const toggle = document.getElementById('day-scheduling-toggle');
+            const enabled = toggle.checked;
+
+            try {
+                const response = await fetch('/api/day/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled })
+                });
+
+                if (response.ok) {
+                    daySchedulingEnabled = enabled;
+                    const container = document.getElementById('day-times-container');
+                    container.style.display = enabled ? 'block' : 'none';
+
+                    // Reload data to reflect changes
+                    await loadDayScheduling();
+                    await loadAtmospheres();
+                    await loadThemes();
+                    await loadImages();
+
+                    showMessage(`Day scheduling ${enabled ? 'enabled' : 'disabled'}`, 'success');
+                } else {
+                    showMessage('Error toggling day scheduling', 'error');
+                    toggle.checked = !enabled;
+                }
+            } catch (error) {
+                console.error('Error toggling day scheduling:', error);
+                showMessage('Error toggling day scheduling', 'error');
+                toggle.checked = !enabled;
+            }
+        }
+
+        function editTimePeriodAtmospheres(timeId) {
+            const assignedAtmospheres = dayTimes[timeId]?.atmospheres || [];
+
+            // Build checkboxes for all atmospheres
+            let atmosphereCheckboxes = '';
+            for (const atmosphereName in availableAtmospheres) {
+                const checked = assignedAtmospheres.includes(atmosphereName) ? 'checked' : '';
+                atmosphereCheckboxes += `
+                    <div style="margin-bottom: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" value="${atmosphereName}" ${checked} style="cursor: pointer;">
+                            <span>${atmosphereName}</span>
+                        </label>
+                    </div>
+                `;
+            }
+
+            // Get time period label
+            const timeLabels = {
+                '1': '5:00 AM - 8:00 AM',
+                '2': '8:00 AM - 11:00 AM',
+                '3': '11:00 AM - 2:00 PM',
+                '4': '2:00 PM - 5:00 PM'
+            };
+
+            const html = `
+                <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;" id="time-atmospheres-modal">
+                    <div style="background: white; padding: 30px; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                        <h3 style="margin-top: 0; margin-bottom: 20px;">Select Atmospheres for Time ${timeId} (${timeLabels[timeId]})</h3>
+                        <div id="atmosphere-checkboxes">
+                            ${atmosphereCheckboxes}
+                        </div>
+                        <div style="display: flex; gap: 10px; margin-top: 20px;">
+                            <button onclick="saveTimePeriodAtmospheres('${timeId}')" style="flex: 1; padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Save</button>
+                            <button onclick="closeTimePeriodAtmospheresModal()" style="flex: 1; padding: 10px; background: #999; color: white; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        async function saveTimePeriodAtmospheres(timeId) {
+            const checkboxes = document.querySelectorAll('#atmosphere-checkboxes input[type="checkbox"]:checked');
+            const selectedAtmospheres = Array.from(checkboxes).map(cb => cb.value);
+
+            try {
+                const response = await fetch(`/api/day/times/${timeId}/atmospheres`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ atmospheres: selectedAtmospheres })
+                });
+
+                if (response.ok) {
+                    closeTimePeriodAtmospheresModal();
+                    await loadDayScheduling();
+                    await loadImages();
+                    showMessage(`Atmospheres updated for Time ${timeId}`, 'success');
+                } else {
+                    showMessage('Error updating time period atmospheres', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating time period atmospheres:', error);
+                showMessage('Error updating time period atmospheres', 'error');
+            }
+        }
+
+        function closeTimePeriodAtmospheresModal() {
+            const modal = document.getElementById('time-atmospheres-modal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
         // Theme management functions
         let availableThemes = {};
         let activeTheme = null;
@@ -2095,6 +2351,7 @@
 
         // Load data on page load
         async function initializePage() {
+            await loadDayScheduling();
             await loadAtmospheres();
             await loadThemes();
             await loadImages();
@@ -2104,6 +2361,10 @@
             const response = await fetch('/api/settings');
             const settings = await response.json();
             previousShuffleId = settings.shuffle_id;
+
+            // Add event listener for day scheduling toggle
+            const dayToggle = document.getElementById('day-scheduling-toggle');
+            dayToggle.addEventListener('change', toggleDayScheduling);
         }
 
         initializePage();
