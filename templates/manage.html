@@ -2164,6 +2164,8 @@
             const cropData = imageCrops[imageName];
 
             // Initialize cropper
+            const displayAspect = 2560 / 2880; // 0.889 - viewport aspect ratio
+
             currentCropper = new Cropper(image, {
                 viewMode: 1,
                 dragMode: 'move',
@@ -2184,6 +2186,35 @@
                             y: cropData.y,
                             width: cropData.width,
                             height: cropData.height
+                        });
+                    } else {
+                        // No existing crop - create default crop matching display aspect ratio
+                        const imageData = currentCropper.getImageData();
+                        const imgW = imageData.naturalWidth;
+                        const imgH = imageData.naturalHeight;
+                        const imgAspect = imgW / imgH;
+
+                        let cropW, cropH, cropX, cropY;
+
+                        if (imgAspect > displayAspect) {
+                            // Image is wider than display - fit height, center width
+                            cropH = imgH;
+                            cropW = cropH * displayAspect;
+                            cropY = 0;
+                            cropX = (imgW - cropW) / 2;
+                        } else {
+                            // Image is taller than display - fit width, center height
+                            cropW = imgW;
+                            cropH = cropW / displayAspect;
+                            cropX = 0;
+                            cropY = (imgH - cropH) / 2;
+                        }
+
+                        currentCropper.setData({
+                            x: cropX,
+                            y: cropY,
+                            width: cropW,
+                            height: cropH
                         });
                     }
                 }
