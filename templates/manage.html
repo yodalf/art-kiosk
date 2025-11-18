@@ -2239,6 +2239,21 @@
             currentCropImage = null;
         }
 
+        function toggleAspectRatio() {
+            if (!currentCropper) return;
+
+            const displayAspect = 2560 / 2880;
+            const checkbox = document.getElementById('lock-aspect-ratio');
+
+            if (checkbox.checked) {
+                // Lock aspect ratio
+                currentCropper.setAspectRatio(displayAspect);
+            } else {
+                // Unlock aspect ratio (free form)
+                currentCropper.setAspectRatio(NaN);
+            }
+        }
+
         async function saveCrop() {
             if (!currentCropper || !currentCropImage) {
                 return;
@@ -2516,6 +2531,12 @@
     <div id="crop-modal" class="crop-modal">
         <div class="crop-modal-content">
             <h2>Crop Image</h2>
+            <div style="margin-bottom: 10px;">
+                <label style="color: #ffffff; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="lock-aspect-ratio" checked onchange="toggleAspectRatio()">
+                    <span>Lock aspect ratio (2560/2880)</span>
+                </label>
+            </div>
             <div class="crop-container">
                 <img id="crop-image" src="" alt="Image to crop">
             </div>
