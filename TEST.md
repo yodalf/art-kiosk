@@ -7,13 +7,14 @@
 
 ## Executive Summary
 
-**Total Tests:** 54
-**Passed:** 54 ✓
+**Total Tests:** 57
+**Passed:** 57 ✓
 **Failed:** 0
+**Skipped:** 0
 **Success Rate:** 100%
-**Execution Time:** 23.70 seconds
+**Execution Time:** 38.98 seconds
 
-All test suites passed successfully, validating the complete functionality of the Art Kiosk system including image management, theme management, atmosphere management, and day scheduling features.
+All test suites passed successfully, validating the complete functionality of the Art Kiosk system including image management, theme management, atmosphere management, day scheduling features, and UI components.
 
 ---
 
@@ -41,7 +42,7 @@ All test suites passed successfully, validating the complete functionality of th
 
 ---
 
-### 2. Integration Tests (40 tests)
+### 2. Integration Tests (43 tests)
 
 #### Atmosphere Management (9 tests)
 Validates REQ-ATM-001 through REQ-ATM-009
@@ -56,14 +57,17 @@ Validates REQ-ATM-001 through REQ-ATM-009
 - ✓ `test_req_atm_008_delete_resets_if_active` - Deleting active atmosphere resets to none
 - ✓ `test_req_atm_009_cadence_controls_transitions` - Atmosphere interval controls timing
 
-#### Day Scheduling (5 tests)
-Validates time-based atmosphere switching with 12 two-hour periods
+#### Day Scheduling (8 tests)
+Validates time-based atmosphere switching with 12 two-hour periods and UI display
 
 - ✓ `test_hour_boundary_detection` - Hour boundaries detected correctly with mock time
 - ✓ `test_time_period_calculation` - Time periods calculated correctly for all hours
 - ✓ `test_day_scheduling_enable_disable` - Day scheduling can be enabled/disabled
 - ✓ `test_rapid_hour_transitions` - Multiple rapid hour transitions handled correctly
 - ✓ `test_time_period_atmosphere_assignment` - Atmospheres can be assigned to time periods
+- ✓ `test_req_day_017_dynamic_time_labels_am_cycle` - Time labels show AM cycle (6am-6pm) with mocked time
+- ✓ `test_req_day_017_dynamic_time_labels_pm_cycle` - Time labels show PM cycle (6pm-6am) with mocked time
+- ✓ `test_dynamic_time_labels_update_on_page_load` - Time labels update automatically on page load
 
 #### Image Management (10 tests)
 Validates REQ-IMG-001 through REQ-IMG-014
@@ -103,15 +107,24 @@ Validates REQ-THEME-001 through REQ-THEME-014
 
 ## Test Infrastructure Features
 
-### Automatic Day Scheduling Management
-Tests automatically disable day scheduling at start to prevent interference with test execution, and restore the original state after completion.
+### Session-Scoped Fixtures
+Day scheduling state is managed at the session level to prevent race conditions:
+- **Session start:** Save day scheduling state once, disable for all tests
+- **Session end:** Restore day scheduling state once after all tests complete
+- **Prevents race conditions:** Multiple tests no longer independently save/restore state
+- Uses `@pytest.fixture(scope="session", autouse=True)` in conftest.py
 
 **Status Messages:**
-- `⚠ Day scheduling was ON - disabling for tests`
-- `✓ Restoring day scheduling to ON`
+- `⚠ SESSION START: Day scheduling was ON - disabling for all tests`
+- `✓ SESSION END: Restoring day scheduling to ON`
 
-### Cleanup Verification
-All tests properly clean up uploaded images and created resources:
+### Per-Test Cleanup
+Individual test resources are cleaned up after each test:
+- Images, themes, and atmospheres created during tests are automatically removed
+- Image enable/disable states are restored to original values
+- Ensures complete test isolation
+
+**Status Messages:**
 - `✓ Cleaned up N test images` - Confirms test images were removed
 
 ### Test Mode API
@@ -119,6 +132,12 @@ Comprehensive test mode API enables deterministic testing of time-dependent feat
 - Mock time control for simulating specific hours
 - Interval overrides for faster test execution
 - Manual triggers for hour boundaries and slideshow advances
+
+### Browser Time Mocking
+UI tests mock the browser's Date object to test time-dependent features:
+- AM cycle tests mock time to 10:00 to force daytime labels
+- PM cycle tests mock time to 22:00 to force evening/night labels
+- Ensures both test paths run on every test execution (0 skipped tests)
 
 ---
 
@@ -184,6 +203,7 @@ All requirements from REQUIREMENTS.md have been validated:
 - **REQ-DAY-005** ✓ Atmosphere assignment to time periods
 - **REQ-DAY-006** ✓ Time period mirroring (periods 1-6 mirror at 7-12)
 - **REQ-DAY-007** ✓ Shuffle ID regeneration on time period changes
+- **REQ-DAY-017** ✓ Dynamic time period labels show AM/PM cycle based on current hour
 
 ---
 
@@ -219,9 +239,11 @@ The test suite includes comprehensive cleanup mechanisms to ensure:
 
 ### Test Isolation
 - Each test runs independently with proper setup and teardown
-- Fixtures automatically manage server state
+- Session-scoped fixtures manage day scheduling state across entire test session
+- Per-test fixtures manage individual resources (images, themes, atmospheres)
 - Day scheduling is disabled during tests to prevent interference
 - Test mode API enables deterministic time-based testing
+- Browser time mocking ensures UI tests run consistently regardless of actual time
 
 ---
 
@@ -230,12 +252,18 @@ The test suite includes comprehensive cleanup mechanisms to ensure:
 1. **Continuous Integration:** All tests are suitable for CI/CD pipelines
 2. **Regression Testing:** Run full test suite before any deployment
 3. **Test Coverage:** Current test coverage validates all documented requirements
-4. **Performance:** Test execution time (23.70s) is acceptable for comprehensive suite
+4. **Performance:** Test execution time (38.98s) is acceptable for comprehensive suite including UI tests
 
 ---
 
 ## Conclusion
 
-The Art Kiosk test suite successfully validates all core functionality with 100% pass rate. The system demonstrates robust behavior across image management, theme organization, atmosphere scheduling, and day-based time period features. All documented requirements have been verified through automated testing.
+The Art Kiosk test suite successfully validates all core functionality with 100% pass rate. The system demonstrates robust behavior across image management, theme organization, atmosphere scheduling, day-based time period features, and UI components. All documented requirements have been verified through automated testing.
+
+**Enhanced in this version:**
+- Session-scoped fixtures prevent test cleanup race conditions
+- Browser time mocking ensures UI tests run completely (0 skipped tests)
+- Dynamic time period label validation (REQ-DAY-017)
+- Comprehensive state restoration after all tests
 
 **Status: ✓ ALL TESTS PASSING**
