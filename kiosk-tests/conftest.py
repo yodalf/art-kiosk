@@ -322,6 +322,10 @@ def server_state(api_client):
                 self.original_active_atmosphere = settings.get('active_atmosphere')
                 self.original_day_scheduling = False
 
+                # Save day_times (time period atmosphere assignments)
+                import copy
+                self.original_day_times = copy.deepcopy(settings.get('day_times', {}))
+
                 day_status = self.client.get('/api/day/status').json()
                 self.original_day_scheduling = day_status.get('enabled', False)
 
@@ -413,6 +417,26 @@ def server_state(api_client):
                 if hasattr(self, 'original_active_atmosphere') and self.original_active_atmosphere:
                     self.client.post('/api/atmospheres/active', json={'atmosphere': self.original_active_atmosphere})
             except:
+                pass
+
+            # Restore day_times (time period atmosphere assignments)
+            try:
+                if hasattr(self, 'original_day_times'):
+                    current_settings = self.client.get('/api/settings').json()
+                    current_day_times = current_settings.get('day_times', {})
+
+                    # Restore each time period's atmospheres
+                    for time_id, original_config in self.original_day_times.items():
+                        original_atmospheres = original_config.get('atmospheres', [])
+                        current_config = current_day_times.get(time_id, {})
+                        current_atmospheres = current_config.get('atmospheres', [])
+
+                        # Only restore if it changed
+                        if original_atmospheres != current_atmospheres:
+                            self.client.post(f'/api/day/time-periods/{time_id}',
+                                           json={'atmospheres': original_atmospheres})
+            except Exception as e:
+                print(f"\n⚠ Warning: Could not restore day_times: {e}")
                 pass
 
             # Restore day scheduling state
