@@ -223,22 +223,18 @@ def get_current_time_period():
 
 def get_active_atmospheres_for_time(time_period, settings):
     """Get atmospheres for a time period, handling mirroring.
-    Times 4-12 mirror times 1-3 in a repeating pattern.
+    Times 7-12 mirror times 1-6 (12-hour repeat pattern).
     """
     day_times = settings.get('day_times', {})
 
-    # Handle mirroring - every 12 hours repeats the 6-hour pattern
-    # Times 1-3 are the base, times 4-12 mirror them
+    # Handle mirroring - times 7-12 mirror times 1-6
     mirror_map = {
-        '4': '1',  # 12 PM mirrors 6 AM
-        '5': '2',  # 2 PM mirrors 8 AM
-        '6': '3',  # 4 PM mirrors 10 AM
-        '7': '1',  # 6 PM mirrors 6 AM
-        '8': '2',  # 8 PM mirrors 8 AM
-        '9': '3',  # 10 PM mirrors 10 AM
-        '10': '1', # 12 AM mirrors 6 AM
-        '11': '2', # 2 AM mirrors 8 AM
-        '12': '3'  # 4 AM mirrors 10 AM
+        '7': '1',   # 6 PM mirrors 6 AM
+        '8': '2',   # 8 PM mirrors 8 AM
+        '9': '3',   # 10 PM mirrors 10 AM
+        '10': '4',  # 12 AM mirrors 12 PM
+        '11': '5',  # 2 AM mirrors 2 PM
+        '12': '6'   # 4 AM mirrors 4 PM
     }
 
     source_time = mirror_map.get(time_period, time_period)
@@ -1047,34 +1043,36 @@ def update_time_atmospheres(time_id):
     day_times[time_id]['atmospheres'] = atmospheres
 
     # Handle mirroring: update all mirrored times
-    # Times 1-3 are the source, times 4-12 mirror them
+    # Times 1-6 are the source, times 7-12 mirror them
     mirror_groups = {
-        '1': ['4', '7', '10'],  # 6 AM mirrors at 12 PM, 6 PM, 12 AM
-        '2': ['5', '8', '11'],  # 8 AM mirrors at 2 PM, 8 PM, 2 AM
-        '3': ['6', '9', '12']   # 10 AM mirrors at 4 PM, 10 PM, 4 AM
+        '1': ['7'],   # 6 AM mirrors at 6 PM
+        '2': ['8'],   # 8 AM mirrors at 8 PM
+        '3': ['9'],   # 10 AM mirrors at 10 PM
+        '4': ['10'],  # 12 PM mirrors at 12 AM
+        '5': ['11'],  # 2 PM mirrors at 2 AM
+        '6': ['12']   # 4 PM mirrors at 4 AM
     }
 
     mirrored_ids = []
 
-    # If updating a source time (1-3), update all its mirrors
+    # If updating a source time (1-6), update its mirror
     if time_id in mirror_groups:
         for mirror_id in mirror_groups[time_id]:
             day_times[mirror_id]['atmospheres'] = atmospheres
             mirrored_ids.append(mirror_id)
-    # If updating a mirror time (4-12), update the source and all other mirrors
+    # If updating a mirror time (7-12), update the source
     else:
         # Find which source this mirrors
         source_map = {
-            '4': '1', '7': '1', '10': '1',
-            '5': '2', '8': '2', '11': '2',
-            '6': '3', '9': '3', '12': '3'
+            '7': '1', '8': '2', '9': '3',
+            '10': '4', '11': '5', '12': '6'
         }
         source_id = source_map.get(time_id)
         if source_id:
             # Update source
             day_times[source_id]['atmospheres'] = atmospheres
             mirrored_ids.append(source_id)
-            # Update all mirrors
+            # Update the mirror (if not self)
             for mirror_id in mirror_groups[source_id]:
                 if mirror_id != time_id:  # Don't update self again
                     day_times[mirror_id]['atmospheres'] = atmospheres

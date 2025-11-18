@@ -762,7 +762,7 @@
 
             <div id="day-times-container" style="display: none;">
                 <p style="color: #aaaaaa; margin-bottom: 15px; font-size: 14px;">
-                    Configure atmospheres for each 2-hour time period. These 3 periods repeat every 12 hours throughout the day.<br>
+                    Configure atmospheres for each 2-hour time period. These 6 periods repeat after 12 hours (AM/PM mirror).<br>
                     <em>If no atmospheres are assigned to a time period, all images will be shown (like "All Images" theme).</em>
                 </p>
 
@@ -776,9 +776,6 @@
                         <div class="time-atmospheres" id="time-1-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
                             No atmospheres assigned
                         </div>
-                        <div style="color: #666; font-size: 11px; margin-top: 5px;">
-                            Also: 12 PM, 6 PM, 12 AM
-                        </div>
                     </div>
 
                     <!-- Time 2: 8:00 AM - 10:00 AM -->
@@ -789,9 +786,6 @@
                         </div>
                         <div class="time-atmospheres" id="time-2-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
                             No atmospheres assigned
-                        </div>
-                        <div style="color: #666; font-size: 11px; margin-top: 5px;">
-                            Also: 2 PM, 8 PM, 2 AM
                         </div>
                     </div>
 
@@ -804,14 +798,44 @@
                         <div class="time-atmospheres" id="time-3-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
                             No atmospheres assigned
                         </div>
-                        <div style="color: #666; font-size: 11px; margin-top: 5px;">
-                            Also: 4 PM, 10 PM, 4 AM
+                    </div>
+
+                    <!-- Time 4: 12:00 PM - 2:00 PM -->
+                    <div class="time-period-card" data-time-id="4">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="color: #ffffff; margin: 0;">Time 4: 12 PM - 2 PM</h4>
+                            <button onclick="editTimePeriodAtmospheres('4')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Edit</button>
+                        </div>
+                        <div class="time-atmospheres" id="time-4-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
+                            No atmospheres assigned
+                        </div>
+                    </div>
+
+                    <!-- Time 5: 2:00 PM - 4:00 PM -->
+                    <div class="time-period-card" data-time-id="5">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="color: #ffffff; margin: 0;">Time 5: 2 PM - 4 PM</h4>
+                            <button onclick="editTimePeriodAtmospheres('5')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Edit</button>
+                        </div>
+                        <div class="time-atmospheres" id="time-5-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
+                            No atmospheres assigned
+                        </div>
+                    </div>
+
+                    <!-- Time 6: 4:00 PM - 6:00 PM -->
+                    <div class="time-period-card" data-time-id="6">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="color: #ffffff; margin: 0;">Time 6: 4 PM - 6 PM</h4>
+                            <button onclick="editTimePeriodAtmospheres('6')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Edit</button>
+                        </div>
+                        <div class="time-atmospheres" id="time-6-atmospheres" style="color: #aaaaaa; font-size: 13px; min-height: 20px;">
+                            No atmospheres assigned
                         </div>
                     </div>
                 </div>
 
                 <p style="color: #888; font-size: 12px; font-style: italic;">
-                    Note: These 3 time periods repeat 4 times throughout the day (every 12 hours).
+                    Note: These 6 periods repeat after 12 hours. Evening/night (6 PM - 6 AM) mirrors the daytime settings.
                 </p>
             </div>
 
@@ -1596,8 +1620,8 @@
         }
 
         function updateTimePeriodDisplays() {
-            // Only update times 1-3 (times 4-12 mirror these)
-            for (let i = 1; i <= 3; i++) {
+            // Update all 6 time periods (times 7-12 mirror these)
+            for (let i = 1; i <= 6; i++) {
                 const timeId = i.toString();
                 const atmospheres = dayTimes[timeId]?.atmospheres || [];
                 const displayElement = document.getElementById(`time-${timeId}-atmospheres`);
@@ -1620,12 +1644,10 @@
 
             if (!daySchedulingEnabled || !currentTimePeriod) return;
 
-            // Map time periods 4-12 to their source 1-3
+            // Map time periods 7-12 to their source 1-6
             const displayMap = {
-                '1': '1', '2': '2', '3': '3',
-                '4': '1', '5': '2', '6': '3',
-                '7': '1', '8': '2', '9': '3',
-                '10': '1', '11': '2', '12': '3'
+                '1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6',
+                '7': '1', '8': '2', '9': '3', '10': '4', '11': '5', '12': '6'
             };
 
             const displayTime = displayMap[currentTimePeriod];
@@ -1688,9 +1710,12 @@
 
             // Get time period label
             const timeLabels = {
-                '1': '6:00 AM - 8:00 AM (also 12 PM, 6 PM, 12 AM)',
-                '2': '8:00 AM - 10:00 AM (also 2 PM, 8 PM, 2 AM)',
-                '3': '10:00 AM - 12:00 PM (also 4 PM, 10 PM, 4 AM)'
+                '1': '6:00 AM - 8:00 AM',
+                '2': '8:00 AM - 10:00 AM',
+                '3': '10:00 AM - 12:00 PM',
+                '4': '12:00 PM - 2:00 PM',
+                '5': '2:00 PM - 4:00 PM',
+                '6': '4:00 PM - 6:00 PM'
             };
 
             const html = `
