@@ -2169,7 +2169,7 @@
             currentCropper = new Cropper(image, {
                 viewMode: 1,
                 dragMode: 'move',
-                aspectRatio: NaN, // Free aspect ratio
+                aspectRatio: displayAspect, // Lock to display aspect ratio
                 autoCropArea: 1,
                 restore: false,
                 guides: true,
@@ -2179,6 +2179,9 @@
                 cropBoxResizable: true,
                 toggleDragModeOnDblclick: false,
                 ready: function() {
+                    // Set aspect ratio first to ensure it's locked
+                    currentCropper.setAspectRatio(displayAspect);
+
                     // If crop data exists, set it
                     if (cropData) {
                         currentCropper.setData({
@@ -2217,6 +2220,9 @@
                             height: cropH
                         });
                     }
+
+                    // Ensure aspect ratio is locked after setting data
+                    currentCropper.setAspectRatio(displayAspect);
                 }
             });
         }
