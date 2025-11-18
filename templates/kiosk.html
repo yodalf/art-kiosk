@@ -626,18 +626,21 @@
                 }, 100);
 
                 // Check if crop overflows or has black bars
+                const widthDiff = Math.round(viewportW - scaledCropW);
+                const heightDiff = Math.round(viewportH - scaledCropH);
+
                 if (scaledCropW > viewportW) {
                     debugLog(`  Width: Crop OVERFLOWS by ${(scaledCropW - viewportW).toFixed(0)}px (${((scaledCropW - viewportW) / 2).toFixed(0)}px hidden on each side) - GOOD, fills width`, 'info');
-                } else if (scaledCropW < viewportW) {
-                    debugLog(`  Width: BLACK BARS ${(viewportW - scaledCropW).toFixed(0)}px total (${((viewportW - scaledCropW) / 2).toFixed(0)}px on each side) - crop too narrow`, 'error');
+                } else if (widthDiff > 0) {
+                    debugLog(`  Width: BLACK BARS ${widthDiff}px total (${(widthDiff / 2).toFixed(0)}px on each side) - crop too narrow`, 'error');
                 } else {
                     debugLog(`  Width: EXACT FIT - no black bars`, 'info');
                 }
 
                 if (scaledCropH > viewportH) {
                     debugLog(`  Height: Crop OVERFLOWS by ${(scaledCropH - viewportH).toFixed(0)}px (${((scaledCropH - viewportH) / 2).toFixed(0)}px hidden on top/bottom) - GOOD, fills height`, 'info');
-                } else if (scaledCropH < viewportH) {
-                    debugLog(`  Height: BLACK BARS ${(viewportH - scaledCropH).toFixed(0)}px total (${((viewportH - scaledCropH) / 2).toFixed(0)}px on top/bottom) - crop too short`, 'error');
+                } else if (heightDiff > 0) {
+                    debugLog(`  Height: BLACK BARS ${heightDiff}px total (${(heightDiff / 2).toFixed(0)}px on top/bottom) - crop too short`, 'error');
                 } else {
                     debugLog(`  Height: EXACT FIT - no black bars`, 'info');
                 }
