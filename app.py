@@ -289,9 +289,9 @@ def list_images():
                 atm_themes = atmosphere_themes.get(atm_name, [])
                 allowed_themes.update(atm_themes)
 
-            # If no atmospheres assigned to this time, no images shown
+            # If no atmospheres assigned to this time, show all images (don't filter)
             if not allowed_themes:
-                allowed_themes = set()  # Empty set means no images match
+                allowed_themes = None  # None means show all images (like "All Images" theme)
         elif active_atmosphere:
             # If atmosphere is active (no day scheduling), get all themes in that atmosphere
             allowed_themes = set(atmosphere_themes.get(active_atmosphere, []))
