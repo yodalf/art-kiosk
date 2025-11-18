@@ -432,6 +432,11 @@
             color: #64b5f6;
         }
 
+        .theme-badge.currently-displayed {
+            border: 3px solid #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+        }
+
         .theme-badge.active {
             background: #2196F3;
             color: white;
@@ -1330,6 +1335,13 @@
                 activeAtmosphere = data.active_atmosphere;
                 atmosphereThemes = data.atmosphere_themes;
 
+                // Get currently displayed atmospheres if Day scheduling is enabled
+                let currentlyDisplayedAtmospheres = [];
+                if (daySchedulingEnabled && currentTimePeriod) {
+                    const currentTimeAtmospheres = get_active_atmospheres_for_time(currentTimePeriod);
+                    currentlyDisplayedAtmospheres = currentTimeAtmospheres;
+                }
+
                 // Update atmospheres list
                 const atmospheresList = document.getElementById('atmospheres-list');
                 atmospheresList.innerHTML = '';
@@ -1341,8 +1353,14 @@
 
                     const badge = document.createElement('div');
                     badge.className = 'theme-badge';
-                    if (atmosphereName === activeAtmosphere) {
+                    if (atmosphereName === activeAtmosphere && !daySchedulingEnabled) {
                         badge.classList.add('active');
+                    }
+
+                    // Highlight if currently displayed via Day scheduling
+                    const isCurrentlyDisplayed = daySchedulingEnabled && currentlyDisplayedAtmospheres.includes(atmosphereName);
+                    if (isCurrentlyDisplayed) {
+                        badge.classList.add('currently-displayed');
                     }
 
                     badge.innerHTML = `
@@ -1593,6 +1611,16 @@
         let dayTimes = {};
         let currentTimePeriod = null;
 
+        function get_active_atmospheres_for_time(timePeriod) {
+            // Mirror map for times 7-12
+            const mirrorMap = {
+                '7': '1', '8': '2', '9': '3',
+                '10': '4', '11': '5', '12': '6'
+            };
+            const sourceTime = mirrorMap[timePeriod] || timePeriod;
+            return dayTimes[sourceTime]?.atmospheres || [];
+        }
+
         async function loadDayScheduling() {
             try {
                 const response = await fetch('/api/day/status');
@@ -1818,8 +1846,26 @@
 
             const badge = document.createElement('div');
             badge.className = 'theme-badge';
-            // Only show theme as active if no atmosphere is active
-            if (themeName === activeTheme && !activeAtmosphere) {
+
+            // Check if this theme is currently displayed
+            let isCurrentlyDisplayed = false;
+            if (daySchedulingEnabled && currentTimePeriod) {
+                // Get atmospheres for current time period
+                const currentTimeAtmospheres = get_active_atmospheres_for_time(currentTimePeriod);
+                // Check if this theme is in any of those atmospheres
+                for (const atmName of currentTimeAtmospheres) {
+                    const atmThemes = atmosphereThemes[atmName] || [];
+                    if (atmThemes.includes(themeName)) {
+                        isCurrentlyDisplayed = true;
+                        break;
+                    }
+                }
+            }
+
+            // Show green border if currently displayed, otherwise show as active if selected
+            if (isCurrentlyDisplayed) {
+                badge.classList.add('currently-displayed');
+            } else if (themeName === activeTheme && !activeAtmosphere && !daySchedulingEnabled) {
                 badge.classList.add('active');
             }
 
