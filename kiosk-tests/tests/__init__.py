@@ -1,0 +1,1 @@
+"""Art Kiosk test suite."""

@@ -31,3 +31,10 @@ Thumbs.db
 # Logs
 *.log
 device.txt
+
+# Testing (kiosk-tests directory has its own .gitignore)
+kiosk-tests/venv/
+kiosk-tests/__pycache__/
+kiosk-tests/.pytest_cache/
+kiosk-tests/screenshots/*.png
+kiosk-tests/screenshots/*.jpg
