@@ -315,7 +315,7 @@ def server_state(api_client):
             self._save_original_state()
 
         def _save_original_state(self):
-            """Save current server state for restoration."""
+            """Save current server state for restoration AND disable day scheduling."""
             try:
                 settings = self.client.get('/api/settings').json()
                 self.original_active_theme = settings.get('active_theme')
@@ -324,6 +324,11 @@ def server_state(api_client):
 
                 day_status = self.client.get('/api/day/status').json()
                 self.original_day_scheduling = day_status.get('enabled', False)
+
+                # CRITICAL: Disable day scheduling for tests to prevent interference
+                if self.original_day_scheduling:
+                    print(f"\n⚠ Day scheduling was ON - disabling for tests")
+                    self.client.post('/api/day/disable')
             except:
                 pass
 
@@ -414,9 +419,11 @@ def server_state(api_client):
             try:
                 if hasattr(self, 'original_day_scheduling'):
                     if self.original_day_scheduling:
+                        print(f"\n✓ Restoring day scheduling to ON")
                         self.client.post('/api/day/enable')
                     else:
-                        self.client.post('/api/day/disable')
+                        # Already disabled, no need to restore
+                        pass
             except:
                 pass
 
