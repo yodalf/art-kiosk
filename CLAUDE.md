@@ -14,21 +14,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **CRITICAL**: When deploying file changes to the Raspberry Pi kiosk, ALWAYS follow this process:
 
+**Device Credentials**: ALWAYS read from `device.txt` file (gitignored) before deploying. This file contains the hostname, username, and password needed for SSH/SCP commands.
+
 ```bash
 # 1. Stop both services first
-sshpass -p "toto" ssh -o StrictHostKeyChecking=no realo@raspberrypi.local "sudo systemctl stop kiosk-display.service && sudo systemctl stop kiosk-firefox.service"
+sshpass -p '<password>' ssh <username>@<hostname> "sudo systemctl stop kiosk-display.service && sudo systemctl stop kiosk-firefox.service"
 
 # 2. Copy updated files
-sshpass -p "toto" scp -o StrictHostKeyChecking=no /path/to/local/file realo@raspberrypi.local:/home/realo/kiosk_images/path/to/file
+sshpass -p '<password>' scp /path/to/local/file <username>@<hostname>:/home/<username>/kiosk_images/path/to/file
 
 # 3. Start both services
-sshpass -p "toto" ssh -o StrictHostKeyChecking=no realo@raspberrypi.local "sudo systemctl start kiosk-display.service && sudo systemctl start kiosk-firefox.service"
+sshpass -p '<password>' ssh <username>@<hostname> "sudo systemctl start kiosk-display.service && sudo systemctl start kiosk-firefox.service"
 
-# 4. Verify services are running
-sshpass -p "toto" ssh -o StrictHostKeyChecking=no realo@raspberrypi.local "sudo systemctl status kiosk-display.service"
+# 4. Verify services are running (optional)
+sshpass -p '<password>' ssh <username>@<hostname> "sudo systemctl status kiosk-display.service"
 ```
 
 **Why this matters**: Updating files while services are running can confuse the system and cause race conditions. Always stop both services before updating any files, then restart both after deployment.
+
+**Note**: The `device.txt` file is gitignored and should never be committed to version control. Read it at the start of every deployment.
 
 ## Project Overview
 

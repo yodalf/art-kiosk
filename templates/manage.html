@@ -718,6 +718,7 @@
         <h1>Kiosk Image Management</h1>
 
         <div class="navigation">
+            <a href="/remote" class="nav-link">Remote</a>
             <a href="/" class="nav-link active">Manage</a>
             <a href="/upload" class="nav-link">Upload</a>
             <a href="/search" class="nav-link">Search Art</a>
@@ -727,32 +728,6 @@
         </div>
 
         <div id="message" class="message"></div>
-
-        <div class="remote-control">
-            <h3>🎮 Remote Control - Control the Kiosk Display</h3>
-            <div class="control-buttons">
-                <div class="control-button-wrapper">
-                    <button class="control-button success" onclick="sendCommand('play')">▶️ Play</button>
-                    <div class="led-indicator" id="led-play"></div>
-                </div>
-                <div class="control-button-wrapper">
-                    <button class="control-button danger" onclick="sendCommand('pause')">⏸️ Pause</button>
-                    <div class="led-indicator" id="led-pause"></div>
-                </div>
-                <div class="control-button-wrapper">
-                    <button class="control-button" onclick="sendCommand('reload')">🔃 Reload</button>
-                    <div class="led-indicator" id="led-reload"></div>
-                </div>
-                <div class="control-button-wrapper">
-                    <button class="control-button" onclick="sendCommand('prev')">⬅️ Previous</button>
-                    <div class="led-indicator" id="led-prev"></div>
-                </div>
-                <div class="control-button-wrapper">
-                    <button class="control-button" onclick="sendCommand('next')">➡️ Next</button>
-                    <div class="led-indicator" id="led-next"></div>
-                </div>
-            </div>
-        </div>
 
         <div class="section">
             <div style="border-bottom: 2px solid #333333; margin-bottom: 15px;"></div>

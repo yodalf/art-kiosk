@@ -266,6 +266,12 @@ def get_active_atmospheres_for_time(time_period, settings):
     return atmospheres
 
 
+@app.route('/remote')
+def remote():
+    """Remote control interface."""
+    return render_template('remote.html')
+
+
 @app.route('/')
 def manage():
     """Image management interface."""
