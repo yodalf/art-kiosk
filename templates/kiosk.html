@@ -421,7 +421,16 @@
 
                 // Check if container has valid dimensions
                 if (viewportW === 0 || viewportH === 0) {
-                    debugLog(`ERROR: Container has zero dimensions (${viewportW}x${viewportH}) - cannot apply crop`, 'error');
+                    debugLog(`Container not ready (${viewportW}x${viewportH}), will retry in 100ms`, 'info');
+                    // Retry after a short delay when container is ready
+                    setTimeout(() => {
+                        if (container.clientWidth > 0 && container.clientHeight > 0) {
+                            debugLog(`Container now ready, retrying crop for ${img.alt}`, 'info');
+                            applyStyles();
+                        } else {
+                            debugLog(`ERROR: Container still has zero dimensions after delay - skipping crop for ${img.alt}`, 'error');
+                        }
+                    }, 100);
                     return;
                 }
 
@@ -455,10 +464,10 @@
                 const offsetX = -cropX * scale;
                 const offsetY = -cropY * scale;
 
-                // Center the crop region in viewport
-                // If crop is larger than viewport in one dimension, center the overflow
-                const centerX = (viewportW - scaledCropW) / 2;
-                const centerY = (viewportH - scaledCropH) / 2;
+                // Center the crop region in viewport ONLY if crop is smaller than viewport
+                // If crop is larger than viewport, align to top-left (0,0) to show the actual crop
+                const centerX = scaledCropW < viewportW ? (viewportW - scaledCropW) / 2 : 0;
+                const centerY = scaledCropH < viewportH ? (viewportH - scaledCropH) / 2 : 0;
 
                 // Apply styles with !important to override any CSS
                 // First, explicitly remove any problematic CSS properties
@@ -542,8 +551,12 @@
                         debugLog(`  SLIDESHOW-CONTAINER RECT: x=${scRect.x.toFixed(0)}, y=${scRect.y.toFixed(0)}, width=${scRect.width.toFixed(0)}, height=${scRect.height.toFixed(0)}`, 'info');
                     }
 
-                    if (renderedW !== Math.round(scaledImgW) || renderedH !== Math.round(scaledImgH)) {
-                        debugLog(`  ERROR: Rendered size doesn't match! Expected ${Math.round(scaledImgW)}x${Math.round(scaledImgH)}`, 'error');
+                    // Check rendered size with tolerance (allow rounding differences)
+                    const tolerance = 20;
+                    const widthDiff = Math.abs(renderedW - Math.round(scaledImgW));
+                    const heightDiff = Math.abs(renderedH - Math.round(scaledImgH));
+                    if (widthDiff > tolerance || heightDiff > tolerance) {
+                        debugLog(`  ERROR: Rendered size doesn't match! Expected ${Math.round(scaledImgW)}x${Math.round(scaledImgH)}, diff: ${widthDiff}x${heightDiff}`, 'error');
                     }
                 }, 100);
 
@@ -604,12 +617,23 @@
                 const leftDiff = Math.abs(visibleLeft - expectedCropLeft);
                 const rightDiff = Math.abs(visibleRight - expectedCropRight);
 
-                if (topDiff > tolerance || bottomDiff > tolerance || leftDiff > tolerance || rightDiff > tolerance) {
+                // Determine which differences are EXPECTED overflows vs actual errors
+                // Bottom overflow is expected when crop is taller than viewport (we show from top)
+                const isBottomOverflowExpected = (visibleBottom < expectedCropBottom) && (scaledCropH > viewportH);
+                // Right overflow is expected when crop is wider than viewport (we show from left)
+                const isRightOverflowExpected = (visibleRight < expectedCropRight) && (scaledCropW > viewportW);
+                // Top/left mismatches are actual errors (we should always align to top-left of crop)
+                const hasTopError = topDiff > tolerance;
+                const hasLeftError = leftDiff > tolerance;
+                const hasBottomError = (bottomDiff > tolerance) && !isBottomOverflowExpected;
+                const hasRightError = (rightDiff > tolerance) && !isRightOverflowExpected;
+
+                if (hasTopError || hasBottomError || hasLeftError || hasRightError) {
                     debugLog(`  ❌ MISMATCH DETECTED:`, 'error');
-                    if (topDiff > tolerance) debugLog(`    Top: visible ${visibleTop.toFixed(0)} vs expected ${expectedCropTop.toFixed(0)} (diff: ${topDiff.toFixed(0)}px)`, 'error');
-                    if (bottomDiff > tolerance) debugLog(`    Bottom: visible ${visibleBottom.toFixed(0)} vs expected ${expectedCropBottom.toFixed(0)} (diff: ${bottomDiff.toFixed(0)}px)`, 'error');
-                    if (leftDiff > tolerance) debugLog(`    Left: visible ${visibleLeft.toFixed(0)} vs expected ${expectedCropLeft.toFixed(0)} (diff: ${leftDiff.toFixed(0)}px)`, 'error');
-                    if (rightDiff > tolerance) debugLog(`    Right: visible ${visibleRight.toFixed(0)} vs expected ${expectedCropRight.toFixed(0)} (diff: ${rightDiff.toFixed(0)}px)`, 'error');
+                    if (hasTopError) debugLog(`    Top: visible ${visibleTop.toFixed(0)} vs expected ${expectedCropTop.toFixed(0)} (diff: ${topDiff.toFixed(0)}px)`, 'error');
+                    if (hasBottomError) debugLog(`    Bottom: visible ${visibleBottom.toFixed(0)} vs expected ${expectedCropBottom.toFixed(0)} (diff: ${bottomDiff.toFixed(0)}px)`, 'error');
+                    if (hasLeftError) debugLog(`    Left: visible ${visibleLeft.toFixed(0)} vs expected ${expectedCropLeft.toFixed(0)} (diff: ${leftDiff.toFixed(0)}px)`, 'error');
+                    if (hasRightError) debugLog(`    Right: visible ${visibleRight.toFixed(0)} vs expected ${expectedCropRight.toFixed(0)} (diff: ${rightDiff.toFixed(0)}px)`, 'error');
 
                     debugLog(`  🔍 DIAGNOSIS: We are showing the WRONG part of the image!`, 'error');
                     if (visibleTop > expectedCropTop) {
@@ -618,7 +642,20 @@
                         debugLog(`    The image needs to be shifted UP by ${(expectedCropTop - visibleTop).toFixed(0)}px`, 'error');
                     }
                 } else {
-                    debugLog(`  ✅ MATCH: Visible region matches expected crop region (within ${tolerance}px tolerance)!`, 'info');
+                    // Check for expected overflows and report them as OK
+                    let overflowMessages = [];
+                    if (isBottomOverflowExpected) {
+                        overflowMessages.push(`bottom overflow: ${bottomDiff.toFixed(0)}px hidden (expected)`);
+                    }
+                    if (isRightOverflowExpected) {
+                        overflowMessages.push(`right overflow: ${rightDiff.toFixed(0)}px hidden (expected)`);
+                    }
+
+                    if (overflowMessages.length > 0) {
+                        debugLog(`  ✅ MATCH: Crop correctly aligned to top-left, ${overflowMessages.join(', ')}`, 'info');
+                    } else {
+                        debugLog(`  ✅ MATCH: Visible region matches expected crop region (within ${tolerance}px tolerance)!`, 'info');
+                    }
                 }
             };
 
