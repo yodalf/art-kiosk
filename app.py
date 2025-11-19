@@ -1918,6 +1918,9 @@ def generate_thumbnail(video_id):
                     if is_thumbnail_mostly_black(thumbnail_path):
                         if attempt < max_retries:
                             print(f"Thumbnail is mostly black, retrying...")
+                            # Delete the black thumbnail before retrying
+                            if thumbnail_path.exists():
+                                thumbnail_path.unlink()
                             continue
                         else:
                             print(f"Thumbnail still mostly black after {max_retries + 1} attempts, keeping it anyway")
@@ -2139,6 +2142,9 @@ def execute_mpv():
                             if is_thumbnail_mostly_black(thumbnail_path):
                                 if attempt < max_retries:
                                     print(f"Thumbnail is mostly black, retrying...")
+                                    # Delete the black thumbnail before retrying
+                                    if thumbnail_path.exists():
+                                        thumbnail_path.unlink()
                                     continue
                                 else:
                                     print(f"Thumbnail still mostly black, keeping it anyway")
