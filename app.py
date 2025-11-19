@@ -44,6 +44,7 @@ current_kiosk_image = None
 # MPV IPC socket path
 MPV_SOCKET = '/tmp/mpv-socket'
 mpv_process = None
+current_video_id = None  # Track which video is currently playing
 
 # Debug message queue (stores last 500 messages)
 from collections import deque
@@ -1791,7 +1792,7 @@ def delete_video(video_id):
     """Delete a video URL."""
     import subprocess
 
-    global mpv_process
+    global mpv_process, current_video_id
 
     settings = get_settings()
     videos = settings.get('video_urls', [])
@@ -1806,6 +1807,7 @@ def delete_video(video_id):
         except:
             mpv_process.kill()
         mpv_process = None
+        current_video_id = None
 
         # Also kill any lingering mpv processes
         subprocess.run(['pkill', '-9', 'mpv'], check=False)
@@ -1913,21 +1915,25 @@ def execute_mpv():
 
     print("========== execute_mpv() CALLED ==========", flush=True)
 
-    global mpv_process
+    global mpv_process, current_video_id
 
     data = request.get_json()
     url = data.get('url')
     title = data.get('title', 'Video')
-    print(f"URL: {url}, Title: {title}", flush=True)
+    video_id = data.get('video_id')  # Get video ID from request
+    print(f"URL: {url}, Title: {title}, Video ID: {video_id}", flush=True)
 
     if not url:
         return jsonify({'error': 'URL is required'}), 400
+
+    # Store the current video ID
+    current_video_id = video_id
 
     print("About to create thread for launch_mpv_async...", flush=True)
 
     def launch_mpv_async():
         """Launch mpv in background thread to avoid blocking the response."""
-        global mpv_process
+        global mpv_process, current_video_id
         try:
             import time
             import sys
@@ -1941,6 +1947,7 @@ def execute_mpv():
                 except:
                     mpv_process.kill()
                 mpv_process = None
+                current_video_id = None
 
                 # Emit event to update UI (change Stop button back to Play)
                 with app.app_context():
@@ -2024,7 +2031,7 @@ def stop_mpv():
     import subprocess
     import threading
 
-    global mpv_process
+    global mpv_process, current_video_id
 
     def stop_mpv_async():
         """Stop mpv and restore Firefox in background thread."""
@@ -2033,7 +2040,7 @@ def stop_mpv():
 
             # STEP 1: Kill mpv process
             print("Killing mpv...")
-            global mpv_process
+            global mpv_process, current_video_id
             if mpv_process is not None:
                 try:
                     mpv_process.terminate()
@@ -2041,6 +2048,7 @@ def stop_mpv():
                 except:
                     mpv_process.kill()
                 mpv_process = None
+                current_video_id = None
                 print("Terminated mpv process")
 
             # Also kill any lingering mpv processes
@@ -2079,9 +2087,12 @@ def stop_mpv():
 @app.route('/api/videos/playback-status', methods=['GET'])
 def get_playback_status():
     """Get current video playback status."""
-    global mpv_process
+    global mpv_process, current_video_id
     is_playing = mpv_process is not None and mpv_process.poll() is None
-    return jsonify({'playing': is_playing})
+    return jsonify({
+        'playing': is_playing,
+        'video_id': current_video_id if is_playing else None
+    })
 
 
 ### Test Mode API Endpoints (for automated testing)
