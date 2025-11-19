@@ -117,6 +117,9 @@ def test_req_theme_007_active_theme_selection(api_client, server_state):
 @pytest.mark.themes
 def test_req_theme_008_active_theme_filters(api_client, image_uploader, server_state):
     """REQ-THEME-008: Active theme SHALL filter displayed images."""
+    # Ensure day scheduling is disabled for this test (in case previous tests enabled it)
+    api_client.post('/api/day/disable')
+
     # Upload image and assign to specific theme
     filename = image_uploader.upload_test_image()
     server_state.create_theme('FilterTest')
