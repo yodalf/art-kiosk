@@ -1846,12 +1846,37 @@ def execute_mpv():
         ])
 
         print(f"Launched mpv for video: {title} - {url}")
+
+        # Emit event to notify UI that video is playing
+        socketio.emit('video_playing', {'status': 'playing'})
+
         return jsonify({'success': True, 'message': 'Video playback started'})
 
     except FileNotFoundError:
         return jsonify({'error': 'mpv not found. Please install mpv.'}), 500
     except Exception as e:
         print(f"Error launching mpv: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/videos/stop-mpv', methods=['POST'])
+def stop_mpv():
+    """Stop mpv video playback by killing all mpv processes."""
+    import subprocess
+
+    try:
+        # Kill all mpv processes
+        subprocess.run(['pkill', '-9', 'mpv'], check=False)
+
+        print("Stopped mpv video playback")
+
+        # Emit event to notify UI that video stopped
+        socketio.emit('video_stopped', {'status': 'stopped'})
+
+        return jsonify({'success': True, 'message': 'Video playback stopped'})
+
+    except Exception as e:
+        print(f"Error stopping mpv: {e}")
         return jsonify({'error': str(e)}), 500
 
 

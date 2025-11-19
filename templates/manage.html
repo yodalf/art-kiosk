@@ -2578,6 +2578,8 @@
         // VIDEO MANAGEMENT (Experimental)
         // ====================================================================
 
+        let currentPlayingVideoId = null;
+
         async function loadVideos() {
             try {
                 const response = await fetch('/api/videos');
@@ -2595,16 +2597,24 @@
                     const card = document.createElement('div');
                     card.className = 'image-card';
                     card.style.cursor = 'pointer';
+                    card.id = `video-card-${video.id}`;
+
+                    const isPlaying = currentPlayingVideoId === video.id;
 
                     card.innerHTML = `
                         <div style="width: 200px; height: 150px; background: #2a2a2a; display: flex; align-items: center; justify-content: center; position: relative;">
-                            <div style="font-size: 48px;">▶</div>
+                            <div id="video-icon-${video.id}" style="font-size: 48px;">${isPlaying ? '⏹' : '▶'}</div>
                             <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); padding: 8px; font-size: 12px; text-align: center;">
                                 ${video.title}
                             </div>
                         </div>
                         <div style="padding: 8px; display: flex; gap: 8px;">
-                            <button onclick="playVideo('${video.id}')" style="flex: 1; padding: 6px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Play</button>
+                            <button
+                                id="play-btn-${video.id}"
+                                onclick="toggleVideo('${video.id}')"
+                                style="flex: 1; padding: 6px; background: ${isPlaying ? '#ff9800' : '#4CAF50'}; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                ${isPlaying ? 'Stop' : 'Play'}
+                            </button>
                             <button onclick="deleteVideo('${video.id}')" style="padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
                         </div>
                     `;
@@ -2649,6 +2659,16 @@
             }
         }
 
+        async function toggleVideo(videoId) {
+            if (currentPlayingVideoId === videoId) {
+                // Stop the currently playing video
+                await stopVideo(videoId);
+            } else {
+                // Play the video
+                await playVideo(videoId);
+            }
+        }
+
         async function playVideo(videoId) {
             try {
                 const response = await fetch(`/api/videos/${videoId}/play`, {
@@ -2656,6 +2676,9 @@
                 });
 
                 if (response.ok) {
+                    // Update UI to show Stop button
+                    currentPlayingVideoId = videoId;
+                    updateVideoButton(videoId, true);
                     console.log('Video playback started');
                 } else {
                     alert('Error playing video');
@@ -2663,6 +2686,37 @@
             } catch (error) {
                 console.error('Error playing video:', error);
                 alert('Error playing video');
+            }
+        }
+
+        async function stopVideo(videoId) {
+            try {
+                const response = await fetch('/api/videos/stop-mpv', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    // Update UI to show Play button
+                    currentPlayingVideoId = null;
+                    updateVideoButton(videoId, false);
+                    console.log('Video playback stopped');
+                } else {
+                    alert('Error stopping video');
+                }
+            } catch (error) {
+                console.error('Error stopping video:', error);
+                alert('Error stopping video');
+            }
+        }
+
+        function updateVideoButton(videoId, isPlaying) {
+            const button = document.getElementById(`play-btn-${videoId}`);
+            const icon = document.getElementById(`video-icon-${videoId}`);
+
+            if (button && icon) {
+                button.textContent = isPlaying ? 'Stop' : 'Play';
+                button.style.background = isPlaying ? '#ff9800' : '#4CAF50';
+                icon.textContent = isPlaying ? '⏹' : '▶';
             }
         }
 
