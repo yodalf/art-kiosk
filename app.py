@@ -1914,18 +1914,14 @@ def execute_mpv():
                 socketio.emit('show_loading')
             time.sleep(0.5)
 
-            # STEP 2: Kill Firefox to free up resources and prevent it from blocking mpv window
-            print("Killing Firefox...", flush=True)
-            subprocess.run(['pkill', '-9', 'firefox'], check=False)
-            time.sleep(0.5)
-
-            # STEP 3: Kill existing mpv
+            # STEP 2: Kill existing mpv
             print("Killing any existing mpv...", flush=True)
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
             time.sleep(0.3)
 
             # STEP 3: Launch mpv with working configuration for Raspberry Pi 5
             # Uses x11 video output for compatibility, limits format to reduce CPU load
+            # Disables audio to reduce CPU usage further
             print(f"Launching mpv with video: {url}", flush=True)
             mpv_env = os.environ.copy()
             mpv_env['DISPLAY'] = ':0'
@@ -1934,7 +1930,8 @@ def execute_mpv():
                 '--vo=x11',
                 '--fullscreen',
                 '--loop-file=inf',
-                '--ytdl-format=bestvideo[height<=720][fps<=30]+bestaudio/best',
+                '--no-audio',
+                '--ytdl-format=bestvideo[height<=720][fps<=30]',
                 '--hwdec=auto',
                 '--cache=auto',
                 url
@@ -1951,9 +1948,15 @@ def execute_mpv():
             else:
                 print(f"MPV process still running (PID: {mpv_proc.pid})", flush=True)
 
-            # STEP 4: Wait for mpv to stabilize (Firefox is now killed, mpv has full screen)
+            # STEP 4: Wait for mpv window to appear and bring it to front using xdotool
+            print("Waiting for mpv window to appear...", flush=True)
             time.sleep(2)
-            print("MPV should now have full screen access", flush=True)
+
+            # Use xdotool to find and focus the mpv window
+            print("Bringing mpv window to front with xdotool...", flush=True)
+            subprocess.run(['xdotool', 'search', '--class', 'mpv', 'windowactivate'], check=False)
+            time.sleep(0.5)
+            print("MPV window should now be in front", flush=True)
 
             # Emit event to notify UI that video is playing
             with app.app_context():
