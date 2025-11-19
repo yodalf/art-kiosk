@@ -1927,6 +1927,7 @@ def execute_mpv():
 
     def launch_mpv_async():
         """Launch mpv in background thread to avoid blocking the response."""
+        global mpv_process
         try:
             import time
             import sys
@@ -1948,7 +1949,7 @@ def execute_mpv():
             print(f"Launching mpv with video: {url}", flush=True)
             mpv_env = os.environ.copy()
             mpv_env['DISPLAY'] = ':0'
-            mpv_proc = subprocess.Popen([
+            mpv_process = subprocess.Popen([
                 'mpv',
                 '--vo=x11',
                 '--fullscreen',
@@ -1960,16 +1961,16 @@ def execute_mpv():
                 url
             ], env=mpv_env)
 
-            print(f"MPV STARTED WITH PID: {mpv_proc.pid}", flush=True)
+            print(f"MPV STARTED WITH PID: {mpv_process.pid}", flush=True)
             print(f"Started mpv with video: {title} - {url}", flush=True)
 
             # Check if mpv is still running after a brief moment
             time.sleep(0.5)
-            poll_result = mpv_proc.poll()
+            poll_result = mpv_process.poll()
             if poll_result is not None:
                 print(f"WARNING: MPV exited immediately with code: {poll_result}", flush=True)
             else:
-                print(f"MPV process still running (PID: {mpv_proc.pid})", flush=True)
+                print(f"MPV process still running (PID: {mpv_process.pid})", flush=True)
 
             # STEP 4: Wait for mpv window to appear and bring it to front using xdotool
             print("Waiting for mpv window to appear...", flush=True)
