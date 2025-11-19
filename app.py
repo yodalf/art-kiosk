@@ -1931,7 +1931,7 @@ def execute_mpv():
                 '--fullscreen',
                 '--loop-file=inf',
                 '--no-audio',
-                '--ytdl-format=bestvideo[height<=720][fps<=30]',
+                '--ytdl-format=bestvideo[height<=720]+bestaudio/best',
                 '--hwdec=auto',
                 '--cache=auto',
                 url
