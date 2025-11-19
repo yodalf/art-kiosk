@@ -1932,14 +1932,25 @@ def execute_mpv():
             import time
             import sys
 
-            # STEP 1: Navigate Firefox to loading page via WebSocket
+            # STEP 1: Stop any currently running video first
+            if mpv_process is not None:
+                print("Stopping currently playing video...", flush=True)
+                try:
+                    mpv_process.terminate()
+                    mpv_process.wait(timeout=2)
+                except:
+                    mpv_process.kill()
+                mpv_process = None
+                print("Previous video stopped", flush=True)
+
+            # STEP 2: Navigate Firefox to loading page via WebSocket
             print("Showing loading page...", flush=True)
             with app.app_context():
                 socketio.emit('show_loading')
             time.sleep(0.5)
 
-            # STEP 2: Kill existing mpv
-            print("Killing any existing mpv...", flush=True)
+            # STEP 3: Kill any lingering mpv processes
+            print("Killing any lingering mpv processes...", flush=True)
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
             time.sleep(0.3)
 
