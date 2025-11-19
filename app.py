@@ -1833,11 +1833,15 @@ def execute_mpv():
         # --no-terminal: Don't show terminal output
         # --fullscreen: Start in fullscreen
         # --keep-open=no: Close when video ends
+        # --no-audio: Disable audio output completely
+        # --mute: Mute audio as backup
         subprocess.Popen([
             'mpv',
             '--fullscreen',
             '--no-terminal',
             '--keep-open=no',
+            '--no-audio',
+            '--mute=yes',
             url
         ])
 
