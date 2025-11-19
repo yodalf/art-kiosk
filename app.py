@@ -110,7 +110,8 @@ def get_settings():
             '12': {'start_hour': 4, 'atmospheres': []}   # 4:00 AM - 6:00 AM (mirrors 3)
         },
         'shuffle_id': random.random(),  # Random ID for consistent shuffling
-        'image_crops': {}  # Image name -> crop data
+        'image_crops': {},  # Image name -> crop data
+        'video_urls': []  # List of video URLs {url: str, title: str, id: str}
     }
 
     if SETTINGS_FILE.exists():
@@ -1723,6 +1724,130 @@ def rename_all_to_uuid():
         print(f"Error renaming images: {e}")
         import traceback
         traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# VIDEO URL MANAGEMENT (Experimental)
+# ============================================================================
+
+@app.route('/api/videos', methods=['GET'])
+def list_videos():
+    """Get list of all video URLs."""
+    settings = get_settings()
+    videos = settings.get('video_urls', [])
+    return jsonify(videos)
+
+
+@app.route('/api/videos', methods=['POST'])
+def add_video():
+    """Add a video URL.
+    Request: {"url": "https://...", "title": "Video Title"}
+    """
+    data = request.get_json()
+    url = data.get('url', '').strip()
+    title = data.get('title', '').strip()
+
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
+
+    if not title:
+        title = 'Untitled Video'
+
+    settings = get_settings()
+    videos = settings.get('video_urls', [])
+
+    # Generate unique ID
+    video_id = str(uuid.uuid4())
+
+    # Add video
+    video = {
+        'id': video_id,
+        'url': url,
+        'title': title,
+        'created': time.time()
+    }
+    videos.append(video)
+    settings['video_urls'] = videos
+
+    save_settings(settings)
+    socketio.emit('settings_update', settings)
+
+    return jsonify(video)
+
+
+@app.route('/api/videos/<video_id>', methods=['DELETE'])
+def delete_video(video_id):
+    """Delete a video URL."""
+    settings = get_settings()
+    videos = settings.get('video_urls', [])
+
+    # Find and remove video
+    videos = [v for v in videos if v.get('id') != video_id]
+    settings['video_urls'] = videos
+
+    save_settings(settings)
+    socketio.emit('settings_update', settings)
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/videos/<video_id>/play', methods=['POST'])
+def play_video(video_id):
+    """Play a video using mpv.
+    Sends command to kiosk to launch mpv.
+    """
+    settings = get_settings()
+    videos = settings.get('video_urls', [])
+
+    # Find video
+    video = next((v for v in videos if v.get('id') == video_id), None)
+    if not video:
+        return jsonify({'error': 'Video not found'}), 404
+
+    # Send command via WebSocket to kiosk
+    socketio.emit('play_video', {
+        'url': video['url'],
+        'title': video['title']
+    })
+
+    return jsonify({'success': True, 'video': video})
+
+
+@app.route('/api/videos/execute-mpv', methods=['POST'])
+def execute_mpv():
+    """Execute mpv to play a video.
+    This runs mpv as a subprocess in fullscreen mode.
+    """
+    import subprocess
+
+    data = request.get_json()
+    url = data.get('url')
+    title = data.get('title', 'Video')
+
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
+
+    try:
+        # Launch mpv in fullscreen mode
+        # --no-terminal: Don't show terminal output
+        # --fullscreen: Start in fullscreen
+        # --keep-open=no: Close when video ends
+        subprocess.Popen([
+            'mpv',
+            '--fullscreen',
+            '--no-terminal',
+            '--keep-open=no',
+            url
+        ])
+
+        print(f"Launched mpv for video: {title} - {url}")
+        return jsonify({'success': True, 'message': 'Video playback started'})
+
+    except FileNotFoundError:
+        return jsonify({'error': 'mpv not found. Please install mpv.'}), 500
+    except Exception as e:
+        print(f"Error launching mpv: {e}")
         return jsonify({'error': str(e)}), 500
 
 

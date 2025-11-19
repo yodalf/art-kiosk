@@ -850,6 +850,19 @@
                 <p style="color: #999;">Loading images...</p>
             </div>
         </div>
+
+        <!-- Video URLs Section (Experimental) -->
+        <div class="section">
+            <h2>Videos (Experimental)</h2>
+            <div style="margin-bottom: 20px;">
+                <input type="text" id="video-url-input" placeholder="Video URL" style="width: 300px; padding: 8px; margin-right: 10px;">
+                <input type="text" id="video-title-input" placeholder="Video Title" style="width: 200px; padding: 8px; margin-right: 10px;">
+                <button onclick="addVideo()" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Add Video</button>
+            </div>
+            <div class="image-grid" id="video-grid">
+                <p style="color: #999;">No videos added yet</p>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -2561,12 +2574,124 @@
             loadDayScheduling(); // Reload to update current time period highlighting
         });
 
+        // ====================================================================
+        // VIDEO MANAGEMENT (Experimental)
+        // ====================================================================
+
+        async function loadVideos() {
+            try {
+                const response = await fetch('/api/videos');
+                const videos = await response.json();
+
+                const grid = document.getElementById('video-grid');
+
+                if (videos.length === 0) {
+                    grid.innerHTML = '<p style="color: #999;">No videos added yet</p>';
+                    return;
+                }
+
+                grid.innerHTML = '';
+                videos.forEach(video => {
+                    const card = document.createElement('div');
+                    card.className = 'image-card';
+                    card.style.cursor = 'pointer';
+
+                    card.innerHTML = `
+                        <div style="width: 200px; height: 150px; background: #2a2a2a; display: flex; align-items: center; justify-content: center; position: relative;">
+                            <div style="font-size: 48px;">▶</div>
+                            <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); padding: 8px; font-size: 12px; text-align: center;">
+                                ${video.title}
+                            </div>
+                        </div>
+                        <div style="padding: 8px; display: flex; gap: 8px;">
+                            <button onclick="playVideo('${video.id}')" style="flex: 1; padding: 6px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Play</button>
+                            <button onclick="deleteVideo('${video.id}')" style="padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
+                        </div>
+                    `;
+
+                    grid.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error loading videos:', error);
+            }
+        }
+
+        async function addVideo() {
+            const urlInput = document.getElementById('video-url-input');
+            const titleInput = document.getElementById('video-title-input');
+
+            const url = urlInput.value.trim();
+            const title = titleInput.value.trim();
+
+            if (!url) {
+                alert('Please enter a video URL');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/videos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, title: title || 'Untitled Video' })
+                });
+
+                if (response.ok) {
+                    urlInput.value = '';
+                    titleInput.value = '';
+                    await loadVideos();
+                } else {
+                    const error = await response.json();
+                    alert('Error adding video: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error adding video:', error);
+                alert('Error adding video');
+            }
+        }
+
+        async function playVideo(videoId) {
+            try {
+                const response = await fetch(`/api/videos/${videoId}/play`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    console.log('Video playback started');
+                } else {
+                    alert('Error playing video');
+                }
+            } catch (error) {
+                console.error('Error playing video:', error);
+                alert('Error playing video');
+            }
+        }
+
+        async function deleteVideo(videoId) {
+            if (!confirm('Delete this video?')) return;
+
+            try {
+                const response = await fetch(`/api/videos/${videoId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    await loadVideos();
+                } else {
+                    alert('Error deleting video');
+                }
+            } catch (error) {
+                console.error('Error deleting video:', error);
+                alert('Error deleting video');
+            }
+        }
+
         // Load data on page load
         async function initializePage() {
             await loadDayScheduling();
             await loadAtmospheres();
             await loadThemes();
             await loadImages();
+            await loadVideos();
             updateLEDs(); // Initialize LED indicators after images are loaded
 
             // Initialize shuffle_id tracking

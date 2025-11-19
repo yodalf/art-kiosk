@@ -1148,6 +1148,36 @@
             }
         }
 
+        // ====================================================================
+        // VIDEO PLAYBACK (Experimental)
+        // ====================================================================
+
+        function playVideoWithMpv(url, title) {
+            // Log the video play request to the server
+            fetch('/api/debug/log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: `Video playback requested: ${title} - ${url}`,
+                    level: 'info'
+                })
+            });
+
+            // Launch mpv in fullscreen
+            // Note: This will only work if the kiosk page has permission to execute commands
+            // In practice, this needs to be handled by the parent process or a system service
+            const mpvCommand = `mpv --fullscreen --no-terminal "${url}"`;
+
+            // Send command to backend to execute (requires backend support)
+            fetch('/api/videos/execute-mpv', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, title })
+            }).catch(err => {
+                debugLog(`Error launching mpv: ${err}`, 'error');
+            });
+        }
+
         // WebSocket event handlers
         socket.on('connect', () => {
             debugLog('WebSocket connected', 'info');
@@ -1175,6 +1205,12 @@
         socket.on('image_list_changed', () => {
             debugLog('Image list changed via WebSocket', 'info');
             checkForImageChanges();
+        });
+
+        // Video playback event (Experimental)
+        socket.on('play_video', (data) => {
+            debugLog(`Playing video: ${data.title} - ${data.url}`, 'info');
+            playVideoWithMpv(data.url, data.title);
         });
 
         // Test mode event listeners
