@@ -1941,6 +1941,10 @@ def execute_mpv():
                 except:
                     mpv_process.kill()
                 mpv_process = None
+
+                # Emit event to update UI (change Stop button back to Play)
+                with app.app_context():
+                    socketio.emit('video_stopped', {'status': 'stopped'})
                 print("Previous video stopped", flush=True)
 
             # STEP 2: Navigate Firefox to loading page via WebSocket
