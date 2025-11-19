@@ -2686,7 +2686,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         url: video.url,
-                        title: video.title
+                        title: video.title,
+                        video_id: videoId
                     })
                 });
 
@@ -2755,12 +2756,31 @@
             }
         }
 
+        async function restorePlaybackStatus() {
+            try {
+                const response = await fetch('/api/videos/playback-status');
+                const status = await response.json();
+
+                if (status.playing && status.video_id) {
+                    // Restore the currently playing video ID
+                    currentPlayingVideoId = status.video_id;
+                    console.log('Restored playback status: video', status.video_id, 'is playing');
+                } else {
+                    currentPlayingVideoId = null;
+                }
+            } catch (error) {
+                console.error('Error restoring playback status:', error);
+                // Don't alert, just fail silently - page will still load
+            }
+        }
+
         // Load data on page load
         async function initializePage() {
             await loadDayScheduling();
             await loadAtmospheres();
             await loadThemes();
             await loadImages();
+            await restorePlaybackStatus(); // Restore video playback state before loading videos
             await loadVideos();
             updateLEDs(); // Initialize LED indicators after images are loaded
 
