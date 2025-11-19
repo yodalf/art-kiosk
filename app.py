@@ -138,7 +138,9 @@ def get_settings():
         },
         'shuffle_id': random.random(),  # Random ID for consistent shuffling
         'image_crops': {},  # Image name -> crop data
-        'video_urls': []  # List of video URLs {url: str, tags: list, id: str}
+        'video_urls': [],  # List of video URLs {url: str, id: str}
+        'video_themes': {},  # Video ID -> list of themes (like image_themes)
+        'enabled_videos': {}  # Video ID -> enabled state (like enabled_images)
     }
 
     if SETTINGS_FILE.exists():
@@ -194,6 +196,10 @@ def get_settings():
                 settings['shuffle_id'] = random.random()
             if 'image_crops' not in settings:
                 settings['image_crops'] = {}
+            if 'video_themes' not in settings:
+                settings['video_themes'] = {}
+            if 'enabled_videos' not in settings:
+                settings['enabled_videos'] = {}
             if 'day_scheduling_enabled' not in settings:
                 settings['day_scheduling_enabled'] = False
             if 'day_times' not in settings:
@@ -401,7 +407,13 @@ def list_images():
             # If only a theme is active (no atmosphere), use that theme
             allowed_themes = {active_theme}
 
-    images = []
+    video_themes = settings.get('video_themes', {})
+    enabled_videos = settings.get('enabled_videos', {})
+    video_urls = settings.get('video_urls', [])
+
+    items = []
+
+    # Add images
     for file in sorted(app.config['UPLOAD_FOLDER'].iterdir()):
         if file.is_file() and allowed_file(file.name):
             enabled = is_image_enabled(file.name)
@@ -420,23 +432,53 @@ def list_images():
             # Get themes for this image
             themes = image_themes.get(file.name, [])
 
-            images.append({
+            items.append({
                 'name': file.name,
                 'url': f'/images/{file.name}',
                 'size': file.stat().st_size,
                 'enabled': enabled,
-                'themes': themes
+                'themes': themes,
+                'type': 'image'
             })
 
-    # Randomize the order of images with a consistent seed
+    # Add videos
+    for video in video_urls:
+        video_id = video.get('id')
+        enabled = enabled_videos.get(video_id, True)  # Default to enabled
+
+        # Skip disabled videos if filtering
+        if enabled_only and not enabled:
+            continue
+
+        # Apply theme/atmosphere filtering
+        if allowed_themes is not None:
+            video_theme_list = set(video_themes.get(video_id, []))
+            # Video must belong to at least one of the allowed themes
+            if not video_theme_list.intersection(allowed_themes):
+                continue
+
+        # Get themes for this video
+        themes = video_themes.get(video_id, [])
+
+        items.append({
+            'name': video_id,
+            'url': video.get('url'),
+            'size': None,
+            'enabled': enabled,
+            'themes': themes,
+            'type': 'video',
+            'video_id': video_id
+        })
+
+    # Randomize the order of items with a consistent seed
     # Use shuffle_id so both management and kiosk see the same order
     # shuffle_id is regenerated when atmosphere/theme changes
     shuffle_id = settings.get('shuffle_id', 0)
     random.seed(shuffle_id)
-    random.shuffle(images)
+    random.shuffle(items)
     random.seed()  # Reset to random seed for other operations
 
-    return jsonify(images)
+    return jsonify(items)
 
 
 @app.route('/api/images', methods=['POST'])
@@ -1775,18 +1817,13 @@ def list_videos():
 @app.route('/api/videos', methods=['POST'])
 def add_video():
     """Add a video URL.
-    Request: {"url": "https://...", "tags": ["tag1", "tag2"]}
+    Request: {"url": "https://..."}
     """
     data = request.get_json()
     url = data.get('url', '').strip()
-    tags = data.get('tags', [])
 
     if not url:
         return jsonify({'error': 'URL is required'}), 400
-
-    # Ensure tags is a list
-    if isinstance(tags, str):
-        tags = [t.strip() for t in tags.split(',') if t.strip()]
 
     settings = get_settings()
     videos = settings.get('video_urls', [])
@@ -1798,11 +1835,22 @@ def add_video():
     video = {
         'id': video_id,
         'url': url,
-        'tags': tags,
         'created': time.time()
     }
     videos.append(video)
     settings['video_urls'] = videos
+
+    # Enable the video by default
+    enabled_videos = settings.get('enabled_videos', {})
+    enabled_videos[video_id] = True
+    settings['enabled_videos'] = enabled_videos
+
+    # Assign the new video to the active theme (if not "All Images")
+    active_theme = settings.get('active_theme')
+    if active_theme and active_theme != 'All Images':
+        video_themes = settings.get('video_themes', {})
+        video_themes[video_id] = [active_theme]
+        settings['video_themes'] = video_themes
 
     save_settings(settings)
     socketio.emit('settings_update', settings)
@@ -1820,6 +1868,18 @@ def delete_video(video_id):
     videos = [v for v in videos if v.get('id') != video_id]
     settings['video_urls'] = videos
 
+    # Clean up enabled_videos
+    enabled_videos = settings.get('enabled_videos', {})
+    if video_id in enabled_videos:
+        del enabled_videos[video_id]
+        settings['enabled_videos'] = enabled_videos
+
+    # Clean up video_themes
+    video_themes = settings.get('video_themes', {})
+    if video_id in video_themes:
+        del video_themes[video_id]
+        settings['video_themes'] = video_themes
+
     # Delete the thumbnail if it exists
     thumbnail_path = THUMBNAILS_FOLDER / f"{video_id}.png"
     if thumbnail_path.exists():
@@ -1832,34 +1892,40 @@ def delete_video(video_id):
     return jsonify({'success': True})
 
 
-@app.route('/api/videos/<video_id>/tags', methods=['POST'])
-def update_video_tags(video_id):
-    """Update tags for a video.
-    Request: {"tags": ["tag1", "tag2"]}
+@app.route('/api/videos/<video_id>/themes', methods=['POST'])
+def update_video_themes(video_id):
+    """Update themes for a video (like images).
+    Request: {"themes": ["Theme1", "Theme2"]}
     """
     data = request.get_json()
-    tags = data.get('tags', [])
-
-    # Ensure tags is a list
-    if isinstance(tags, str):
-        tags = [t.strip() for t in tags.split(',') if t.strip()]
+    themes = data.get('themes', [])
 
     settings = get_settings()
-    videos = settings.get('video_urls', [])
+    video_themes = settings.get('video_themes', {})
+    video_themes[video_id] = themes
+    settings['video_themes'] = video_themes
 
-    # Find and update video
-    for video in videos:
-        if video.get('id') == video_id:
-            video['tags'] = tags
-            break
-    else:
-        return jsonify({'error': 'Video not found'}), 404
-
-    settings['video_urls'] = videos
     save_settings(settings)
     socketio.emit('settings_update', settings)
 
-    return jsonify({'success': True, 'tags': tags})
+    return jsonify({'success': True, 'themes': themes})
+
+
+@app.route('/api/videos/<video_id>/toggle', methods=['POST'])
+def toggle_video(video_id):
+    """Toggle enabled state for a video."""
+    settings = get_settings()
+    enabled_videos = settings.get('enabled_videos', {})
+
+    # Toggle the state (default to True if not set)
+    current_state = enabled_videos.get(video_id, True)
+    enabled_videos[video_id] = not current_state
+    settings['enabled_videos'] = enabled_videos
+
+    save_settings(settings)
+    socketio.emit('settings_update', settings)
+
+    return jsonify({'success': True, 'enabled': enabled_videos[video_id]})
 
 
 @app.route('/api/videos/<video_id>/generate-thumbnail', methods=['POST'])
