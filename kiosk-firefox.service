@@ -2,7 +2,7 @@
 Description=Kiosk Firefox Display
 After=kiosk-display.service graphical.target
 Requires=kiosk-display.service
-PartOf=kiosk-display.service
+PartOf=kiosk.target
 BindsTo=kiosk-display.service
 Wants=graphical.target
 
@@ -34,4 +34,4 @@ KillMode=control-group
 TimeoutStopSec=10
 
 [Install]
-WantedBy=graphical.target
+WantedBy=kiosk.target

@@ -1,6 +1,7 @@
 [Unit]
 Description=Kiosk Image Display Server
 After=network.target
+PartOf=kiosk.target
 
 [Service]
 Type=simple
@@ -10,15 +11,19 @@ Environment="DISPLAY=:0"
 # Kill any process using port 80 before starting
 ExecStartPre=-/usr/bin/fuser -k 80/tcp
 ExecStartPre=/bin/sleep 1
+# Kill any existing mpv processes before starting
+ExecStartPre=-/usr/bin/pkill -9 mpv
 # Allow binding to port 80 without root
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 ExecStart=/home/realo/kiosk_images/venv/bin/python /home/realo/kiosk_images/app.py
 # Ensure port 80 is freed on stop
 ExecStopPost=-/usr/bin/fuser -k 80/tcp
 ExecStopPost=/bin/sleep 1
+# Kill any mpv processes on stop
+ExecStopPost=-/usr/bin/pkill -9 mpv
 Restart=always
 RestartSec=10
 TimeoutStopSec=5
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=kiosk.target

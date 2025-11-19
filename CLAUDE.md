@@ -17,16 +17,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Device Credentials**: ALWAYS read from `device.txt` file (gitignored) before deploying. This file contains the hostname, username, and password needed for SSH/rsync commands.
 
 ```bash
-# STEP 1: Stop the kiosk-display service (Firefox will stop automatically due to BindsTo)
-sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl stop kiosk-display.service"
+# STEP 1: Stop the kiosk.target (stops all services AND kills mpv)
+sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl stop kiosk.target"
 
 # STEP 2: Sync all code files using rsync (excludes venv, images, settings.json, .git)
-sshpass -p '<password>' rsync -avz --exclude 'venv/' --exclude 'images/' --exclude '*.pyc' --exclude '__pycache__/' --exclude '.git/' --exclude 'settings.json' ./ <username>@<hostname>:~/kiosk_images/
+sshpass -p '<password>' rsync -avz --exclude 'venv/' --exclude 'images/' --exclude '*.pyc' --exclude '__pycache__/' --exclude '.git/' --exclude 'settings.json' -e "ssh -o StrictHostKeyChecking=no" ./ <username>@<hostname>:~/kiosk_images/
 
-# STEP 3: Start the kiosk-display service (Firefox will start automatically)
-sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl start kiosk-display.service"
+# STEP 3: Start the kiosk.target (starts both display and firefox services)
+sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl start kiosk.target"
 
-# STEP 4: VALIDATE both services are running (REQUIRED - do not skip!)
+# STEP 4: VALIDATE all services are running (REQUIRED - do not skip!)
 # Check kiosk-display service
 sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl status kiosk-display.service --no-pager"
 
@@ -34,20 +34,16 @@ sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "s
 sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl status kiosk-firefox.service --no-pager"
 
 # If Firefox service failed, restart it:
-sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl restart kiosk-firefox.service"
-
-# Verify Firefox is now running:
-sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl status kiosk-firefox.service --no-pager"
+sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl restart kiosk-firefox.service && sleep 2 && sudo systemctl status kiosk-firefox.service --no-pager"
 ```
 
 **Why this matters**:
+- The kiosk.target manages both kiosk-display.service and kiosk-firefox.service
+- Stopping kiosk.target automatically stops all services and kills any mpv processes
 - Updating files while services are running can cause race conditions and file corruption
-- The Firefox service is bound to kiosk-display via `PartOf` and `BindsTo` directives
-- Stopping kiosk-display automatically stops Firefox
-- Starting kiosk-display automatically starts Firefox
-- However, Firefox service sometimes fails to restart automatically - you MUST validate and manually restart if needed
-- This ensures both services restart in the correct order
-- NEVER skip stopping the service before copying files
+- Starting kiosk.target starts both services in the correct order
+- Firefox service sometimes fails to restart automatically - you MUST validate and manually restart if needed
+- NEVER skip stopping the kiosk.target before copying files
 - NEVER skip validation - always check that both services are active (running)
 
 **Important**:

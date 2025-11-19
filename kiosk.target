@@ -1,0 +1,8 @@
+[Unit]
+Description=Kiosk System (Display Server + Firefox)
+After=network.target graphical.target
+Wants=graphical.target
+StopWhenUnneeded=no
+
+[Install]
+WantedBy=multi-user.target

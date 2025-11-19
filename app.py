@@ -1894,8 +1894,11 @@ def execute_mpv():
     video_id = data.get('video_id')  # Get video ID from request
     print(f"URL: {url}, Title: {title}, Video ID: {video_id}", flush=True)
 
-    # Store the current video ID
+    # Store the current video ID in memory and persist to settings
     current_video_id = video_id
+    settings = get_settings()
+    settings['current_video_id'] = video_id
+    save_settings(settings)
 
     if not url:
         return jsonify({'error': 'URL is required'}), 400
@@ -1985,7 +1988,7 @@ def stop_mpv():
     import subprocess
     import threading
 
-    global mpv_process
+    global mpv_process, current_video_id
 
     def stop_mpv_async():
         """Stop mpv and restore Firefox in background thread."""
@@ -1994,7 +1997,7 @@ def stop_mpv():
 
             # STEP 1: Kill mpv process
             print("Killing mpv...")
-            global mpv_process
+            global mpv_process, current_video_id
             if mpv_process is not None:
                 try:
                     mpv_process.terminate()
@@ -2003,6 +2006,12 @@ def stop_mpv():
                     mpv_process.kill()
                 mpv_process = None
                 print("Terminated mpv process")
+
+            # Clear the current video ID from memory and settings
+            current_video_id = None
+            settings = get_settings()
+            settings['current_video_id'] = None
+            save_settings(settings)
 
             # Also kill any lingering mpv processes
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
@@ -2163,8 +2172,21 @@ def monitor_hour_changes():
 @app.route('/api/videos/playback-status', methods=['GET'])
 def get_playback_status():
     """Get current video playback status."""
+    import subprocess
     global mpv_process, current_video_id
-    is_playing = mpv_process is not None and mpv_process.poll() is None
+
+    # Check if mpv is actually running (handles server restarts)
+    try:
+        result = subprocess.run(['pgrep', '-x', 'mpv'], capture_output=True, text=True)
+        is_playing = result.returncode == 0  # pgrep returns 0 if process found
+    except:
+        is_playing = False
+
+    # Get video_id from settings if not in memory (handles server restarts)
+    if current_video_id is None:
+        settings = get_settings()
+        current_video_id = settings.get('current_video_id')
+
     return jsonify({
         'playing': is_playing,
         'video_id': current_video_id if is_playing else None

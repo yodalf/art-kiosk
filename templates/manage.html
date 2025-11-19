@@ -2671,6 +2671,11 @@
 
         async function playVideo(videoId) {
             try {
+                // Stop currently playing video first if any
+                if (currentPlayingVideoId && currentPlayingVideoId !== videoId) {
+                    await stopVideo(currentPlayingVideoId);
+                }
+
                 // Get video data
                 const videos = await fetch('/api/videos').then(r => r.json());
                 const video = videos.find(v => v.id === videoId);
@@ -2692,8 +2697,16 @@
                 });
 
                 if (response.ok) {
-                    // Update UI to show Stop button
+                    // Update UI to show Stop button for new video
+                    const oldVideoId = currentPlayingVideoId;
                     currentPlayingVideoId = videoId;
+
+                    // Update old video button to Play if it exists
+                    if (oldVideoId && oldVideoId !== videoId) {
+                        updateVideoButton(oldVideoId, false);
+                    }
+
+                    // Update new video button to Stop
                     updateVideoButton(videoId, true);
                     console.log('Video playback started');
                 } else {
@@ -2741,6 +2754,11 @@
             if (!confirm('Delete this video?')) return;
 
             try {
+                // Stop video first if it's currently playing
+                if (currentPlayingVideoId === videoId) {
+                    await stopVideo(videoId);
+                }
+
                 const response = await fetch(`/api/videos/${videoId}`, {
                     method: 'DELETE'
                 });
