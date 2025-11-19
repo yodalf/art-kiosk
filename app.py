@@ -2076,6 +2076,14 @@ def stop_mpv():
     return jsonify({'success': True, 'message': 'Stopping video...'})
 
 
+@app.route('/api/videos/playback-status', methods=['GET'])
+def get_playback_status():
+    """Get current video playback status."""
+    global mpv_process
+    is_playing = mpv_process is not None and mpv_process.poll() is None
+    return jsonify({'playing': is_playing})
+
+
 ### Test Mode API Endpoints (for automated testing)
 
 @app.route('/api/test/enable', methods=['POST'])
