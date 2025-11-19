@@ -1800,6 +1800,8 @@ def delete_video(video_id):
 def play_video(video_id):
     """Play a video using mpv (legacy endpoint - redirects to execute-mpv).
     """
+    import threading
+
     settings = get_settings()
     videos = settings.get('video_urls', [])
 
@@ -1808,41 +1810,48 @@ def play_video(video_id):
     if not video:
         return jsonify({'error': 'Video not found'}), 404
 
-    # Call the execute_mpv logic directly
-    try:
-        # STEP 1: Stop Firefox
-        print("Stopping Firefox kiosk...")
-        subprocess.run(['sudo', 'systemctl', 'stop', 'kiosk-firefox.service'], check=False)
-        time.sleep(1)
+    def launch_mpv_async():
+        """Launch mpv in background thread to avoid blocking the response."""
+        try:
+            # STEP 1: Stop Firefox
+            print("Stopping Firefox kiosk...")
+            subprocess.run(['sudo', 'systemctl', 'stop', 'kiosk-firefox.service'], check=False)
+            time.sleep(1)
 
-        # STEP 2: Kill existing mpv
-        print("Killing any existing mpv...")
-        subprocess.run(['pkill', '-9', 'mpv'], check=False)
-        time.sleep(0.5)
+            # STEP 2: Kill existing mpv
+            print("Killing any existing mpv...")
+            subprocess.run(['pkill', '-9', 'mpv'], check=False)
+            time.sleep(0.5)
 
-        # STEP 3: Launch mpv directly with the video URL
-        print(f"Launching mpv with video: {video['url']}")
-        mpv_env = os.environ.copy()
-        mpv_env['DISPLAY'] = ':0'
-        subprocess.Popen([
-            'mpv',
-            '--fullscreen',
-            '--no-osd-bar',
-            '--osd-level=0',
-            '--no-border',
-            '--ytdl-format=bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
-            '--hwdec=auto',
-            '--no-audio',
-            '--mute=yes',
-            video['url']
-        ], env=mpv_env)
+            # STEP 3: Launch mpv directly with the video URL
+            print(f"Launching mpv with video: {video['url']}")
+            mpv_env = os.environ.copy()
+            mpv_env['DISPLAY'] = ':0'
+            subprocess.Popen([
+                'mpv',
+                '--fullscreen',
+                '--no-osd-bar',
+                '--osd-level=0',
+                '--no-border',
+                '--ytdl-format=bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+                '--hwdec=auto',
+                '--no-audio',
+                '--mute=yes',
+                video['url']
+            ], env=mpv_env)
 
-        print("MPV launch command sent")
-        return jsonify({'success': True, 'message': 'Video playback started'})
+            print("MPV launch command sent")
+        except Exception as e:
+            print(f"Error executing mpv: {e}")
+            import traceback
+            traceback.print_exc()
 
-    except Exception as e:
-        print(f"Error executing mpv: {e}")
-        return jsonify({'error': str(e)}), 500
+    # Start mpv in background thread
+    thread = threading.Thread(target=launch_mpv_async, daemon=True)
+    thread.start()
+
+    # Return immediately
+    return jsonify({'success': True, 'message': 'Video playback starting...'})
 
 
 @app.route('/api/videos/execute-mpv', methods=['POST'])
@@ -1852,6 +1861,7 @@ def execute_mpv():
     """
     import subprocess
     import os
+    import threading
 
     global mpv_process
 
@@ -1862,89 +1872,103 @@ def execute_mpv():
     if not url:
         return jsonify({'error': 'URL is required'}), 400
 
-    try:
-        # STEP 1: Stop Firefox to avoid conflict
-        print("Stopping Firefox kiosk...")
-        subprocess.run(['sudo', 'systemctl', 'stop', 'kiosk-firefox.service'], check=False)
+    def launch_mpv_async():
+        """Launch mpv in background thread to avoid blocking the response."""
+        try:
+            import time
 
-        # Wait a moment for Firefox to close
-        import time
-        time.sleep(1)
+            # STEP 1: Stop Firefox to avoid conflict
+            print("Stopping Firefox kiosk...")
+            subprocess.run(['sudo', 'systemctl', 'stop', 'kiosk-firefox.service'], check=False)
 
-        # STEP 2: Kill any existing mpv process
-        print("Killing any existing mpv...")
-        subprocess.run(['pkill', '-9', 'mpv'], check=False)
-        time.sleep(0.5)
+            # Wait a moment for Firefox to close
+            time.sleep(1)
 
-        # STEP 3: Launch mpv directly with the video URL
-        print(f"Launching mpv with video: {url}")
-        mpv_env = os.environ.copy()
-        mpv_env['DISPLAY'] = ':0'
-        subprocess.Popen([
-            'mpv',
-            '--fullscreen',
-            '--no-osd-bar',
-            '--osd-level=0',
-            '--no-border',
-            '--ytdl-format=bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
-            '--hwdec=auto',
-            '--no-audio',
-            '--mute=yes',
-            url
-        ], env=mpv_env)
+            # STEP 2: Kill any existing mpv process
+            print("Killing any existing mpv...")
+            subprocess.run(['pkill', '-9', 'mpv'], check=False)
+            time.sleep(0.5)
 
-        print(f"Started mpv with video: {title} - {url}")
+            # STEP 3: Launch mpv directly with the video URL
+            print(f"Launching mpv with video: {url}")
+            mpv_env = os.environ.copy()
+            mpv_env['DISPLAY'] = ':0'
+            subprocess.Popen([
+                'mpv',
+                '--fullscreen',
+                '--no-osd-bar',
+                '--osd-level=0',
+                '--no-border',
+                '--ytdl-format=bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+                '--hwdec=auto',
+                '--no-audio',
+                '--mute=yes',
+                url
+            ], env=mpv_env)
 
-        # Emit event to notify UI that video is playing
-        socketio.emit('video_playing', {'status': 'playing'})
+            print(f"Started mpv with video: {title} - {url}")
 
-        return jsonify({'success': True, 'message': 'Video playback started'})
+            # Emit event to notify UI that video is playing
+            socketio.emit('video_playing', {'status': 'playing'})
 
-    except FileNotFoundError:
-        return jsonify({'error': 'mpv not found. Please install mpv.'}), 500
-    except Exception as e:
-        print(f"Error launching mpv: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        except Exception as e:
+            print(f"Error launching mpv: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # Start mpv in background thread
+    thread = threading.Thread(target=launch_mpv_async, daemon=True)
+    thread.start()
+
+    # Return immediately
+    return jsonify({'success': True, 'message': 'Video playback starting...'})
 
 
 @app.route('/api/videos/stop-mpv', methods=['POST'])
 def stop_mpv():
     """Stop mpv video playback and restart Firefox kiosk display."""
     import subprocess
+    import threading
 
     global mpv_process
 
-    try:
-        # STEP 1: Kill mpv process
-        print("Killing mpv...")
-        if mpv_process is not None:
-            try:
-                mpv_process.terminate()
-                mpv_process.wait(timeout=2)
-            except:
-                mpv_process.kill()
-            mpv_process = None
-            print("Terminated mpv process")
+    def stop_mpv_async():
+        """Stop mpv and restart Firefox in background thread."""
+        try:
+            # STEP 1: Kill mpv process
+            print("Killing mpv...")
+            global mpv_process
+            if mpv_process is not None:
+                try:
+                    mpv_process.terminate()
+                    mpv_process.wait(timeout=2)
+                except:
+                    mpv_process.kill()
+                mpv_process = None
+                print("Terminated mpv process")
 
-        # Also kill any lingering mpv processes
-        subprocess.run(['pkill', '-9', 'mpv'], check=False)
+            # Also kill any lingering mpv processes
+            subprocess.run(['pkill', '-9', 'mpv'], check=False)
 
-        # STEP 3: Restart Firefox kiosk
-        print("Restarting Firefox kiosk...")
-        subprocess.run(['sudo', 'systemctl', 'start', 'kiosk-firefox.service'], check=False)
+            # STEP 2: Restart Firefox kiosk
+            print("Restarting Firefox kiosk...")
+            subprocess.run(['sudo', 'systemctl', 'start', 'kiosk-firefox.service'], check=False)
 
-        # Emit event to notify UI that video stopped
-        socketio.emit('video_stopped', {'status': 'stopped'})
+            # Emit event to notify UI that video stopped
+            socketio.emit('video_stopped', {'status': 'stopped'})
 
-        return jsonify({'success': True, 'message': 'Video stopped, Firefox restarted'})
+            print("Firefox kiosk restarted")
+        except Exception as e:
+            print(f"Error stopping mpv: {e}")
+            import traceback
+            traceback.print_exc()
 
-    except Exception as e:
-        print(f"Error stopping mpv: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+    # Start stop process in background thread
+    thread = threading.Thread(target=stop_mpv_async, daemon=True)
+    thread.start()
+
+    # Return immediately
+    return jsonify({'success': True, 'message': 'Stopping video...'})
 
 
 ### Test Mode API Endpoints (for automated testing)
