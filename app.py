@@ -1813,15 +1813,17 @@ def play_video(video_id):
     def launch_mpv_async():
         """Launch mpv in background thread to avoid blocking the response."""
         try:
-            # STEP 1: Stop Firefox
-            print("Stopping Firefox kiosk...")
-            subprocess.run(['sudo', 'systemctl', 'stop', 'kiosk-firefox.service'], check=False)
-            time.sleep(1)
+            # STEP 1: Minimize Firefox window to background
+            print("Minimizing Firefox window...")
+            subprocess.run([
+                'DISPLAY=:0', 'xdotool', 'search', '--name', 'Firefox',
+                'windowminimize'
+            ], check=False, shell=True)
 
             # STEP 2: Kill existing mpv
             print("Killing any existing mpv...")
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
-            time.sleep(0.5)
+            time.sleep(0.3)
 
             # STEP 3: Launch mpv directly with the video URL
             print(f"Launching mpv with video: {video['url']}")
@@ -1877,17 +1879,17 @@ def execute_mpv():
         try:
             import time
 
-            # STEP 1: Stop Firefox to avoid conflict
-            print("Stopping Firefox kiosk...")
-            subprocess.run(['sudo', 'systemctl', 'stop', 'kiosk-firefox.service'], check=False)
-
-            # Wait a moment for Firefox to close
-            time.sleep(1)
+            # STEP 1: Minimize Firefox window to background
+            print("Minimizing Firefox window...")
+            subprocess.run([
+                'DISPLAY=:0', 'xdotool', 'search', '--name', 'Firefox',
+                'windowminimize'
+            ], check=False, shell=True)
 
             # STEP 2: Kill any existing mpv process
             print("Killing any existing mpv...")
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
-            time.sleep(0.5)
+            time.sleep(0.3)
 
             # STEP 3: Launch mpv directly with the video URL
             print(f"Launching mpv with video: {url}")
@@ -1933,8 +1935,10 @@ def stop_mpv():
     global mpv_process
 
     def stop_mpv_async():
-        """Stop mpv and restart Firefox in background thread."""
+        """Stop mpv and restore Firefox in background thread."""
         try:
+            import time
+
             # STEP 1: Kill mpv process
             print("Killing mpv...")
             global mpv_process
@@ -1949,15 +1953,19 @@ def stop_mpv():
 
             # Also kill any lingering mpv processes
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
+            time.sleep(0.3)
 
-            # STEP 2: Restart Firefox kiosk
-            print("Restarting Firefox kiosk...")
-            subprocess.run(['sudo', 'systemctl', 'start', 'kiosk-firefox.service'], check=False)
+            # STEP 2: Restore Firefox window to foreground
+            print("Restoring Firefox window...")
+            subprocess.run([
+                'DISPLAY=:0', 'xdotool', 'search', '--name', 'Firefox',
+                'windowactivate'
+            ], check=False, shell=True)
 
             # Emit event to notify UI that video stopped
             socketio.emit('video_stopped', {'status': 'stopped'})
 
-            print("Firefox kiosk restarted")
+            print("Firefox window restored")
         except Exception as e:
             print(f"Error stopping mpv: {e}")
             import traceback
