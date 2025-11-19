@@ -41,6 +41,10 @@ command_timestamp = 0
 # Current image being displayed on kiosk
 current_kiosk_image = None
 
+# MPV IPC socket path
+MPV_SOCKET = '/tmp/mpv-socket'
+mpv_process = None
+
 # Debug message queue (stores last 500 messages)
 from collections import deque
 debug_messages = deque(maxlen=500)
@@ -1816,10 +1820,11 @@ def play_video(video_id):
 
 @app.route('/api/videos/execute-mpv', methods=['POST'])
 def execute_mpv():
-    """Execute mpv to play a video.
-    This runs mpv as a subprocess in fullscreen mode.
-    """
+    """Execute mpv to play a video using IPC mode for better control."""
     import subprocess
+    import os
+
+    global mpv_process
 
     data = request.get_json()
     url = data.get('url')
@@ -1829,23 +1834,47 @@ def execute_mpv():
         return jsonify({'error': 'URL is required'}), 400
 
     try:
-        # Launch mpv in fullscreen mode
-        # --no-terminal: Don't show terminal output
-        # --fullscreen: Start in fullscreen
-        # --keep-open=no: Close when video ends
-        # --no-audio: Disable audio output completely
-        # --mute: Mute audio as backup
-        subprocess.Popen([
-            'mpv',
-            '--fullscreen',
-            '--no-terminal',
-            '--keep-open=no',
-            '--no-audio',
-            '--mute=yes',
-            url
-        ])
+        # Start mpv in IPC mode if not already running
+        if mpv_process is None or mpv_process.poll() is not None:
+            # Remove old socket if it exists
+            if os.path.exists(MPV_SOCKET):
+                os.remove(MPV_SOCKET)
 
-        print(f"Launched mpv for video: {title} - {url}")
+            # Launch mpv in idle mode with IPC server
+            mpv_process = subprocess.Popen([
+                'mpv',
+                '--idle',
+                '--force-window',
+                '--fullscreen',
+                '--no-osd-bar',
+                '--osd-level=0',
+                '--no-border',
+                '--ytdl-format=best',
+                f'--input-ipc-server={MPV_SOCKET}',
+                '--hwdec=auto',
+                '--really-quiet',
+                '--no-audio',
+                '--mute=yes'
+            ])
+
+            # Wait a bit for mpv to start and create socket
+            import time
+            time.sleep(0.5)
+
+        # Send command to mpv via IPC to load and play the video
+        import socket as sock
+        client = sock.socket(sock.AF_UNIX, sock.SOCK_STREAM)
+        client.connect(MPV_SOCKET)
+
+        # Send loadfile command via IPC
+        command = {
+            'command': ['loadfile', url, 'replace']
+        }
+        import json as json_module
+        client.send((json_module.dumps(command) + '\n').encode('utf-8'))
+        client.close()
+
+        print(f"Loaded video in mpv via IPC: {title} - {url}")
 
         # Emit event to notify UI that video is playing
         socketio.emit('video_playing', {'status': 'playing'})
@@ -1856,19 +1885,30 @@ def execute_mpv():
         return jsonify({'error': 'mpv not found. Please install mpv.'}), 500
     except Exception as e:
         print(f"Error launching mpv: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/videos/stop-mpv', methods=['POST'])
 def stop_mpv():
-    """Stop mpv video playback by killing all mpv processes."""
-    import subprocess
+    """Stop mpv video playback by sending stop command via IPC."""
+    import socket as sock
 
     try:
-        # Kill all mpv processes
-        subprocess.run(['pkill', '-9', 'mpv'], check=False)
+        # Send stop command via IPC
+        client = sock.socket(sock.AF_UNIX, sock.SOCK_STREAM)
+        client.connect(MPV_SOCKET)
 
-        print("Stopped mpv video playback")
+        # Send stop command
+        command = {
+            'command': ['stop']
+        }
+        import json as json_module
+        client.send((json_module.dumps(command) + '\n').encode('utf-8'))
+        client.close()
+
+        print("Stopped mpv video playback via IPC")
 
         # Emit event to notify UI that video stopped
         socketio.emit('video_stopped', {'status': 'stopped'})
