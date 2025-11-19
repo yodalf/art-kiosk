@@ -1823,6 +1823,33 @@ def trigger_slideshow_advance():
     return jsonify({'success': True})
 
 
+def monitor_hour_changes():
+    """Background thread to monitor hour changes and emit WebSocket events."""
+    import threading
+
+    last_time_period = None
+
+    while True:
+        try:
+            settings = get_settings()
+            if settings.get('day_scheduling_enabled'):
+                current_period = get_current_time_period()
+
+                if last_time_period is not None and last_time_period != current_period:
+                    # Hour boundary crossed - emit event
+                    socketio.emit('hour_boundary_changed', {
+                        'previous_period': last_time_period,
+                        'current_period': current_period
+                    })
+
+                last_time_period = current_period
+        except Exception as e:
+            print(f"Error in hour monitor: {e}")
+
+        # Check every 30 seconds
+        time.sleep(30)
+
+
 if __name__ == '__main__':
     # Load and log settings on startup
     settings = get_settings()
@@ -1833,6 +1860,12 @@ if __name__ == '__main__':
     if settings.get('enabled_images'):
         for img, enabled in settings['enabled_images'].items():
             print(f"  - {img}: {'enabled' if enabled else 'disabled'}")
+
+    # Start background thread to monitor hour changes
+    import threading
+    hour_monitor_thread = threading.Thread(target=monitor_hour_changes, daemon=True)
+    hour_monitor_thread.start()
+    print("Started hour boundary monitor thread")
 
     # Run on all interfaces, port 80
     socketio.run(app, host='0.0.0.0', port=80, debug=False, allow_unsafe_werkzeug=True)

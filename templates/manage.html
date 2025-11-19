@@ -2556,6 +2556,11 @@
             loadImages();
         });
 
+        socket.on('hour_boundary_changed', (data) => {
+            console.log(`Hour boundary changed: period ${data.previous_period} -> ${data.current_period}`);
+            loadDayScheduling(); // Reload to update current time period highlighting
+        });
+
         // Load data on page load
         async function initializePage() {
             await loadDayScheduling();
