@@ -1789,8 +1789,36 @@ def add_video():
 @app.route('/api/videos/<video_id>', methods=['DELETE'])
 def delete_video(video_id):
     """Delete a video URL."""
+    import subprocess
+
+    global mpv_process
+
     settings = get_settings()
     videos = settings.get('video_urls', [])
+
+    # Check if we're deleting a currently playing video
+    # If mpv is running, stop it first
+    if mpv_process is not None:
+        print(f"Stopping mpv before deleting video {video_id}...")
+        try:
+            mpv_process.terminate()
+            mpv_process.wait(timeout=2)
+        except:
+            mpv_process.kill()
+        mpv_process = None
+
+        # Also kill any lingering mpv processes
+        subprocess.run(['pkill', '-9', 'mpv'], check=False)
+
+        # Bring Firefox back to foreground and restore kiosk view
+        subprocess.run([
+            'bash', '-c',
+            'DISPLAY=:0 xdotool search --name Firefox windowactivate'
+        ], check=False)
+
+        socketio.emit('show_kiosk')
+        socketio.emit('video_stopped', {'status': 'stopped'})
+        print("Video playback stopped and kiosk view restored")
 
     # Find and remove video
     videos = [v for v in videos if v.get('id') != video_id]
