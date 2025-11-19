@@ -138,7 +138,7 @@ def get_settings():
         },
         'shuffle_id': random.random(),  # Random ID for consistent shuffling
         'image_crops': {},  # Image name -> crop data
-        'video_urls': []  # List of video URLs {url: str, title: str, id: str}
+        'video_urls': []  # List of video URLs {url: str, tags: list, id: str}
     }
 
     if SETTINGS_FILE.exists():
@@ -1775,17 +1775,18 @@ def list_videos():
 @app.route('/api/videos', methods=['POST'])
 def add_video():
     """Add a video URL.
-    Request: {"url": "https://...", "title": "Video Title"}
+    Request: {"url": "https://...", "tags": ["tag1", "tag2"]}
     """
     data = request.get_json()
     url = data.get('url', '').strip()
-    title = data.get('title', '').strip()
+    tags = data.get('tags', [])
 
     if not url:
         return jsonify({'error': 'URL is required'}), 400
 
-    if not title:
-        title = 'Untitled Video'
+    # Ensure tags is a list
+    if isinstance(tags, str):
+        tags = [t.strip() for t in tags.split(',') if t.strip()]
 
     settings = get_settings()
     videos = settings.get('video_urls', [])
@@ -1797,7 +1798,7 @@ def add_video():
     video = {
         'id': video_id,
         'url': url,
-        'title': title,
+        'tags': tags,
         'created': time.time()
     }
     videos.append(video)
@@ -1831,6 +1832,36 @@ def delete_video(video_id):
     return jsonify({'success': True})
 
 
+@app.route('/api/videos/<video_id>/tags', methods=['POST'])
+def update_video_tags(video_id):
+    """Update tags for a video.
+    Request: {"tags": ["tag1", "tag2"]}
+    """
+    data = request.get_json()
+    tags = data.get('tags', [])
+
+    # Ensure tags is a list
+    if isinstance(tags, str):
+        tags = [t.strip() for t in tags.split(',') if t.strip()]
+
+    settings = get_settings()
+    videos = settings.get('video_urls', [])
+
+    # Find and update video
+    for video in videos:
+        if video.get('id') == video_id:
+            video['tags'] = tags
+            break
+    else:
+        return jsonify({'error': 'Video not found'}), 404
+
+    settings['video_urls'] = videos
+    save_settings(settings)
+    socketio.emit('settings_update', settings)
+
+    return jsonify({'success': True, 'tags': tags})
+
+
 @app.route('/api/videos/<video_id>/generate-thumbnail', methods=['POST'])
 def generate_thumbnail(video_id):
     """Generate a thumbnail for a video by playing it and taking a screenshot.
@@ -1851,12 +1882,11 @@ def generate_thumbnail(video_id):
         try:
             import time
 
-            print(f"Generating thumbnail for video: {video['title']}")
+            print(f"Generating thumbnail for video: {video['url']}")
 
             # STEP 1: Start playing the video using execute-mpv endpoint
             # This will handle showing the loading screen and starting mpv
             url = video['url']
-            title = video['title']
 
             # Navigate to loading page
             with app.app_context():
@@ -2042,9 +2072,8 @@ def execute_mpv():
 
     data = request.get_json()
     url = data.get('url')
-    title = data.get('title', 'Video')
     video_id = data.get('video_id')  # Get video ID from request
-    print(f"URL: {url}, Title: {title}, Video ID: {video_id}", flush=True)
+    print(f"URL: {url}, Video ID: {video_id}", flush=True)
 
     # Store the current video ID in memory and persist to settings
     current_video_id = video_id
@@ -2094,7 +2123,7 @@ def execute_mpv():
             ], env=mpv_env)
 
             print(f"MPV STARTED WITH PID: {mpv_proc.pid}", flush=True)
-            print(f"Started mpv with video: {title} - {url}", flush=True)
+            print(f"Started mpv with video: {url}", flush=True)
 
             # Check if mpv is still running after a brief moment
             time.sleep(0.5)
