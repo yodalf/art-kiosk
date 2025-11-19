@@ -115,6 +115,7 @@
         let previousTimePeriod = null; // Track time period to detect Day scheduling transitions
         let daySchedulingEnabled = false; // Track if day scheduling is enabled
         let lastCheckHour = null; // Track last hour we checked for day scheduling transitions
+        let isPlayingVideo = false; // Track if mpv is currently playing a video
 
         // Test mode support (for automated testing)
         let testMode = {
@@ -426,6 +427,14 @@
                     slide.classList.add('contain-mode');
                 }
                 slide.dataset.index = index;
+
+                // Handle video items - create a placeholder (black) slide
+                if (image.type === 'video') {
+                    slide.classList.add('video-placeholder');
+                    slide.style.backgroundColor = '#000';
+                    container.appendChild(slide);
+                    return;
+                }
 
                 // Check if crop exists for this image
                 const cropData = imageCrops[image.name];
@@ -753,9 +762,32 @@
         }
 
         // Show specific slide
-        function showSlide(index, instant = false) {
+        async function showSlide(index, instant = false) {
             const slides = document.querySelectorAll('.slide');
 
+            // Stop any currently playing video first
+            await stopVideoIfPlaying();
+
+            // Check if this item is a video
+            const item = images[index];
+            if (item && item.type === 'video') {
+                // Hide all slides since we're playing a video
+                slides.forEach(slide => {
+                    slide.style.opacity = '0';
+                    slide.classList.remove('active');
+                });
+
+                currentIndex = index;
+
+                // Report current item to server
+                reportCurrentImage(item.name);
+
+                // Start video playback
+                await startVideoForSlideshow(item.url, item.video_id || item.name);
+                return;
+            }
+
+            // Normal image slide handling
             if (instant) {
                 // Instant transition: disable transition FIRST, then change properties
                 // Step 1: Disable transitions on all slides
@@ -763,7 +795,7 @@
                     slide.style.transition = 'none';
                 });
                 // Force reflow to ensure transition: none is applied
-                slides[0].offsetHeight;
+                if (slides[0]) slides[0].offsetHeight;
 
                 // Step 2: Now hide all slides
                 slides.forEach(slide => {
@@ -1151,6 +1183,40 @@
         // ====================================================================
         // VIDEO PLAYBACK (Experimental)
         // ====================================================================
+
+        // Stop currently playing video if any
+        async function stopVideoIfPlaying() {
+            if (isPlayingVideo) {
+                debugLog('Stopping video playback', 'info');
+                try {
+                    await fetch('/api/videos/stop-mpv', {
+                        method: 'POST'
+                    });
+                    isPlayingVideo = false;
+                } catch (err) {
+                    debugLog(`Error stopping mpv: ${err}`, 'error');
+                }
+            }
+        }
+
+        // Start video playback for slideshow items
+        async function startVideoForSlideshow(url, videoId) {
+            debugLog(`Starting video in slideshow: ${videoId}`, 'info');
+            try {
+                const response = await fetch('/api/videos/execute-mpv', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, title: videoId })
+                });
+                if (response.ok) {
+                    isPlayingVideo = true;
+                } else {
+                    debugLog(`Error starting video: ${response.status}`, 'error');
+                }
+            } catch (err) {
+                debugLog(`Error launching mpv: ${err}`, 'error');
+            }
+        }
 
         function playVideoWithMpv(url, title) {
             // Log the video play request to the server
