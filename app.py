@@ -16,8 +16,26 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 from werkzeug.utils import secure_filename
 from painting_searcher import PaintingSearcher
+from PIL import Image
 
 app = Flask(__name__)
+
+
+def is_thumbnail_mostly_black(image_path, threshold=30):
+    """Check if an image is mostly black (average brightness below threshold).
+    Returns True if the image is too dark, False otherwise.
+    """
+    try:
+        img = Image.open(image_path).convert('L')  # Convert to grayscale
+        pixels = list(img.getdata())
+        avg_brightness = sum(pixels) / len(pixels)
+        print(f"Thumbnail brightness: {avg_brightness:.1f} (threshold: {threshold})")
+        return avg_brightness < threshold
+    except Exception as e:
+        print(f"Error checking thumbnail brightness: {e}")
+        return False
+
+
 socketio = SocketIO(app, cors_allowed_origins="*")
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'images'
@@ -26,6 +44,10 @@ app.config['SLIDESHOW_INTERVAL'] = 600  # seconds (10 minutes)
 
 # Create upload folder if it doesn't exist
 app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
+
+# Create thumbnails folder for video previews
+THUMBNAILS_FOLDER = Path(__file__).parent / 'thumbnails'
+THUMBNAILS_FOLDER.mkdir(exist_ok=True)
 
 # Create EXTRA_IMAGES folder for art search downloads
 EXTRA_IMAGES_FOLDER = Path(__file__).parent / 'EXTRA_IMAGES'
@@ -1789,7 +1811,7 @@ def add_video():
 
 @app.route('/api/videos/<video_id>', methods=['DELETE'])
 def delete_video(video_id):
-    """Delete a video URL."""
+    """Delete a video URL and its thumbnail."""
     settings = get_settings()
     videos = settings.get('video_urls', [])
 
@@ -1797,10 +1819,137 @@ def delete_video(video_id):
     videos = [v for v in videos if v.get('id') != video_id]
     settings['video_urls'] = videos
 
+    # Delete the thumbnail if it exists
+    thumbnail_path = THUMBNAILS_FOLDER / f"{video_id}.png"
+    if thumbnail_path.exists():
+        thumbnail_path.unlink()
+        print(f"Deleted thumbnail: {thumbnail_path}")
+
     save_settings(settings)
     socketio.emit('settings_update', settings)
 
     return jsonify({'success': True})
+
+
+@app.route('/api/videos/<video_id>/generate-thumbnail', methods=['POST'])
+def generate_thumbnail(video_id):
+    """Generate a thumbnail for a video by playing it and taking a screenshot.
+    This will start the video, wait 20 seconds for it to load, take a screenshot,
+    and leave the video playing.
+    """
+    import subprocess
+    import threading
+
+    settings = get_settings()
+    videos = settings.get('video_urls', [])
+    video = next((v for v in videos if v.get('id') == video_id), None)
+
+    if not video:
+        return jsonify({'error': 'Video not found'}), 404
+
+    def generate_thumbnail_async():
+        try:
+            import time
+
+            print(f"Generating thumbnail for video: {video['title']}")
+
+            # STEP 1: Start playing the video using execute-mpv endpoint
+            # This will handle showing the loading screen and starting mpv
+            url = video['url']
+            title = video['title']
+
+            # Navigate to loading page
+            with app.app_context():
+                socketio.emit('show_loading')
+            time.sleep(0.5)
+
+            # Kill any existing mpv
+            subprocess.run(['pkill', '-9', 'mpv'], check=False)
+            time.sleep(0.3)
+
+            # Start mpv
+            print(f"Starting mpv for thumbnail generation...")
+            mpv_env = os.environ.copy()
+            mpv_env['DISPLAY'] = ':0'
+            mpv_proc = subprocess.Popen([
+                'mpv',
+                '--vo=x11',
+                '--fullscreen',
+                '--loop-file=inf',
+                '--no-audio',
+                '--ytdl-format=bestvideo[height<=720]+bestaudio/best',
+                '--hwdec=auto',
+                '--cache=auto',
+                '--panscan=1.0',
+                url
+            ], env=mpv_env)
+
+            print(f"MPV started with PID: {mpv_proc.pid}")
+
+            # Update current video ID and notify UI that video is playing
+            global current_video_id
+            current_video_id = video_id
+            settings = get_settings()
+            settings['current_video_id'] = video_id
+            save_settings(settings)
+
+            with app.app_context():
+                socketio.emit('video_started', {'video_id': video_id})
+
+            # STEP 2: Take screenshot with retry if mostly black
+            thumbnail_path = THUMBNAILS_FOLDER / f"{video_id}.png"
+            max_retries = 2
+
+            for attempt in range(max_retries + 1):
+                # Wait for video to load
+                wait_time = 10 if attempt == 0 else 5
+                print(f"Waiting {wait_time} seconds for video to load (attempt {attempt + 1}/{max_retries + 1})...")
+                time.sleep(wait_time)
+
+                # Take screenshot
+                print(f"Taking screenshot to: {thumbnail_path}")
+                result = subprocess.run([
+                    'scrot',
+                    str(thumbnail_path)
+                ], env={'DISPLAY': ':0'}, capture_output=True)
+
+                if result.returncode == 0:
+                    # Check if thumbnail is mostly black
+                    if is_thumbnail_mostly_black(thumbnail_path):
+                        if attempt < max_retries:
+                            print(f"Thumbnail is mostly black, retrying...")
+                            continue
+                        else:
+                            print(f"Thumbnail still mostly black after {max_retries + 1} attempts, keeping it anyway")
+
+                    print(f"Thumbnail saved successfully: {thumbnail_path}")
+                    # Emit event to notify frontend that thumbnail is ready
+                    with app.app_context():
+                        socketio.emit('thumbnail_generated', {'video_id': video_id})
+                    break
+                else:
+                    print(f"Failed to generate thumbnail: {result.stderr}")
+                    break
+
+            # STEP 3: Video is left playing for preview
+            print("Video left playing for preview")
+
+        except Exception as e:
+            print(f"Error generating thumbnail: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # Start thumbnail generation in background thread
+    thread = threading.Thread(target=generate_thumbnail_async, daemon=True)
+    thread.start()
+
+    return jsonify({'success': True, 'message': 'Thumbnail generation started...'})
+
+
+@app.route('/thumbnails/<filename>')
+def serve_thumbnail(filename):
+    """Serve video thumbnails."""
+    return send_from_directory(THUMBNAILS_FOLDER, filename)
 
 
 @app.route('/api/videos/<video_id>/play', methods=['POST'])
@@ -1965,6 +2114,42 @@ def execute_mpv():
             # Emit event to notify UI that video is playing
             with app.app_context():
                 socketio.emit('video_playing', {'status': 'playing'})
+
+            # Generate thumbnail if it doesn't exist
+            if video_id:
+                thumbnail_path = THUMBNAILS_FOLDER / f"{video_id}.png"
+                if not thumbnail_path.exists():
+                    print(f"No thumbnail for video {video_id}, generating one...")
+                    max_retries = 2
+
+                    for attempt in range(max_retries + 1):
+                        # Wait for video to load
+                        wait_time = 10 if attempt == 0 else 5
+                        print(f"Waiting {wait_time}s for thumbnail (attempt {attempt + 1}/{max_retries + 1})...")
+                        time.sleep(wait_time)
+
+                        # Take screenshot
+                        result = subprocess.run([
+                            'scrot',
+                            str(thumbnail_path)
+                        ], env={'DISPLAY': ':0'}, capture_output=True)
+
+                        if result.returncode == 0:
+                            # Check if thumbnail is mostly black
+                            if is_thumbnail_mostly_black(thumbnail_path):
+                                if attempt < max_retries:
+                                    print(f"Thumbnail is mostly black, retrying...")
+                                    continue
+                                else:
+                                    print(f"Thumbnail still mostly black, keeping it anyway")
+
+                            print(f"Thumbnail saved: {thumbnail_path}")
+                            with app.app_context():
+                                socketio.emit('thumbnail_generated', {'video_id': video_id})
+                            break
+                        else:
+                            print(f"Failed to generate thumbnail: {result.stderr}")
+                            break
 
         except Exception as e:
             print(f"Error launching mpv: {e}", flush=True)

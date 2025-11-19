@@ -2574,6 +2574,23 @@
             loadDayScheduling(); // Reload to update current time period highlighting
         });
 
+        socket.on('thumbnail_generated', (data) => {
+            console.log(`Thumbnail generated for video: ${data.video_id}`);
+            // Reload the thumbnail image by adding a cache-busting timestamp
+            const thumbImg = document.getElementById(`video-thumb-${data.video_id}`);
+            if (thumbImg) {
+                thumbImg.src = `/thumbnails/${data.video_id}.png?t=${Date.now()}`;
+                thumbImg.style.display = 'block';
+            }
+        });
+
+        socket.on('video_started', (data) => {
+            console.log(`Video started: ${data.video_id}`);
+            // Update the UI to show Stop button
+            currentPlayingVideoId = data.video_id;
+            updateVideoButton(data.video_id, true);
+        });
+
         // ====================================================================
         // VIDEO MANAGEMENT (Experimental)
         // ====================================================================
@@ -2602,9 +2619,13 @@
                     const isPlaying = currentPlayingVideoId === video.id;
 
                     card.innerHTML = `
-                        <div style="width: 200px; height: 150px; background: #2a2a2a; display: flex; align-items: center; justify-content: center; position: relative;">
-                            <div id="video-icon-${video.id}" style="font-size: 48px;">${isPlaying ? '⏹' : '▶'}</div>
-                            <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); padding: 8px; font-size: 12px; text-align: center;">
+                        <div style="width: 200px; height: 150px; background: #2a2a2a; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+                            <img id="video-thumb-${video.id}"
+                                 src="/thumbnails/${video.id}.png"
+                                 style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;"
+                                 onerror="this.style.display='none'">
+                            <div id="video-icon-${video.id}" style="font-size: 48px; position: relative; z-index: 1; text-shadow: 0 0 10px rgba(0,0,0,0.8);">${isPlaying ? '⏹' : '▶'}</div>
+                            <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); padding: 8px; font-size: 12px; text-align: center; z-index: 2;">
                                 ${video.title}
                             </div>
                         </div>
@@ -2646,9 +2667,19 @@
                 });
 
                 if (response.ok) {
+                    const video = await response.json();
                     urlInput.value = '';
                     titleInput.value = '';
                     await loadVideos();
+
+                    // Trigger thumbnail generation (starts video, waits 20s, takes screenshot, leaves video playing)
+                    fetch(`/api/videos/${video.id}/generate-thumbnail`, {
+                        method: 'POST'
+                    }).then(r => r.json()).then(result => {
+                        console.log('Thumbnail generation started:', result);
+                    }).catch(err => {
+                        console.error('Error generating thumbnail:', err);
+                    });
                 } else {
                     const error = await response.json();
                     alert('Error adding video: ' + (error.error || 'Unknown error'));

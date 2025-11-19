@@ -11,6 +11,7 @@ images/
 settings.json
 api_keys.json
 EXTRA_IMAGES/
+thumbnails/
 
 # OS
 .DS_Store
