@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Deployment to Raspberry Pi
 
-**CRITICAL**: When deploying file changes to the Raspberry Pi kiosk, ALWAYS follow this exact 3-step process:
+**CRITICAL**: When deploying file changes to the Raspberry Pi kiosk, ALWAYS follow this exact 4-step process:
 
 **Device Credentials**: ALWAYS read from `device.txt` file (gitignored) before deploying. This file contains the hostname, username, and password needed for SSH/rsync commands.
 
@@ -26,8 +26,18 @@ sshpass -p '<password>' rsync -avz --exclude 'venv/' --exclude 'images/' --exclu
 # STEP 3: Start the kiosk-display service (Firefox will start automatically)
 sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl start kiosk-display.service"
 
-# Optional: Verify services are running
+# STEP 4: VALIDATE both services are running (REQUIRED - do not skip!)
+# Check kiosk-display service
 sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl status kiosk-display.service --no-pager"
+
+# Check kiosk-firefox service - if it failed, restart it
+sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl status kiosk-firefox.service --no-pager"
+
+# If Firefox service failed, restart it:
+sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl restart kiosk-firefox.service"
+
+# Verify Firefox is now running:
+sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl status kiosk-firefox.service --no-pager"
 ```
 
 **Why this matters**:
@@ -35,14 +45,17 @@ sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "s
 - The Firefox service is bound to kiosk-display via `PartOf` and `BindsTo` directives
 - Stopping kiosk-display automatically stops Firefox
 - Starting kiosk-display automatically starts Firefox
+- However, Firefox service sometimes fails to restart automatically - you MUST validate and manually restart if needed
 - This ensures both services restart in the correct order
 - NEVER skip stopping the service before copying files
+- NEVER skip validation - always check that both services are active (running)
 
 **Important**:
 - The `device.txt` file is gitignored and should never be committed to version control
 - Always use rsync with the exact excludes shown above to sync the entire project
 - DO NOT use individual scp commands - always sync the whole directory with rsync
-- The order is CRITICAL: Stop → Sync → Start
+- The order is CRITICAL: Stop → Sync → Start → Validate
+- Both kiosk-display AND kiosk-firefox must be "active (running)" for deployment to be successful
 
 ## Project Overview
 
