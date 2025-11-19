@@ -2671,8 +2671,23 @@
 
         async function playVideo(videoId) {
             try {
-                const response = await fetch(`/api/videos/${videoId}/play`, {
-                    method: 'POST'
+                // Get video data
+                const videos = await fetch('/api/videos').then(r => r.json());
+                const video = videos.find(v => v.id === videoId);
+
+                if (!video) {
+                    alert('Video not found');
+                    return;
+                }
+
+                // Directly call execute-mpv instead of using WebSocket
+                const response = await fetch('/api/videos/execute-mpv', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: video.url,
+                        title: video.title
+                    })
                 });
 
                 if (response.ok) {
@@ -2681,7 +2696,8 @@
                     updateVideoButton(videoId, true);
                     console.log('Video playback started');
                 } else {
-                    alert('Error playing video');
+                    const error = await response.json();
+                    alert(`Error playing video: ${error.error || 'Unknown error'}`);
                 }
             } catch (error) {
                 console.error('Error playing video:', error);
