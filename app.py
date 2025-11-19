@@ -1819,9 +1819,11 @@ def play_video(video_id):
     def launch_mpv_async():
         """Launch mpv in background thread to avoid blocking the response."""
         try:
+            import time
             # STEP 1: Navigate Firefox to loading page via WebSocket
             print("Showing loading page...")
-            socketio.emit('show_loading')
+            with app.app_context():
+                socketio.emit('show_loading')
             time.sleep(0.5)
 
             # STEP 2: Kill existing mpv
@@ -1829,27 +1831,35 @@ def play_video(video_id):
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
             time.sleep(0.3)
 
-            # STEP 3: Launch mpv directly with the video URL
+            # STEP 3: Launch mpv with exact same settings as working kiosk
             print(f"Launching mpv with video: {video['url']}")
             mpv_env = os.environ.copy()
             mpv_env['DISPLAY'] = ':0'
-            subprocess.Popen([
+            mpv_proc = subprocess.Popen([
                 'mpv',
                 '--fullscreen',
                 '--no-osd-bar',
                 '--osd-level=0',
                 '--no-border',
                 '--loop-file=inf',
-                '--speed=1.0',
-                '--ytdl-format=bestvideo[height<=720]+bestaudio/best[height<=720]/best',
-                '--hwdec=rpi',
-                '--vo=xv',
+                '--ytdl-format=best',
+                '--hwdec=auto',
+                '--no-keepaspect',
+                '--video-unscaled=no',
                 '--no-audio',
                 '--mute=yes',
                 video['url']
-            ], env=mpv_env)
+            ], env=mpv_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            print(f"MPV process started with PID: {mpv_proc.pid}")
 
             print("MPV launch command sent")
+
+            # STEP 4: Wait a moment for mpv to start, then navigate Firefox back to kiosk view in background
+            time.sleep(2)
+            print("Navigating Firefox back to kiosk view in background...")
+            with app.app_context():
+                socketio.emit('show_kiosk')
+
         except Exception as e:
             print(f"Error executing mpv: {e}")
             import traceback
@@ -1871,64 +1881,91 @@ def execute_mpv():
     import subprocess
     import os
     import threading
+    import sys
+
+    print("========== execute_mpv() CALLED ==========", flush=True)
 
     global mpv_process
 
     data = request.get_json()
     url = data.get('url')
     title = data.get('title', 'Video')
+    print(f"URL: {url}, Title: {title}", flush=True)
 
     if not url:
         return jsonify({'error': 'URL is required'}), 400
+
+    print("About to create thread for launch_mpv_async...", flush=True)
 
     def launch_mpv_async():
         """Launch mpv in background thread to avoid blocking the response."""
         try:
             import time
+            import sys
 
             # STEP 1: Navigate Firefox to loading page via WebSocket
-            print("Showing loading page...")
-            socketio.emit('show_loading')
+            print("Showing loading page...", flush=True)
+            with app.app_context():
+                socketio.emit('show_loading')
             time.sleep(0.5)
 
-            # STEP 2: Kill any existing mpv process
-            print("Killing any existing mpv...")
+            # STEP 2: Kill Firefox to free up resources and prevent it from blocking mpv window
+            print("Killing Firefox...", flush=True)
+            subprocess.run(['pkill', '-9', 'firefox'], check=False)
+            time.sleep(0.5)
+
+            # STEP 3: Kill existing mpv
+            print("Killing any existing mpv...", flush=True)
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
             time.sleep(0.3)
 
-            # STEP 3: Launch mpv directly with the video URL
-            print(f"Launching mpv with video: {url}")
+            # STEP 3: Launch mpv with working configuration for Raspberry Pi 5
+            # Uses x11 video output for compatibility, limits format to reduce CPU load
+            print(f"Launching mpv with video: {url}", flush=True)
             mpv_env = os.environ.copy()
             mpv_env['DISPLAY'] = ':0'
-            subprocess.Popen([
+            mpv_proc = subprocess.Popen([
                 'mpv',
+                '--vo=x11',
                 '--fullscreen',
-                '--no-osd-bar',
-                '--osd-level=0',
-                '--no-border',
                 '--loop-file=inf',
-                '--speed=1.0',
-                '--ytdl-format=bestvideo[height<=720]+bestaudio/best[height<=720]/best',
-                '--hwdec=rpi',
-                '--vo=xv',
-                '--no-audio',
-                '--mute=yes',
+                '--ytdl-format=bestvideo[height<=720][fps<=30]+bestaudio/best',
+                '--hwdec=auto',
+                '--cache=auto',
                 url
             ], env=mpv_env)
 
-            print(f"Started mpv with video: {title} - {url}")
+            print(f"MPV STARTED WITH PID: {mpv_proc.pid}", flush=True)
+            print(f"Started mpv with video: {title} - {url}", flush=True)
+
+            # Check if mpv is still running after a brief moment
+            time.sleep(0.5)
+            poll_result = mpv_proc.poll()
+            if poll_result is not None:
+                print(f"WARNING: MPV exited immediately with code: {poll_result}", flush=True)
+            else:
+                print(f"MPV process still running (PID: {mpv_proc.pid})", flush=True)
+
+            # STEP 4: Wait for mpv to stabilize (Firefox is now killed, mpv has full screen)
+            time.sleep(2)
+            print("MPV should now have full screen access", flush=True)
 
             # Emit event to notify UI that video is playing
-            socketio.emit('video_playing', {'status': 'playing'})
+            with app.app_context():
+                socketio.emit('video_playing', {'status': 'playing'})
 
         except Exception as e:
-            print(f"Error launching mpv: {e}")
+            print(f"Error launching mpv: {e}", flush=True)
             import traceback
             traceback.print_exc()
 
     # Start mpv in background thread
+    print("Creating thread...", flush=True)
     thread = threading.Thread(target=launch_mpv_async, daemon=True)
+    print(f"Thread created: {thread}", flush=True)
+    print("Starting thread...", flush=True)
     thread.start()
+    print("Thread started!", flush=True)
 
     # Return immediately
     return jsonify({'success': True, 'message': 'Video playback starting...'})
