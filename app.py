@@ -1790,37 +1790,8 @@ def add_video():
 @app.route('/api/videos/<video_id>', methods=['DELETE'])
 def delete_video(video_id):
     """Delete a video URL."""
-    import subprocess
-
-    global mpv_process, current_video_id
-
     settings = get_settings()
     videos = settings.get('video_urls', [])
-
-    # Check if we're deleting a currently playing video
-    # If mpv is running, stop it first
-    if mpv_process is not None:
-        print(f"Stopping mpv before deleting video {video_id}...")
-        try:
-            mpv_process.terminate()
-            mpv_process.wait(timeout=2)
-        except:
-            mpv_process.kill()
-        mpv_process = None
-        current_video_id = None
-
-        # Also kill any lingering mpv processes
-        subprocess.run(['pkill', '-9', 'mpv'], check=False)
-
-        # Bring Firefox back to foreground and restore kiosk view
-        subprocess.run([
-            'bash', '-c',
-            'DISPLAY=:0 xdotool search --name Firefox windowactivate'
-        ], check=False)
-
-        socketio.emit('show_kiosk')
-        socketio.emit('video_stopped', {'status': 'stopped'})
-        print("Video playback stopped and kiosk view restored")
 
     # Find and remove video
     videos = [v for v in videos if v.get('id') != video_id]
@@ -1923,55 +1894,42 @@ def execute_mpv():
     video_id = data.get('video_id')  # Get video ID from request
     print(f"URL: {url}, Title: {title}, Video ID: {video_id}", flush=True)
 
-    if not url:
-        return jsonify({'error': 'URL is required'}), 400
-
     # Store the current video ID
     current_video_id = video_id
+
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
 
     print("About to create thread for launch_mpv_async...", flush=True)
 
     def launch_mpv_async():
         """Launch mpv in background thread to avoid blocking the response."""
-        global mpv_process, current_video_id
         try:
             import time
             import sys
 
-            # STEP 1: Stop any currently running video first
-            if mpv_process is not None:
-                print("Stopping currently playing video...", flush=True)
-                try:
-                    mpv_process.terminate()
-                    mpv_process.wait(timeout=2)
-                except:
-                    mpv_process.kill()
-                mpv_process = None
-                current_video_id = None
-
-                # Emit event to update UI (change Stop button back to Play)
-                with app.app_context():
-                    socketio.emit('video_stopped', {'status': 'stopped'})
-                print("Previous video stopped", flush=True)
-
-            # STEP 2: Navigate Firefox to loading page via WebSocket
+            # STEP 1: Navigate Firefox to loading page via WebSocket
             print("Showing loading page...", flush=True)
             with app.app_context():
                 socketio.emit('show_loading')
             time.sleep(0.5)
 
-            # STEP 3: Kill any lingering mpv processes
-            print("Killing any lingering mpv processes...", flush=True)
+            # STEP 2: Kill Firefox to free up resources and prevent it from blocking mpv window
+            print("Killing Firefox...", flush=True)
+            subprocess.run(['pkill', '-9', 'firefox'], check=False)
+            time.sleep(0.5)
+
+            # STEP 3: Kill existing mpv
+            print("Killing any existing mpv...", flush=True)
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
             time.sleep(0.3)
 
             # STEP 3: Launch mpv with working configuration for Raspberry Pi 5
             # Uses x11 video output for compatibility, limits format to reduce CPU load
-            # Disables audio to reduce CPU usage further
             print(f"Launching mpv with video: {url}", flush=True)
             mpv_env = os.environ.copy()
             mpv_env['DISPLAY'] = ':0'
-            mpv_process = subprocess.Popen([
+            mpv_proc = subprocess.Popen([
                 'mpv',
                 '--vo=x11',
                 '--fullscreen',
@@ -1979,30 +1937,23 @@ def execute_mpv():
                 '--ytdl-format=bestvideo[height<=720][fps<=30]+bestaudio/best',
                 '--hwdec=auto',
                 '--cache=auto',
-                '--no-audio',  # Disable audio playback
                 url
             ], env=mpv_env)
 
-            print(f"MPV STARTED WITH PID: {mpv_process.pid}", flush=True)
+            print(f"MPV STARTED WITH PID: {mpv_proc.pid}", flush=True)
             print(f"Started mpv with video: {title} - {url}", flush=True)
 
             # Check if mpv is still running after a brief moment
             time.sleep(0.5)
-            poll_result = mpv_process.poll()
+            poll_result = mpv_proc.poll()
             if poll_result is not None:
                 print(f"WARNING: MPV exited immediately with code: {poll_result}", flush=True)
             else:
-                print(f"MPV process still running (PID: {mpv_process.pid})", flush=True)
+                print(f"MPV process still running (PID: {mpv_proc.pid})", flush=True)
 
-            # STEP 4: Wait for mpv window to appear and bring it to front using xdotool
-            print("Waiting for mpv window to appear...", flush=True)
+            # STEP 4: Wait for mpv to stabilize (Firefox is now killed, mpv has full screen)
             time.sleep(2)
-
-            # Use xdotool to find and focus the mpv window
-            print("Bringing mpv window to front with xdotool...", flush=True)
-            subprocess.run(['xdotool', 'search', '--class', 'mpv', 'windowactivate'], check=False)
-            time.sleep(0.5)
-            print("MPV window should now be in front", flush=True)
+            print("MPV should now have full screen access", flush=True)
 
             # Emit event to notify UI that video is playing
             with app.app_context():
@@ -2031,7 +1982,7 @@ def stop_mpv():
     import subprocess
     import threading
 
-    global mpv_process, current_video_id
+    global mpv_process
 
     def stop_mpv_async():
         """Stop mpv and restore Firefox in background thread."""
@@ -2040,7 +1991,7 @@ def stop_mpv():
 
             # STEP 1: Kill mpv process
             print("Killing mpv...")
-            global mpv_process, current_video_id
+            global mpv_process
             if mpv_process is not None:
                 try:
                     mpv_process.terminate()
@@ -2048,7 +1999,6 @@ def stop_mpv():
                 except:
                     mpv_process.kill()
                 mpv_process = None
-                current_video_id = None
                 print("Terminated mpv process")
 
             # Also kill any lingering mpv processes
@@ -2082,17 +2032,6 @@ def stop_mpv():
 
     # Return immediately
     return jsonify({'success': True, 'message': 'Stopping video...'})
-
-
-@app.route('/api/videos/playback-status', methods=['GET'])
-def get_playback_status():
-    """Get current video playback status."""
-    global mpv_process, current_video_id
-    is_playing = mpv_process is not None and mpv_process.poll() is None
-    return jsonify({
-        'playing': is_playing,
-        'video_id': current_video_id if is_playing else None
-    })
 
 
 ### Test Mode API Endpoints (for automated testing)
@@ -2218,6 +2157,15 @@ def monitor_hour_changes():
         # Check every 30 seconds
         time.sleep(30)
 
+@app.route('/api/videos/playback-status', methods=['GET'])
+def get_playback_status():
+    """Get current video playback status."""
+    global mpv_process, current_video_id
+    is_playing = mpv_process is not None and mpv_process.poll() is None
+    return jsonify({
+        'playing': is_playing,
+        'video_id': current_video_id if is_playing else None
+    })
 
 if __name__ == '__main__':
     # Load and log settings on startup
