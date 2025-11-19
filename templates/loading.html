@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading Video</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            cursor: none;
+        }
+
+        .spinner {
+            width: 200px;
+            height: 200px;
+            border: 20px solid #333;
+            border-top: 20px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="spinner"></div>
+
+    <script>
+        // Connect to WebSocket
+        const socket = io();
+
+        // Listen for show_kiosk event to navigate back to slideshow
+        socket.on('show_kiosk', () => {
+            console.log('Navigating back to kiosk view...');
+            window.location.href = '/view';
+        });
+    </script>
+</body>
+</html>

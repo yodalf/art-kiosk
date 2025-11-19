@@ -306,6 +306,12 @@ def kiosk():
                          active_theme=settings.get('active_theme'))
 
 
+@app.route('/loading')
+def loading():
+    """Loading page displayed while video is starting."""
+    return render_template('loading.html')
+
+
 @app.route('/upload')
 def upload():
     """Image upload page."""
@@ -1813,12 +1819,10 @@ def play_video(video_id):
     def launch_mpv_async():
         """Launch mpv in background thread to avoid blocking the response."""
         try:
-            # STEP 1: Minimize Firefox window to background
-            print("Minimizing Firefox window...")
-            subprocess.run([
-                'DISPLAY=:0', 'xdotool', 'search', '--name', 'Firefox',
-                'windowminimize'
-            ], check=False, shell=True)
+            # STEP 1: Navigate Firefox to loading page via WebSocket
+            print("Showing loading page...")
+            socketio.emit('show_loading')
+            time.sleep(0.5)
 
             # STEP 2: Kill existing mpv
             print("Killing any existing mpv...")
@@ -1879,12 +1883,10 @@ def execute_mpv():
         try:
             import time
 
-            # STEP 1: Minimize Firefox window to background
-            print("Minimizing Firefox window...")
-            subprocess.run([
-                'DISPLAY=:0', 'xdotool', 'search', '--name', 'Firefox',
-                'windowminimize'
-            ], check=False, shell=True)
+            # STEP 1: Navigate Firefox to loading page via WebSocket
+            print("Showing loading page...")
+            socketio.emit('show_loading')
+            time.sleep(0.5)
 
             # STEP 2: Kill any existing mpv process
             print("Killing any existing mpv...")
@@ -1953,19 +1955,24 @@ def stop_mpv():
 
             # Also kill any lingering mpv processes
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
+            time.sleep(0.5)
+
+            # STEP 2: Bring Firefox window to foreground first
+            print("Bringing Firefox to foreground...")
+            subprocess.run([
+                'bash', '-c',
+                'DISPLAY=:0 xdotool search --name Firefox windowactivate'
+            ], check=False)
             time.sleep(0.3)
 
-            # STEP 2: Restore Firefox window to foreground
-            print("Restoring Firefox window...")
-            subprocess.run([
-                'DISPLAY=:0', 'xdotool', 'search', '--name', 'Firefox',
-                'windowactivate'
-            ], check=False, shell=True)
+            # STEP 3: Navigate Firefox back to kiosk view via WebSocket
+            print("Showing kiosk view...")
+            socketio.emit('show_kiosk')
 
             # Emit event to notify UI that video stopped
             socketio.emit('video_stopped', {'status': 'stopped'})
 
-            print("Firefox window restored")
+            print("Kiosk view restored")
         except Exception as e:
             print(f"Error stopping mpv: {e}")
             import traceback

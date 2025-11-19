@@ -1213,6 +1213,16 @@
             playVideoWithMpv(data.url, data.title);
         });
 
+        socket.on('show_loading', () => {
+            debugLog('Navigating to loading page...', 'info');
+            window.location.href = '/loading';
+        });
+
+        socket.on('show_kiosk', () => {
+            debugLog('Navigating back to kiosk view...', 'info');
+            window.location.href = '/view';
+        });
+
         // Test mode event listeners
         socket.on('test_mode_enabled', (data) => {
             debugLog('TEST MODE: Enabled', 'info');
