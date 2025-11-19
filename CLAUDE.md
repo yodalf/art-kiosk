@@ -12,32 +12,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Deployment to Raspberry Pi
 
-**CRITICAL**: When deploying file changes to the Raspberry Pi kiosk, ALWAYS follow this process:
+**CRITICAL**: When deploying file changes to the Raspberry Pi kiosk, ALWAYS follow this exact 3-step process:
 
-**Device Credentials**: ALWAYS read from `device.txt` file (gitignored) before deploying. This file contains the hostname, username, and password needed for SSH/SCP commands.
+**Device Credentials**: ALWAYS read from `device.txt` file (gitignored) before deploying. This file contains the hostname, username, and password needed for SSH/rsync commands.
 
 ```bash
-# 1. Stop the kiosk-display service (Firefox will stop automatically due to BindsTo)
-sshpass -p '<password>' ssh <username>@<hostname> "sudo systemctl stop kiosk-display.service"
+# STEP 1: Stop the kiosk-display service (Firefox will stop automatically due to BindsTo)
+sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl stop kiosk-display.service"
 
-# 2. Copy updated files
-sshpass -p '<password>' scp /path/to/local/file <username>@<hostname>:/home/<username>/kiosk_images/path/to/file
+# STEP 2: Sync all code files using rsync (excludes venv, images, settings.json, .git)
+sshpass -p '<password>' rsync -avz --exclude 'venv/' --exclude 'images/' --exclude '*.pyc' --exclude '__pycache__/' --exclude '.git/' --exclude 'settings.json' ./ <username>@<hostname>:~/kiosk_images/
 
-# 3. Start the kiosk-display service (Firefox will start automatically)
-sshpass -p '<password>' ssh <username>@<hostname> "sudo systemctl start kiosk-display.service"
+# STEP 3: Start the kiosk-display service (Firefox will start automatically)
+sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl start kiosk-display.service"
 
-# 4. Verify services are running (optional)
-sshpass -p '<password>' ssh <username>@<hostname> "sudo systemctl status kiosk-display.service kiosk-firefox.service"
+# Optional: Verify services are running
+sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl status kiosk-display.service --no-pager"
 ```
 
 **Why this matters**:
-- Updating files while services are running can cause race conditions
+- Updating files while services are running can cause race conditions and file corruption
 - The Firefox service is bound to kiosk-display via `PartOf` and `BindsTo` directives
 - Stopping kiosk-display automatically stops Firefox
 - Starting kiosk-display automatically starts Firefox
 - This ensures both services restart in the correct order
+- NEVER skip stopping the service before copying files
 
-**Note**: The `device.txt` file is gitignored and should never be committed to version control. Read it at the start of every deployment.
+**Important**:
+- The `device.txt` file is gitignored and should never be committed to version control
+- Always use rsync with the exact excludes shown above to sync the entire project
+- DO NOT use individual scp commands - always sync the whole directory with rsync
+- The order is CRITICAL: Stop → Sync → Start
 
 ## Project Overview
 
