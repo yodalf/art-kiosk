@@ -2671,11 +2671,6 @@
 
         async function playVideo(videoId) {
             try {
-                // Stop currently playing video first if any
-                if (currentPlayingVideoId && currentPlayingVideoId !== videoId) {
-                    await stopVideo(currentPlayingVideoId);
-                }
-
                 // Get video data
                 const videos = await fetch('/api/videos').then(r => r.json());
                 const video = videos.find(v => v.id === videoId);
@@ -2685,7 +2680,7 @@
                     return;
                 }
 
-                // Directly call execute-mpv instead of using WebSocket
+                // Directly call execute-mpv - backend will show spinner and kill old mpv
                 const response = await fetch('/api/videos/execute-mpv', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

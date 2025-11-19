@@ -2,6 +2,7 @@
 Description=Kiosk System (Display Server + Firefox)
 After=network.target graphical.target
 Wants=graphical.target
+Requires=kiosk-display.service kiosk-firefox.service
 StopWhenUnneeded=no
 
 [Install]

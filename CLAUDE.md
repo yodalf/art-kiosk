@@ -17,13 +17,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Device Credentials**: ALWAYS read from `device.txt` file (gitignored) before deploying. This file contains the hostname, username, and password needed for SSH/rsync commands.
 
 ```bash
-# STEP 1: Stop the kiosk.target (stops all services AND kills mpv)
-sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl stop kiosk.target"
+# STEP 1: Stop all kiosk services (stops display, which auto-stops firefox)
+sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl stop kiosk-display.service"
 
 # STEP 2: Sync all code files using rsync (excludes venv, images, settings.json, .git)
 sshpass -p '<password>' rsync -avz --exclude 'venv/' --exclude 'images/' --exclude '*.pyc' --exclude '__pycache__/' --exclude '.git/' --exclude 'settings.json' -e "ssh -o StrictHostKeyChecking=no" ./ <username>@<hostname>:~/kiosk_images/
 
-# STEP 3: Start the kiosk.target (starts both display and firefox services)
+# STEP 3: Start kiosk.target (starts both display and firefox services)
 sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "sudo systemctl start kiosk.target"
 
 # STEP 4: VALIDATE all services are running (REQUIRED - do not skip!)
@@ -38,12 +38,12 @@ sshpass -p '<password>' ssh -o StrictHostKeyChecking=no <username>@<hostname> "s
 ```
 
 **Why this matters**:
-- The kiosk.target manages both kiosk-display.service and kiosk-firefox.service
-- Stopping kiosk.target automatically stops all services and kills any mpv processes
+- Stopping kiosk-display.service automatically stops kiosk-firefox.service (via BindsTo)
+- kiosk-display.service kills mpv processes on stop (via ExecStopPost)
 - Updating files while services are running can cause race conditions and file corruption
 - Starting kiosk.target starts both services in the correct order
 - Firefox service sometimes fails to restart automatically - you MUST validate and manually restart if needed
-- NEVER skip stopping the kiosk.target before copying files
+- NEVER skip stopping the service before copying files
 - NEVER skip validation - always check that both services are active (running)
 
 **Important**:
