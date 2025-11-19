@@ -855,9 +855,9 @@
         <div class="section">
             <h2>Videos (Experimental)</h2>
             <div style="margin-bottom: 20px;">
-                <input type="text" id="video-url-input" placeholder="Video URL" style="width: 300px; padding: 8px; margin-right: 10px;">
-                <input type="text" id="video-tags-input" placeholder="Tags (comma-separated)" style="width: 200px; padding: 8px; margin-right: 10px;">
+                <input type="text" id="video-url-input" placeholder="Video URL (YouTube, etc.)" style="width: 400px; padding: 8px; margin-right: 10px;">
                 <button onclick="addVideo()" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Add Video</button>
+                <span style="color: #888; margin-left: 10px; font-size: 12px;">Videos appear in slideshow with images</span>
             </div>
             <div class="image-grid" id="video-grid">
                 <p style="color: #999;">No videos added yet</p>
@@ -1016,10 +1016,15 @@
                     return;
                 }
 
-                // Images are already filtered and shuffled by backend
-                images.forEach(image => {
-                    const cropData = imageCrops[image.name];
-                    const card = createImageCard(image, cropData);
+                // Items (images and videos) are already filtered and shuffled by backend
+                images.forEach(item => {
+                    let card;
+                    if (item.type === 'video') {
+                        card = createVideoCard(item);
+                    } else {
+                        const cropData = imageCrops[item.name];
+                        card = createImageCard(item, cropData);
+                    }
                     grid.appendChild(card);
                 });
             } catch (error) {
@@ -1257,6 +1262,210 @@
             card.appendChild(led);
 
             return card;
+        }
+
+        // Create video card element for slideshow integration
+        function createVideoCard(video) {
+            const card = document.createElement('div');
+            card.className = 'image-card';
+            if (!video.enabled) {
+                card.classList.add('disabled');
+            }
+
+            // Video container with thumbnail and play icon
+            const videoContainer = document.createElement('div');
+            videoContainer.style.width = '100%';
+            videoContainer.style.height = '200px';
+            videoContainer.style.overflow = 'hidden';
+            videoContainer.style.position = 'relative';
+            videoContainer.style.background = '#2a2a2a';
+            videoContainer.style.display = 'flex';
+            videoContainer.style.alignItems = 'center';
+            videoContainer.style.justifyContent = 'center';
+
+            // Thumbnail
+            const thumb = document.createElement('img');
+            thumb.src = `/thumbnails/${video.video_id}.png`;
+            thumb.style.width = '100%';
+            thumb.style.height = '100%';
+            thumb.style.objectFit = 'cover';
+            thumb.style.position = 'absolute';
+            thumb.onerror = () => { thumb.style.display = 'none'; };
+
+            // Play icon overlay
+            const playIcon = document.createElement('div');
+            playIcon.style.fontSize = '48px';
+            playIcon.style.position = 'relative';
+            playIcon.style.zIndex = '1';
+            playIcon.style.textShadow = '0 0 10px rgba(0,0,0,0.8)';
+            playIcon.textContent = '▶';
+
+            videoContainer.appendChild(thumb);
+            videoContainer.appendChild(playIcon);
+            card.appendChild(videoContainer);
+
+            // Enable/disable checkbox
+            const checkboxContainer = document.createElement('label');
+            checkboxContainer.className = 'enable-checkbox';
+            checkboxContainer.title = 'Enable/disable video in slideshow';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = video.enabled;
+            checkbox.onchange = async () => {
+                await toggleVideoEnabled(video.video_id, checkbox.checked, card);
+            };
+
+            const label = document.createElement('span');
+            label.textContent = video.enabled ? 'Enabled' : 'Disabled';
+            checkbox.addEventListener('change', () => {
+                label.textContent = checkbox.checked ? 'Enabled' : 'Disabled';
+            });
+
+            checkboxContainer.appendChild(checkbox);
+            checkboxContainer.appendChild(label);
+
+            const info = document.createElement('div');
+            info.className = 'image-card-info';
+
+            // Theme tags
+            const themesDiv = document.createElement('div');
+            themesDiv.className = 'image-themes';
+            (video.themes || []).forEach(themeName => {
+                const tag = document.createElement('span');
+                tag.className = 'image-theme-tag';
+                tag.style.cursor = 'pointer';
+                tag.title = 'Click to remove from theme';
+                tag.textContent = themeName + ' ✕';
+                tag.onclick = async () => {
+                    const newThemes = (video.themes || []).filter(t => t !== themeName);
+                    await updateVideoThemes(video.video_id, newThemes);
+                    await loadImages();
+                };
+                themesDiv.appendChild(tag);
+            });
+
+            // Action menu (three dots)
+            const menuContainer = document.createElement('div');
+            menuContainer.className = 'action-menu-container';
+
+            const menuButton = document.createElement('button');
+            menuButton.className = 'action-menu-button';
+            menuButton.innerHTML = '⋮';
+            menuButton.title = 'Actions';
+            menuButton.onclick = (e) => {
+                e.stopPropagation();
+                toggleMenu(menuContainer);
+            };
+
+            const menuDropdown = document.createElement('div');
+            menuDropdown.className = 'action-menu-dropdown';
+
+            // Add to theme submenu
+            if (Object.keys(availableThemes).length > 0) {
+                const themeMenuItem = document.createElement('div');
+                themeMenuItem.className = 'menu-item has-submenu';
+                themeMenuItem.innerHTML = 'Add to theme <span class="submenu-arrow">▸</span>';
+
+                const themeSubmenu = document.createElement('div');
+                themeSubmenu.className = 'submenu';
+
+                for (const themeName in availableThemes) {
+                    if (!(video.themes || []).includes(themeName)) {
+                        const themeOption = document.createElement('div');
+                        themeOption.className = 'submenu-item';
+                        themeOption.textContent = themeName;
+                        themeOption.onclick = async (e) => {
+                            e.stopPropagation();
+                            const newThemes = [...(video.themes || []), themeName];
+                            await updateVideoThemes(video.video_id, newThemes);
+                            await loadImages();
+                        };
+                        themeSubmenu.appendChild(themeOption);
+                    }
+                }
+
+                themeMenuItem.appendChild(themeSubmenu);
+
+                themeMenuItem.addEventListener('mouseenter', () => {
+                    themeSubmenu.classList.add('show');
+                });
+
+                themeMenuItem.addEventListener('mouseleave', (e) => {
+                    setTimeout(() => {
+                        if (!themeSubmenu.matches(':hover')) {
+                            themeSubmenu.classList.remove('show');
+                        }
+                    }, 100);
+                });
+
+                themeSubmenu.addEventListener('mouseleave', () => {
+                    themeSubmenu.classList.remove('show');
+                });
+
+                menuDropdown.appendChild(themeMenuItem);
+            }
+
+            // Delete menu item
+            const deleteMenuItem = document.createElement('div');
+            deleteMenuItem.className = 'menu-item menu-item-danger';
+            deleteMenuItem.textContent = 'Delete';
+            deleteMenuItem.onclick = (e) => {
+                e.stopPropagation();
+                closeAllMenus();
+                deleteVideo(video.video_id);
+            };
+            menuDropdown.appendChild(deleteMenuItem);
+
+            menuContainer.appendChild(menuButton);
+            menuContainer.appendChild(menuDropdown);
+
+            info.appendChild(themesDiv);
+
+            card.appendChild(menuContainer);
+            card.appendChild(checkboxContainer);
+            card.appendChild(info);
+
+            return card;
+        }
+
+        // Update video themes
+        async function updateVideoThemes(videoId, themes) {
+            try {
+                const response = await fetch(`/api/videos/${videoId}/themes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ themes })
+                });
+                if (!response.ok) {
+                    showMessage('Error updating video themes', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating video themes:', error);
+                showMessage('Error updating video themes', 'error');
+            }
+        }
+
+        // Toggle video enabled state
+        async function toggleVideoEnabled(videoId, enabled, cardElement) {
+            try {
+                const response = await fetch(`/api/videos/${videoId}/toggle`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    if (enabled) {
+                        cardElement.classList.remove('disabled');
+                    } else {
+                        cardElement.classList.add('disabled');
+                    }
+                } else {
+                    showMessage('Error toggling video', 'error');
+                }
+            } catch (error) {
+                console.error('Error toggling video:', error);
+                showMessage('Error toggling video', 'error');
+            }
         }
 
         // Delete image
@@ -2649,11 +2858,7 @@
 
         async function addVideo() {
             const urlInput = document.getElementById('video-url-input');
-            const tagsInput = document.getElementById('video-tags-input');
-
             const url = urlInput.value.trim();
-            const tagsStr = tagsInput.value.trim();
-            const tags = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(t => t) : [];
 
             if (!url) {
                 alert('Please enter a video URL');
@@ -2664,13 +2869,14 @@
                 const response = await fetch('/api/videos', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, tags })
+                    body: JSON.stringify({ url })
                 });
 
                 if (response.ok) {
                     const video = await response.json();
                     urlInput.value = '';
-                    tagsInput.value = '';
+                    // Reload images to show the new video in the grid
+                    await loadImages();
                     await loadVideos();
 
                     // Trigger thumbnail generation (starts video, waits 20s, takes screenshot, leaves video playing)
