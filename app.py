@@ -1976,10 +1976,10 @@ def execute_mpv():
                 '--vo=x11',
                 '--fullscreen',
                 '--loop-file=inf',
-                '--no-audio',
-                '--ytdl-format=bestvideo[height<=720][fps<=30]',
+                '--ytdl-format=bestvideo[height<=720][fps<=30]+bestaudio/best',
                 '--hwdec=auto',
                 '--cache=auto',
+                '--no-audio',  # Disable audio playback
                 url
             ], env=mpv_env)
 
