@@ -1937,6 +1937,7 @@ def execute_mpv():
                 '--ytdl-format=bestvideo[height<=720]+bestaudio/best',
                 '--hwdec=auto',
                 '--cache=auto',
+                '--panscan=1.0',  # Crop video to fill screen (portrait mode)
                 url
             ], env=mpv_env)
 
