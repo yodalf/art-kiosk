@@ -966,14 +966,17 @@
         // Jump to specific image in kiosk display
         async function jumpToImage(imageName) {
             try {
-                // If a video is playing, stop it first and jump directly
-                if (currentPlayingVideoId) {
+                // Check if a video is currently playing
+                const statusResponse = await fetch('/api/videos/playback-status');
+                const status = await statusResponse.json();
+
+                if (status.is_playing) {
+                    // Stop the video and jump directly to the image
                     await fetch('/api/videos/stop-mpv', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ jump_to: imageName })
                     });
-                    currentPlayingVideoId = null;
                     // The stop-mpv endpoint will emit the jump command
                     return;
                 }
