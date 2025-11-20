@@ -457,8 +457,10 @@ This document defines testable requirements for the Art Kiosk system. Requiremen
 
 ### 8.5 Video Thumbnails
 
-**REQ-VIDEO-015**: System SHALL generate video thumbnails
-- **Test**: Add video, verify thumbnail in thumbnails/ directory
+**REQ-VIDEO-015**: System SHALL generate video thumbnails after 20-second playback
+- **Behavior**: When a video is added, system starts playback and captures a screenshot after 20 seconds to create the thumbnail
+- **Storage**: Thumbnail saved as `thumbnails/<video_id>.jpg`
+- **Test**: Add video, wait for thumbnail generation (≈25s), verify thumbnail exists in thumbnails/ directory
 
 **REQ-VIDEO-016**: Thumbnails SHALL be included in backup
 - **Test**: Create backup, verify thumbnails/ copied
