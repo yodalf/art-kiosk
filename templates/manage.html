@@ -851,16 +851,13 @@
             </div>
         </div>
 
-        <!-- Video URLs Section (Experimental) -->
+        <!-- Add Video Section -->
         <div class="section">
-            <h2>Videos (Experimental)</h2>
-            <div style="margin-bottom: 20px;">
+            <h2>Add Video</h2>
+            <div>
                 <input type="text" id="video-url-input" placeholder="Video URL (YouTube, etc.)" style="width: 400px; padding: 8px; margin-right: 10px;">
                 <button onclick="addVideo()" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Add Video</button>
-                <span style="color: #888; margin-left: 10px; font-size: 12px;">Videos appear in slideshow with images</span>
-            </div>
-            <div class="image-grid" id="video-grid">
-                <p style="color: #999;">No videos added yet</p>
+                <span style="color: #888; margin-left: 10px; font-size: 12px;">Videos appear mixed with images above</span>
             </div>
         </div>
     </div>
@@ -1282,6 +1279,7 @@
             videoContainer.style.display = 'flex';
             videoContainer.style.alignItems = 'center';
             videoContainer.style.justifyContent = 'center';
+            videoContainer.style.zIndex = '1'; // Keep below action menu
 
             // Thumbnail
             const thumb = document.createElement('img');
@@ -2347,6 +2345,9 @@
             }
 
             try {
+                // Stop any currently playing video before switching themes
+                await fetch('/api/videos/stop-mpv', { method: 'POST' });
+
                 const response = await fetch('/api/themes/active', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -2877,7 +2878,6 @@
                     urlInput.value = '';
                     // Reload images to show the new video in the grid
                     await loadImages();
-                    await loadVideos();
 
                     // Trigger thumbnail generation (starts video, waits 20s, takes screenshot, leaves video playing)
                     fetch(`/api/videos/${video.id}/generate-thumbnail`, {
@@ -2996,7 +2996,7 @@
                 });
 
                 if (response.ok) {
-                    await loadVideos();
+                    await loadImages(); // Videos appear in image grid
                 } else {
                     alert('Error deleting video');
                 }
@@ -3030,8 +3030,7 @@
             await loadAtmospheres();
             await loadThemes();
             await loadImages();
-            await restorePlaybackStatus(); // Restore video playback state before loading videos
-            await loadVideos();
+            await restorePlaybackStatus(); // Restore video playback state
             updateLEDs(); // Initialize LED indicators after images are loaded
 
             // Initialize shuffle_id tracking

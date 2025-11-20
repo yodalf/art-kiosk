@@ -920,13 +920,13 @@
             // Normal advancement (or fallback if reshuffle failed)
             debugLog(`Normal slide advancement: ${currentIndex} -> ${(currentIndex + 1) % images.length}`, 'debug');
             currentIndex = (currentIndex + 1) % images.length;
-            showSlide(currentIndex, instant);
+            await showSlide(currentIndex, instant);
         }
 
         // Previous slide
-        function prevSlide(instant = false) {
+        async function prevSlide(instant = false) {
             currentIndex = (currentIndex - 1 + images.length) % images.length;
-            showSlide(currentIndex, instant);
+            await showSlide(currentIndex, instant);
         }
 
         // Start automatic slideshow
