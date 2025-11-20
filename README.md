@@ -13,6 +13,8 @@ A web-based kiosk system for displaying images in slideshow mode, optimized for 
 - **"All Images" atmosphere and theme** - Permanent defaults that show all enabled images regardless of assignments (cannot be deleted)
 - **Randomized ordering** - Images display in random order that changes with each theme/atmosphere switch
 - **Image cropping** - Crop images to select specific regions that fill the entire kiosk display
+- **Video support** - Play YouTube videos mixed with images in the slideshow with automatic transitions
+- **Backup and restore** - Create backups of all images, settings, and configurations; restore to any previous state
 - **Enable/disable individual images** - Control which images appear in the slideshow with checkboxes
 - **Auto-preview uploads** - Newly uploaded images automatically display on the kiosk for immediate review
 - **Remote control** - Control the kiosk from any device on your network
@@ -40,6 +42,12 @@ A web-based kiosk system for displaying images in slideshow mode, optimized for 
 - Werkzeug 3.0.1
 - flask-socketio 5.3.6
 - python-socketio 5.11.1
+- requests 2.31.0
+
+### System Dependencies (for video support)
+- mpv (video player)
+- yt-dlp (YouTube video download)
+- xdotool (window management)
 
 **Important**: This system is designed for X11. If using Raspberry Pi OS with Wayland (newer versions), switch to X11 mode:
 ```bash
@@ -416,6 +424,41 @@ Crop behavior:
 - **Regular Images**: Changes apply automatically within 2 seconds via the smart reload system
 - Crops are stored per-image and persist across restarts
 
+### Video Support
+
+Add YouTube videos to your slideshow mixed with images:
+
+1. **Add videos** - Enter a YouTube URL in the "Add Video" section and click "Add Video"
+2. **Thumbnails** - Thumbnails are automatically generated when videos first play
+3. **Play/Stop** - Click Play on a video card to start playback, Stop to end it
+4. **Mixed slideshow** - Videos appear in the randomized slideshow with images
+5. **Auto-transition** - Videos automatically transition to the next item after the interval expires
+6. **Theme assignment** - Videos can be assigned to themes like images
+
+Video behavior:
+- **Fullscreen playback** - Videos play in fullscreen using mpv
+- **Auto-transition** - Server-side timer ensures videos transition after the interval
+- **Continue to next item** - After video ends, slideshow continues to the next item in the list (not first)
+- **Manual control** - Stop videos manually from the management interface
+
+### Backup and Restore
+
+Create complete backups of your kiosk configuration:
+
+1. **Navigate to Backup** - Go to the Backup page from the navigation menu
+2. **Create backup** - Click "Create Backup" to save current state
+3. **View backups** - All backups are listed with creation date and size
+4. **Restore** - Click "Restore" on any backup to restore that state
+5. **Delete** - Remove old backups you no longer need
+
+Backups include:
+- All images and their enabled states
+- All videos and video thumbnails
+- Theme and atmosphere configurations
+- Day scheduling settings
+- Image crops and other settings
+- Complete settings.json
+
 ### Auto-Preview on Upload
 
 When you upload a new image via the upload page:
@@ -546,6 +589,21 @@ The debug console shows:
 - `POST /api/day/toggle` - Enable/disable Day scheduling (`{"enabled": true}`)
 - `POST /api/day/times/<time_id>/atmospheres` - Update atmospheres for a time period (`{"atmospheres": ["Atmosphere1", "Atmosphere2"]}`)
 
+**Videos:**
+- `GET /api/videos` - List all videos
+- `POST /api/videos` - Add a new video (`{"url": "https://youtube.com/..."}`)
+- `DELETE /api/videos/<video_id>` - Delete a video
+- `POST /api/videos/<video_id>/toggle` - Toggle video enabled state
+- `POST /api/videos/<video_id>/themes` - Update video themes
+- `POST /api/videos/execute-mpv` - Start video playback
+- `POST /api/videos/stop-mpv` - Stop video playback
+
+**Backup and Restore:**
+- `GET /api/backups` - List all backups
+- `POST /api/backup` - Create a new backup
+- `POST /api/backup/restore/<backup_name>` - Restore from a backup
+- `DELETE /api/backup/<backup_name>` - Delete a backup
+
 ## Convenience Scripts
 
 - **start-kiosk.sh** - Start the kiosk (cleans up previous instances, starts server, launches Firefox)
@@ -594,7 +652,9 @@ kiosk_images/
     ├── upload.html            # Upload interface
     ├── search.html            # Art search interface
     ├── extra-images.html      # Extra images management
-    └── debug.html             # Debug console
+    ├── debug.html             # Debug console
+    ├── backup.html            # Backup and restore interface
+    └── loading.html           # Loading screen for video transitions
 ```
 
 ## Supported Image Formats

@@ -402,9 +402,72 @@ This document defines testable requirements for the Art Kiosk system. Requiremen
 
 ---
 
-## 8. Slideshow Display
+## 8. Video Playback
 
-### 8.1 Image Transitions
+### 8.1 Video Management
+
+**REQ-VIDEO-001**: POST /api/videos SHALL add video by YouTube URL
+- **Request**: `{"url": "https://youtube.com/watch?v=..."}`
+- **Test**: Add video, verify in settings.enabled_videos
+
+**REQ-VIDEO-002**: DELETE /api/videos/<id> SHALL remove video
+- **Test**: Delete video, verify removed from settings
+
+**REQ-VIDEO-003**: GET /api/videos SHALL list all videos with metadata
+- **Test**: Call endpoint, verify video list returned
+
+### 8.2 Video Playback
+
+**REQ-VIDEO-004**: Videos SHALL play via mpv in fullscreen mode
+- **Test**: Execute video, verify mpv process running in fullscreen
+
+**REQ-VIDEO-005**: System SHALL show loading page during video playback
+- **Test**: Start video, verify Firefox navigates to /loading
+
+**REQ-VIDEO-006**: Server-side timer SHALL track video interval
+- **Test**: Start video, verify video_transition_timer set
+
+### 8.3 Video Auto-Transition
+
+**REQ-VIDEO-007**: Video SHALL auto-transition after interval expires
+- **Test**: Start video, wait for interval, verify mpv killed and kiosk shown
+
+**REQ-VIDEO-008**: Video SHALL transition to correct next item in list
+- **Test**: Video at index 2, verify transition to index 3 (not index 0)
+
+**REQ-VIDEO-009**: Auto-transition SHALL emit show_kiosk with start_image
+- **Test**: Verify WebSocket event includes next item name
+
+### 8.4 Video Stop Conditions
+
+**REQ-VIDEO-010**: Video SHALL stop on theme change
+- **Test**: Video playing, change theme, verify mpv killed
+
+**REQ-VIDEO-011**: Video SHALL stop on atmosphere switch
+- **Test**: Video playing, switch atmosphere, verify mpv killed
+
+**REQ-VIDEO-012**: Video SHALL stop on reload command
+- **Test**: Video playing, send reload, verify mpv killed
+
+**REQ-VIDEO-013**: Video SHALL stop on jump to image
+- **Test**: Video playing, send jump to image, verify mpv killed
+
+**REQ-VIDEO-014**: Video SHALL stop on interval advance
+- **Test**: Video playing, timer expires, verify mpv killed
+
+### 8.5 Video Thumbnails
+
+**REQ-VIDEO-015**: System SHALL generate video thumbnails
+- **Test**: Add video, verify thumbnail in thumbnails/ directory
+
+**REQ-VIDEO-016**: Thumbnails SHALL be included in backup
+- **Test**: Create backup, verify thumbnails/ copied
+
+---
+
+## 9. Slideshow Display
+
+### 9.1 Image Transitions
 
 **REQ-SLIDE-001**: Dissolve transition SHALL use 0.8s opacity animation
 - **Test**: Measure transition duration ≈ 800ms
