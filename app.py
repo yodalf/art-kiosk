@@ -2718,8 +2718,10 @@ def restore_backup(backup_name):
                         dst = THUMBNAILS_FOLDER / filename
                         shutil.copy2(src, dst)
 
-        # Emit reload event to kiosk so it picks up the restored settings/images
+        # Emit multiple events to ensure kiosk picks up the restored settings/images
         socketio.emit('remote_command', {'command': 'reload'})
+        socketio.emit('image_list_changed')
+        socketio.emit('settings_update', {})
 
         return jsonify({
             'success': True,
