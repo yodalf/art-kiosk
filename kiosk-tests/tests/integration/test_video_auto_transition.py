@@ -141,12 +141,17 @@ def test_video_auto_transition():
             timeout=5
         )
         assert response.status_code == 200, f"Failed to send jump command: {response.status_code}"
-        time.sleep(3)  # Wait for video to start
+        time.sleep(5)  # Wait for video to start
 
-        # Get initial state
+        # Get initial state - should show the video
         initial_state = get_current_kiosk_state()
         initial_image = initial_state.get('current_image') if initial_state else None
         print(f"  Initial state: {initial_image}")
+
+        # Verify the video is actually playing
+        assert initial_image == video_id, \
+            f"Video did not start! Expected {video_id}, got {initial_image}"
+        print(f"  ✓ Video {video_id} is playing")
 
         # Step 5: Wait for interval + buffer
         wait_time = TEST_INTERVAL + 5  # Add 5 second buffer
