@@ -1311,6 +1311,12 @@
             videoContainer.appendChild(playIcon);
             card.appendChild(videoContainer);
 
+            // Click on video to play it
+            videoContainer.onclick = async () => {
+                await playVideo(video.video_id);
+            };
+            videoContainer.style.cursor = 'pointer';
+
             // Enable/disable checkbox
             const checkboxContainer = document.createElement('label');
             checkboxContainer.className = 'enable-checkbox';
