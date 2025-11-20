@@ -186,8 +186,8 @@
                 images = newImages;
                 previousImageVector = getImageVector(images); // Store current vector as VP
 
-                // Load crop settings and shuffle_id
-                const settingsResponse = await fetch('/api/settings');
+                // Load crop settings and shuffle_id (with cache-busting)
+                const settingsResponse = await fetch('/api/settings?t=' + Date.now());
                 const settings = await settingsResponse.json();
                 imageCrops = settings.image_crops || {};
                 previousShuffleId = settings.shuffle_id; // Store shuffle_id to detect order changes
@@ -261,8 +261,8 @@
                 const newImages = await imagesResponse.json();
                 const newVector = getImageVector(newImages); // V - new vector
 
-                // Check for settings changes
-                const settingsResponse = await fetch('/api/settings');
+                // Check for settings changes (with cache-busting)
+                const settingsResponse = await fetch('/api/settings?t=' + Date.now());
                 const settings = await settingsResponse.json();
                 const newInterval = settings.interval * 1000;
                 const newImageCrops = settings.image_crops || {};

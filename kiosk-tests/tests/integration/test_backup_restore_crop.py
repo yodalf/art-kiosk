@@ -272,6 +272,13 @@ def test_backup_restore_crop():
             time.sleep(3)  # Wait for restore and kiosk reload
             print(f"  Restored from: {backup1_name}")
 
+            # Verify server-side: crop should NOT exist after restoring first backup
+            server_crop = get_crop(test_image_name)
+            if server_crop:
+                print(f"  WARNING: Server still has crop data after restore: {server_crop}")
+            else:
+                print("  Server verified: no crop data in settings")
+
             # Navigate to kiosk view and jump to the image
             page.goto(f"{BASE_URL}/view")
             time.sleep(2)  # Wait for page load
