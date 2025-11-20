@@ -2485,7 +2485,10 @@ def get_playback_status():
 # ====================================================================
 
 BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
-MAX_BACKUPS = 3
+MAX_BACKUPS = 3  # Regular backups
+MAX_TESTING_BACKUPS = 1  # Testing backups (separate from regular)
+TESTING_BACKUP_PREFIX = 'kiosk_testing_backup_'
+REGULAR_BACKUP_PREFIX = 'kiosk_backup_'
 
 @app.route('/backup')
 def backup_page():
@@ -2522,12 +2525,19 @@ def create_backup():
     import tarfile
     import tempfile
 
+    # Check if this is a testing backup
+    data = request.get_json() or {}
+    is_testing = data.get('testing', False)
+
     # Ensure backup directory exists
     os.makedirs(BACKUP_DIR, exist_ok=True)
 
     # Generate backup filename with timestamp
     timestamp = time.strftime('%Y%m%d_%H%M%S')
-    backup_name = f'kiosk_backup_{timestamp}.tgz'
+    if is_testing:
+        backup_name = f'{TESTING_BACKUP_PREFIX}{timestamp}.tgz'
+    else:
+        backup_name = f'{REGULAR_BACKUP_PREFIX}{timestamp}.tgz'
     backup_path = os.path.join(BACKUP_DIR, backup_name)
 
     try:
@@ -2555,8 +2565,8 @@ def create_backup():
         # Get backup size
         backup_size = os.path.getsize(backup_path)
 
-        # Clean up old backups (keep only MAX_BACKUPS)
-        cleanup_old_backups()
+        # Clean up old backups (keep only MAX_BACKUPS for regular, MAX_TESTING_BACKUPS for testing)
+        cleanup_old_backups(is_testing)
 
         return jsonify({
             'success': True,
@@ -2571,26 +2581,43 @@ def create_backup():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-def cleanup_old_backups():
-    """Remove old backups, keeping only the newest MAX_BACKUPS."""
+def cleanup_old_backups(is_testing=False):
+    """Remove old backups, keeping only the newest MAX_BACKUPS (regular) or MAX_TESTING_BACKUPS (testing)."""
     if not os.path.exists(BACKUP_DIR):
         return
 
-    backups = []
+    # Separate regular and testing backups
+    regular_backups = []
+    testing_backups = []
+
     for filename in os.listdir(BACKUP_DIR):
         if filename.endswith('.tgz'):
             filepath = os.path.join(BACKUP_DIR, filename)
-            backups.append((filepath, os.path.getmtime(filepath)))
+            mtime = os.path.getmtime(filepath)
+            if filename.startswith(TESTING_BACKUP_PREFIX):
+                testing_backups.append((filepath, mtime))
+            elif filename.startswith(REGULAR_BACKUP_PREFIX):
+                regular_backups.append((filepath, mtime))
 
     # Sort by modification time, oldest first
-    backups.sort(key=lambda x: x[1])
+    regular_backups.sort(key=lambda x: x[1])
+    testing_backups.sort(key=lambda x: x[1])
 
-    # Remove oldest backups if we have more than MAX_BACKUPS
-    while len(backups) > MAX_BACKUPS:
-        oldest = backups.pop(0)
+    # Remove oldest regular backups if we have more than MAX_BACKUPS
+    while len(regular_backups) > MAX_BACKUPS:
+        oldest = regular_backups.pop(0)
         try:
             os.remove(oldest[0])
-            print(f"Removed old backup: {oldest[0]}")
+            print(f"Removed old regular backup: {oldest[0]}")
+        except Exception as e:
+            print(f"Error removing old backup {oldest[0]}: {e}")
+
+    # Remove oldest testing backups if we have more than MAX_TESTING_BACKUPS
+    while len(testing_backups) > MAX_TESTING_BACKUPS:
+        oldest = testing_backups.pop(0)
+        try:
+            os.remove(oldest[0])
+            print(f"Removed old testing backup: {oldest[0]}")
         except Exception as e:
             print(f"Error removing old backup {oldest[0]}: {e}")
 
