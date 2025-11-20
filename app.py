@@ -2314,23 +2314,23 @@ def stop_mpv():
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
             time.sleep(0.3)
 
-            # STEP 2: Bring Firefox window to foreground
+            # STEP 2: Navigate Firefox to kiosk view (still in background)
+            print("Showing kiosk view...")
+            socketio.emit('show_kiosk')
+
+            # STEP 3: Wait for kiosk to load and jump to image if specified
+            if target_image:
+                time.sleep(1)  # Wait for kiosk.html to load and connect
+                print(f"Jumping to image: {target_image}")
+                socketio.emit('remote_command', {'command': 'jump', 'image_name': target_image})
+                time.sleep(0.5)  # Wait for image to load
+
+            # STEP 4: Bring Firefox window to foreground (after new image is ready)
             print("Bringing Firefox to foreground...")
             subprocess.run([
                 'bash', '-c',
                 'DISPLAY=:0 xdotool search --name Firefox windowactivate'
             ], check=False)
-            time.sleep(0.2)
-
-            # STEP 3: Show kiosk view first (Firefox is on loading page)
-            print("Showing kiosk view...")
-            socketio.emit('show_kiosk')
-
-            # STEP 4: If we have a target image, wait for kiosk to load then jump
-            if target_image:
-                time.sleep(1)  # Wait for kiosk.html to load and connect
-                print(f"Jumping to image: {target_image}")
-                socketio.emit('remote_command', {'command': 'jump', 'image_name': target_image})
 
             # Emit event to notify UI that video stopped
             socketio.emit('video_stopped', {'status': 'stopped'})
