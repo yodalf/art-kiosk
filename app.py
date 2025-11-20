@@ -11,6 +11,7 @@ import random
 import requests
 import hashlib
 import uuid
+import subprocess
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
@@ -659,7 +660,7 @@ def update_settings():
 @app.route('/api/control/send', methods=['POST'])
 def send_command():
     """Send a command to the kiosk display."""
-    global current_command, command_timestamp
+    global current_command, command_timestamp, current_video_id
 
     data = request.json
     command = data.get('command')
@@ -671,12 +672,35 @@ def send_command():
             return jsonify({'error': 'Missing image_name parameter'}), 400
         current_command = {'command': 'jump', 'image_name': image_name}
         command_timestamp = time.time()
+
+        # If a video is playing and we're jumping to a different item, stop it
+        if current_video_id and image_name != current_video_id:
+            cancel_video_transition_timer()
+            subprocess.run(['pkill', '-9', 'mpv'], check=False)
+            current_video_id = None
+            # Emit show_kiosk so loading page navigates to the target
+            socketio.emit('show_kiosk', {'start_image': image_name})
+
         # Also emit via WebSocket for clients that don't poll
         socketio.emit('remote_command', {'command': 'jump', 'image_name': image_name})
         return jsonify({'success': True, 'command': command, 'image_name': image_name})
     elif command in ['next', 'prev', 'pause', 'play', 'reload']:
         current_command = command
         command_timestamp = time.time()
+
+        # If a video is playing, stop it and emit WebSocket event for loading page
+        if current_video_id and command in ['next', 'prev', 'reload']:
+            # Stop the video
+            print(f"[STOP VIDEO] Command '{command}' received while video '{current_video_id}' is playing - stopping mpv", flush=True)
+            cancel_video_transition_timer()
+            result = subprocess.run(['pkill', '-9', 'mpv'], check=False)
+            print(f"[STOP VIDEO] pkill result: {result.returncode}", flush=True)
+            current_video_id = None
+            # Emit show_kiosk so loading page navigates back
+            socketio.emit('show_kiosk', {})
+
+        # Also emit via WebSocket for clients
+        socketio.emit('remote_command', {'command': command})
         return jsonify({'success': True, 'command': command})
     else:
         return jsonify({'error': 'Invalid command'}), 400
@@ -950,6 +974,8 @@ def update_theme_interval(theme_name):
 @app.route('/api/themes/active', methods=['POST'])
 def set_active_theme():
     """Set the active theme."""
+    global current_video_id
+
     data = request.json
     theme_name = data.get('theme') or data.get('theme_name')
 
@@ -962,6 +988,13 @@ def set_active_theme():
     # Validate theme exists
     if theme_name not in themes:
         return jsonify({'error': 'Theme not found'}), 404
+
+    # Stop any playing video when switching themes
+    if current_video_id:
+        cancel_video_transition_timer()
+        subprocess.run(['pkill', '-9', 'mpv'], check=False)
+        current_video_id = None
+        socketio.emit('show_kiosk', {})
 
     # Update interval to theme's interval
     theme_interval = themes[theme_name].get('interval', 3600)
@@ -1117,11 +1150,20 @@ def update_atmosphere_interval(atmosphere_name):
 @app.route('/api/atmospheres/active', methods=['POST'])
 def set_active_atmosphere():
     """Set the active atmosphere."""
+    global current_video_id
+
     data = request.json
     atmosphere_name = data.get('atmosphere') or data.get('atmosphere_name')
 
     settings = get_settings()
     atmospheres = settings.get('atmospheres', {})
+
+    # Stop any playing video when switching atmospheres
+    if current_video_id:
+        cancel_video_transition_timer()
+        subprocess.run(['pkill', '-9', 'mpv'], check=False)
+        current_video_id = None
+        socketio.emit('show_kiosk', {})
 
     # Allow setting to None to clear active atmosphere
     if atmosphere_name is None:

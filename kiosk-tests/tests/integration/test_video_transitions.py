@@ -34,14 +34,15 @@ device_config = load_device_config()
 
 
 def is_mpv_running():
-    """Check if mpv is running on the remote device."""
+    """Check if mpv is running on the remote device (excludes zombie/defunct processes)."""
     hostname = device_config.get('hostname', 'raspberrypi.local')
     username = device_config.get('username', 'realo')
     password = device_config.get('password', 'toto')
 
-    cmd = f"sshpass -p '{password}' ssh -o StrictHostKeyChecking=no {username}@{hostname} 'pgrep -x mpv'"
+    # Check for mpv processes that are not zombies (state Z)
+    cmd = f"sshpass -p '{password}' ssh -o StrictHostKeyChecking=no {username}@{hostname} 'ps aux | grep \"[m]pv\" | grep -v defunct | grep -v grep'"
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    return result.returncode == 0
+    return result.returncode == 0 and result.stdout.strip() != ''
 
 
 def wait_for_mpv_stopped(timeout=10):
@@ -147,6 +148,9 @@ def video_setup(api_client, server_state):
     # Use first video and first image
     video_name = videos[0]['name']
     image_name = images[0]['name']
+
+    # Set a longer interval for video tests to prevent auto-transition during tests
+    api_client.post('/api/themes/All Images/interval', json={'interval': 120})
 
     yield {
         'theme': theme_name,
