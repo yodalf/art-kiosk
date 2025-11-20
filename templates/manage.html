@@ -970,8 +970,8 @@
                 if (currentPlayingVideoId) {
                     await fetch('/api/videos/stop-mpv', { method: 'POST' });
                     currentPlayingVideoId = null;
-                    // Small delay to let kiosk return to view
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    // Wait for kiosk to fully reload after stopping video
+                    await new Promise(resolve => setTimeout(resolve, 1500));
                 }
                 // Send jump command via WebSocket
                 socket.emit('send_command', { command: 'jump', image_name: imageName });
