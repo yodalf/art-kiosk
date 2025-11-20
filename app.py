@@ -2322,13 +2322,15 @@ def stop_mpv():
             ], check=False)
             time.sleep(0.2)
 
-            # STEP 3: If we have a target image, jump to it; otherwise just show kiosk
+            # STEP 3: Show kiosk view first (Firefox is on loading page)
+            print("Showing kiosk view...")
+            socketio.emit('show_kiosk')
+
+            # STEP 4: If we have a target image, wait for kiosk to load then jump
             if target_image:
+                time.sleep(1)  # Wait for kiosk.html to load and connect
                 print(f"Jumping to image: {target_image}")
                 socketio.emit('remote_command', {'command': 'jump', 'image_name': target_image})
-            else:
-                print("Showing kiosk view...")
-                socketio.emit('show_kiosk')
 
             # Emit event to notify UI that video stopped
             socketio.emit('video_stopped', {'status': 'stopped'})
