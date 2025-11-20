@@ -12,6 +12,7 @@ import requests
 import hashlib
 import uuid
 import subprocess
+import threading
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
@@ -49,6 +50,91 @@ app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
 # Create thumbnails folder for video previews
 THUMBNAILS_FOLDER = Path(__file__).parent / 'thumbnails'
 THUMBNAILS_FOLDER.mkdir(exist_ok=True)
+
+
+def generate_video_thumbnail(video_id, url):
+    """Generate thumbnail for a video by playing it and capturing a screenshot after 20 seconds.
+
+    This runs in a background thread to avoid blocking the API response.
+    """
+    thumbnail_path = THUMBNAILS_FOLDER / f"{video_id}.jpg"
+
+    try:
+        print(f"[THUMBNAIL] Starting thumbnail generation for video {video_id}", flush=True)
+
+        # Start mpv in background with minimal settings for thumbnail capture
+        mpv_cmd = [
+            'mpv',
+            '--vo=x11',
+            '--fullscreen',
+            '--no-audio',
+            '--ytdl-format=bestvideo[height<=720]+bestaudio/best',
+            '--hwdec=auto',
+            url
+        ]
+
+        mpv_process = subprocess.Popen(mpv_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f"[THUMBNAIL] mpv started with PID {mpv_process.pid}", flush=True)
+
+        # Wait 20 seconds for video to start and show content
+        time.sleep(20)
+
+        # Check if mpv is still running
+        if mpv_process.poll() is not None:
+            print(f"[THUMBNAIL] mpv exited early, cannot capture screenshot", flush=True)
+            return
+
+        # Capture screenshot using scrot
+        temp_screenshot = f"/tmp/thumbnail_{video_id}.png"
+        scrot_result = subprocess.run(['scrot', temp_screenshot], capture_output=True, text=True)
+
+        if scrot_result.returncode != 0:
+            print(f"[THUMBNAIL] scrot failed: {scrot_result.stderr}", flush=True)
+            # Try import as fallback
+            import_result = subprocess.run(['import', '-window', 'root', temp_screenshot], capture_output=True, text=True)
+            if import_result.returncode != 0:
+                print(f"[THUMBNAIL] import also failed: {import_result.stderr}", flush=True)
+                mpv_process.terminate()
+                return
+
+        print(f"[THUMBNAIL] Screenshot captured to {temp_screenshot}", flush=True)
+
+        # Stop mpv
+        mpv_process.terminate()
+        try:
+            mpv_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            mpv_process.kill()
+
+        # Convert to JPEG and resize for thumbnail
+        try:
+            from PIL import Image
+            img = Image.open(temp_screenshot)
+
+            # Resize to reasonable thumbnail size (maintain aspect ratio)
+            img.thumbnail((640, 640), Image.Resampling.LANCZOS)
+
+            # Save as JPEG
+            img.save(str(thumbnail_path), 'JPEG', quality=85)
+            print(f"[THUMBNAIL] Thumbnail saved to {thumbnail_path}", flush=True)
+
+            # Check if thumbnail is mostly black (might need to retry)
+            if is_thumbnail_mostly_black(str(thumbnail_path)):
+                print(f"[THUMBNAIL] Warning: Thumbnail appears mostly black", flush=True)
+
+        except Exception as e:
+            print(f"[THUMBNAIL] Error processing image: {e}", flush=True)
+            # Fallback: just copy the screenshot
+            import shutil
+            shutil.copy(temp_screenshot, str(thumbnail_path))
+
+        # Clean up temp file
+        if os.path.exists(temp_screenshot):
+            os.remove(temp_screenshot)
+
+    except Exception as e:
+        print(f"[THUMBNAIL] Error generating thumbnail: {e}", flush=True)
+
 
 # Create EXTRA_IMAGES folder for art search downloads
 EXTRA_IMAGES_FOLDER = Path(__file__).parent / 'EXTRA_IMAGES'
@@ -1906,6 +1992,14 @@ def add_video():
 
     save_settings(settings)
     socketio.emit('settings_update', settings)
+
+    # Start thumbnail generation in background thread
+    thumbnail_thread = threading.Thread(
+        target=generate_video_thumbnail,
+        args=(video_id, url),
+        daemon=True
+    )
+    thumbnail_thread.start()
 
     return jsonify(video)
 
