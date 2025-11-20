@@ -67,6 +67,7 @@ current_kiosk_image = None
 MPV_SOCKET = '/tmp/mpv-socket'
 mpv_process = None
 current_video_id = None  # Track which video is currently playing
+video_transition_timer = None  # Timer for auto-transitioning after video interval
 
 # Debug message queue (stores last 500 messages)
 from collections import deque
@@ -2130,6 +2131,58 @@ def play_video(video_id):
     return jsonify({'success': True, 'message': 'Video playback starting...'})
 
 
+def cancel_video_transition_timer():
+    """Cancel any pending video auto-transition timer."""
+    global video_transition_timer
+    if video_transition_timer:
+        video_transition_timer.cancel()
+        video_transition_timer = None
+
+
+def start_video_transition_timer():
+    """Start a timer to auto-transition after the video interval expires."""
+    import threading
+    import subprocess
+
+    global video_transition_timer
+
+    # Cancel any existing timer
+    cancel_video_transition_timer()
+
+    # Get the current interval from settings
+    settings = get_settings()
+    interval_seconds = settings.get('interval', 3600)
+
+    print(f"Starting video auto-transition timer for {interval_seconds} seconds", flush=True)
+
+    def auto_transition():
+        """Called when video interval expires - transition to next item."""
+        global video_transition_timer, current_video_id
+        video_transition_timer = None
+
+        print(f"Video auto-transition timer fired after {interval_seconds} seconds", flush=True)
+
+        # Stop mpv
+        subprocess.run(['pkill', '-9', 'mpv'], check=False)
+        current_video_id = None
+
+        # Update settings to clear current video
+        settings = get_settings()
+        settings['current_video_id'] = None
+        save_settings(settings)
+
+        # Navigate Firefox back to kiosk view
+        # The kiosk will load and show the next item
+        with app.app_context():
+            socketio.emit('show_kiosk')
+
+        print("Video auto-transition complete - sent show_kiosk", flush=True)
+
+    video_transition_timer = threading.Timer(interval_seconds, auto_transition)
+    video_transition_timer.daemon = True
+    video_transition_timer.start()
+
+
 @app.route('/api/videos/execute-mpv', methods=['POST'])
 def execute_mpv():
     """Execute mpv to play a video using IPC mode for better control.
@@ -2221,6 +2274,9 @@ def execute_mpv():
             with app.app_context():
                 socketio.emit('video_playing', {'status': 'playing'})
 
+            # Start the auto-transition timer
+            start_video_transition_timer()
+
             # Generate thumbnail if it doesn't exist
             if video_id:
                 thumbnail_path = THUMBNAILS_FOLDER / f"{video_id}.png"
@@ -2284,6 +2340,9 @@ def stop_mpv():
     import threading
 
     global mpv_process, current_video_id
+
+    # Cancel any pending auto-transition timer
+    cancel_video_transition_timer()
 
     # Get optional jump_to parameter
     data = request.get_json(silent=True) or {}

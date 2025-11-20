@@ -1,4 +1,8 @@
-"""Test that videos auto-transition after the interval expires."""
+"""Test that videos auto-transition after the interval expires.
+
+This test verifies that when a video is playing, the kiosk automatically
+transitions to the next item after the configured interval expires.
+"""
 import pytest
 import requests
 import os
@@ -85,17 +89,20 @@ def test_video_auto_transition():
     """
     Test that a video automatically transitions to the next item after the interval.
 
+    This test uses the jump command (same as clicking Play in manage.html) to start
+    a video, then verifies the kiosk auto-transitions after the interval expires.
+
     Steps:
     1. Get the current "All Images" interval and save it
-    2. Set a short interval (10 seconds)
+    2. Set a short interval (15 seconds)
     3. Get list of videos
-    4. Jump to a video
+    4. Jump to a video using jump command
     5. Wait for interval + buffer
     6. Verify kiosk has transitioned to a different item
     7. Restore original interval
     """
     original_interval = None
-    TEST_INTERVAL = 10  # 10 seconds for testing
+    TEST_INTERVAL = 15  # 15 seconds for testing
 
     try:
         # Step 1: Save original interval
@@ -125,14 +132,21 @@ def test_video_auto_transition():
         video_id = video.get('id')
         print(f"  Found video: {video_id}")
 
-        # Step 4: Jump to video
-        print("\nStep 4: Jumping to video...")
-        assert jump_to_video(video_id), "Failed to jump to video"
-        time.sleep(2)  # Wait for video to start
+        # Step 4: Jump to video using jump command (same as manage.html Play button)
+        print("\nStep 4: Jumping to video via jump command...")
+        # Note: videos in images array have name = video_id (without 'video:' prefix)
+        response = requests.post(
+            f"{BASE_URL}/api/control/send",
+            json={'command': 'jump', 'image_name': video_id},
+            timeout=5
+        )
+        assert response.status_code == 200, f"Failed to send jump command: {response.status_code}"
+        time.sleep(3)  # Wait for video to start
 
         # Get initial state
         initial_state = get_current_kiosk_state()
-        print(f"  Initial state: {initial_state}")
+        initial_image = initial_state.get('current_image') if initial_state else None
+        print(f"  Initial state: {initial_image}")
 
         # Step 5: Wait for interval + buffer
         wait_time = TEST_INTERVAL + 5  # Add 5 second buffer
@@ -142,20 +156,13 @@ def test_video_auto_transition():
         # Step 6: Check if transitioned
         print("\nStep 6: Checking if kiosk transitioned...")
         final_state = get_current_kiosk_state()
-        print(f"  Final state: {final_state}")
+        final_image = final_state.get('current_image') if final_state else None
+        print(f"  Final state: {final_image}")
 
         # The kiosk should have moved to a different item
-        initial_image = initial_state.get('current_image') if initial_state else None
-        final_image = final_state.get('current_image') if final_state else None
-
-        # If we started on a video, we should now be on something different
-        # (either another video or an image)
-        if initial_image and initial_image.startswith('video:'):
-            assert final_image != initial_image, \
-                f"Kiosk did not auto-transition! Still showing: {final_image}"
-            print(f"  ✓ Kiosk transitioned from {initial_image} to {final_image}")
-        else:
-            print(f"  Warning: Initial state was not a video: {initial_image}")
+        assert final_image != initial_image, \
+            f"Kiosk did not auto-transition! Still showing: {final_image}"
+        print(f"  ✓ Kiosk transitioned from {initial_image} to {final_image}")
 
         print("\n✓ Video auto-transition test PASSED!")
 
@@ -165,6 +172,12 @@ def test_video_auto_transition():
             print(f"\nCleanup: Restoring original interval ({original_interval} seconds)...")
             set_theme_interval('All Images', original_interval)
             print("  Cleanup complete")
+
+        # Stop any playing video
+        try:
+            requests.post(f"{BASE_URL}/api/videos/stop-mpv", timeout=5)
+        except:
+            pass
 
 
 @pytest.mark.integration

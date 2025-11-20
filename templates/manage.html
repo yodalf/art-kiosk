@@ -2949,12 +2949,13 @@
             try {
                 // Send jump command to kiosk so it maintains the slideshow timer
                 // This allows auto-transition to work after the interval expires
+                // Note: videos in the images array have name = videoId (without 'video:' prefix)
                 const response = await fetch('/api/control/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         command: 'jump',
-                        image_name: `video:${videoId}`
+                        image_name: videoId
                     })
                 });
 
