@@ -2576,6 +2576,13 @@ def create_backup():
                     if os.path.isfile(filepath):
                         tar.add(filepath, arcname=f'EXTRA_IMAGES/{filename}')
 
+            # Add thumbnails directory (video thumbnails)
+            if THUMBNAILS_FOLDER.exists():
+                for filename in os.listdir(THUMBNAILS_FOLDER):
+                    filepath = THUMBNAILS_FOLDER / filename
+                    if filepath.is_file():
+                        tar.add(str(filepath), arcname=f'thumbnails/{filename}')
+
         # Get backup size
         backup_size = os.path.getsize(backup_path)
 
@@ -2691,6 +2698,22 @@ def restore_backup(backup_name):
                     for filename in os.listdir(extra_src):
                         src = os.path.join(extra_src, filename)
                         dst = os.path.join(extra_dst, filename)
+                        shutil.copy2(src, dst)
+
+                # Restore thumbnails (video thumbnails)
+                thumbnails_src = os.path.join(tmpdir, 'thumbnails')
+                if os.path.exists(thumbnails_src):
+                    # Clear existing thumbnails
+                    if THUMBNAILS_FOLDER.exists():
+                        for f in os.listdir(THUMBNAILS_FOLDER):
+                            os.remove(THUMBNAILS_FOLDER / f)
+                    else:
+                        THUMBNAILS_FOLDER.mkdir(exist_ok=True)
+
+                    # Copy restored thumbnails
+                    for filename in os.listdir(thumbnails_src):
+                        src = os.path.join(thumbnails_src, filename)
+                        dst = THUMBNAILS_FOLDER / filename
                         shutil.copy2(src, dst)
 
         return jsonify({
