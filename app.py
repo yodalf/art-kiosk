@@ -2284,7 +2284,7 @@ def stop_mpv():
     global mpv_process, current_video_id
 
     # Get optional jump_to parameter
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
     jump_to_image = data.get('jump_to')
 
     def stop_mpv_async(target_image):
