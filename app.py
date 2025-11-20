@@ -695,12 +695,15 @@ def poll_command():
 @app.route('/api/kiosk/current-image', methods=['GET', 'POST'])
 def current_image():
     """Get or update the current image being displayed on kiosk."""
-    global current_kiosk_image
+    global current_kiosk_image, current_video_id
 
     if request.method == 'POST':
         data = request.json
         image_name = data.get('image_name')
         current_kiosk_image = image_name
+        # Clear video ID when showing an image (unless it's a video name)
+        if image_name and not image_name.startswith('video:'):
+            current_video_id = None
         return jsonify({'success': True})
     else:  # GET
         return jsonify({
