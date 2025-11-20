@@ -1997,13 +1997,8 @@ def add_video():
     save_settings(settings)
     socketio.emit('settings_update', settings)
 
-    # Start thumbnail generation in background thread
-    thumbnail_thread = threading.Thread(
-        target=generate_video_thumbnail,
-        args=(video_id, url),
-        daemon=True
-    )
-    thumbnail_thread.start()
+    # Start thumbnail generation in background task (uses socketio's event loop)
+    socketio.start_background_task(generate_video_thumbnail, video_id, url)
 
     return jsonify(video)
 
