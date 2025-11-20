@@ -669,6 +669,8 @@ def send_command():
             return jsonify({'error': 'Missing image_name parameter'}), 400
         current_command = {'command': 'jump', 'image_name': image_name}
         command_timestamp = time.time()
+        # Also emit via WebSocket for clients that don't poll
+        socketio.emit('remote_command', {'command': 'jump', 'image_name': image_name})
         return jsonify({'success': True, 'command': command, 'image_name': image_name})
     elif command in ['next', 'prev', 'pause', 'play', 'reload']:
         current_command = command
