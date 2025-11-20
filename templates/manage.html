@@ -2827,9 +2827,11 @@
             // Reload the thumbnail image by adding a cache-busting timestamp
             const thumbImg = document.getElementById(`video-thumb-${data.video_id}`);
             if (thumbImg) {
-                thumbImg.src = `/thumbnails/${data.video_id}.png?t=${Date.now()}`;
+                thumbImg.src = `/thumbnails/${data.video_id}.jpg?t=${Date.now()}`;
                 thumbImg.style.display = 'block';
             }
+            // Also reload images to update any grid views
+            loadImages();
         });
 
         socket.on('video_started', (data) => {

@@ -122,6 +122,10 @@ def generate_video_thumbnail(video_id, url):
             if is_thumbnail_mostly_black(str(thumbnail_path)):
                 print(f"[THUMBNAIL] Warning: Thumbnail appears mostly black", flush=True)
 
+            # Emit event to notify frontend that thumbnail is ready
+            socketio.emit('thumbnail_generated', {'video_id': video_id})
+            print(f"[THUMBNAIL] Emitted thumbnail_generated event for {video_id}", flush=True)
+
         except Exception as e:
             print(f"[THUMBNAIL] Error processing image: {e}", flush=True)
             # Fallback: just copy the screenshot
