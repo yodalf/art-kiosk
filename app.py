@@ -2277,13 +2277,17 @@ def execute_mpv():
 
 @app.route('/api/videos/stop-mpv', methods=['POST'])
 def stop_mpv():
-    """Stop mpv video playback and restart Firefox kiosk display."""
+    """Stop mpv video playback and restore Firefox kiosk display."""
     import subprocess
     import threading
 
     global mpv_process, current_video_id
 
-    def stop_mpv_async():
+    # Get optional jump_to parameter
+    data = request.get_json() or {}
+    jump_to_image = data.get('jump_to')
+
+    def stop_mpv_async(target_image):
         """Stop mpv and restore Firefox in background thread."""
         try:
             import time
@@ -2308,19 +2312,23 @@ def stop_mpv():
 
             # Also kill any lingering mpv processes
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
-            time.sleep(0.5)
+            time.sleep(0.3)
 
-            # STEP 2: Bring Firefox window to foreground first
+            # STEP 2: Bring Firefox window to foreground
             print("Bringing Firefox to foreground...")
             subprocess.run([
                 'bash', '-c',
                 'DISPLAY=:0 xdotool search --name Firefox windowactivate'
             ], check=False)
-            time.sleep(0.3)
+            time.sleep(0.2)
 
-            # STEP 3: Navigate Firefox back to kiosk view via WebSocket
-            print("Showing kiosk view...")
-            socketio.emit('show_kiosk')
+            # STEP 3: If we have a target image, jump to it; otherwise just show kiosk
+            if target_image:
+                print(f"Jumping to image: {target_image}")
+                socketio.emit('remote_command', {'command': 'jump', 'image_name': target_image})
+            else:
+                print("Showing kiosk view...")
+                socketio.emit('show_kiosk')
 
             # Emit event to notify UI that video stopped
             socketio.emit('video_stopped', {'status': 'stopped'})
@@ -2332,7 +2340,7 @@ def stop_mpv():
             traceback.print_exc()
 
     # Start stop process in background thread
-    thread = threading.Thread(target=stop_mpv_async, daemon=True)
+    thread = threading.Thread(target=stop_mpv_async, args=(jump_to_image,), daemon=True)
     thread.start()
 
     # Return immediately

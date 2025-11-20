@@ -966,12 +966,16 @@
         // Jump to specific image in kiosk display
         async function jumpToImage(imageName) {
             try {
-                // If a video is playing, stop it first
+                // If a video is playing, stop it first and jump directly
                 if (currentPlayingVideoId) {
-                    await fetch('/api/videos/stop-mpv', { method: 'POST' });
+                    await fetch('/api/videos/stop-mpv', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ jump_to: imageName })
+                    });
                     currentPlayingVideoId = null;
-                    // Wait for kiosk to fully reload after stopping video
-                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    // The stop-mpv endpoint will emit the jump command
+                    return;
                 }
                 // Send jump command via WebSocket
                 socket.emit('send_command', { command: 'jump', image_name: imageName });
