@@ -1284,9 +1284,14 @@
             window.location.href = '/loading';
         });
 
-        socket.on('show_kiosk', () => {
-            debugLog('Navigating back to kiosk view...', 'info');
-            window.location.href = '/view';
+        socket.on('show_kiosk', (data) => {
+            if (data && data.start_image) {
+                debugLog(`Navigating to kiosk view at image: ${data.start_image}`, 'info');
+                window.location.href = `/view?image=${encodeURIComponent(data.start_image)}`;
+            } else {
+                debugLog('Navigating back to kiosk view...', 'info');
+                window.location.href = '/view';
+            }
         });
 
         // Test mode event listeners

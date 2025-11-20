@@ -68,6 +68,7 @@ MPV_SOCKET = '/tmp/mpv-socket'
 mpv_process = None
 current_video_id = None  # Track which video is currently playing
 video_transition_timer = None  # Timer for auto-transitioning after video interval
+video_next_item = None  # Track the next item to show after video ends
 
 # Debug message queue (stores last 500 messages)
 from collections import deque
@@ -2157,7 +2158,7 @@ def start_video_transition_timer():
 
     def auto_transition():
         """Called when video interval expires - transition to next item."""
-        global video_transition_timer, current_video_id
+        global video_transition_timer, current_video_id, video_next_item
         video_transition_timer = None
 
         print(f"Video auto-transition timer fired after {interval_seconds} seconds", flush=True)
@@ -2171,12 +2172,19 @@ def start_video_transition_timer():
         settings['current_video_id'] = None
         save_settings(settings)
 
-        # Navigate Firefox back to kiosk view
-        # The kiosk will load and show the next item
-        with app.app_context():
-            socketio.emit('show_kiosk')
+        # Navigate Firefox back to kiosk view with the next item
+        # Pass the next item name so kiosk continues from where it left off
+        next_item = video_next_item
+        video_next_item = None
 
-        print("Video auto-transition complete - sent show_kiosk", flush=True)
+        with app.app_context():
+            if next_item:
+                print(f"Navigating to next item: {next_item}", flush=True)
+                socketio.emit('show_kiosk', {'start_image': next_item})
+            else:
+                socketio.emit('show_kiosk', {})
+
+        print("Video auto-transition complete", flush=True)
 
     video_transition_timer = threading.Timer(interval_seconds, auto_transition)
     video_transition_timer.daemon = True
@@ -2195,11 +2203,11 @@ def execute_mpv():
 
     print("========== execute_mpv() CALLED ==========", flush=True)
 
-    global mpv_process, current_video_id
+    global mpv_process, current_video_id, video_next_item
 
     data = request.get_json()
     url = data.get('url')
-    video_id = data.get('video_id')  # Get video ID from request
+    video_id = data.get('video_id') or data.get('title')  # Get video ID from request (kiosk sends 'title')
     print(f"URL: {url}, Video ID: {video_id}", flush=True)
 
     # Store the current video ID in memory and persist to settings
@@ -2207,6 +2215,35 @@ def execute_mpv():
     settings = get_settings()
     settings['current_video_id'] = video_id
     save_settings(settings)
+
+    # Calculate the next item in the list for auto-transition
+    if video_id:
+        try:
+            # Get enabled images list (same as what kiosk sees)
+            # We need to make a request to our own endpoint to get the properly filtered list
+            import requests as req
+            images_resp = req.get('http://localhost/api/images?enabled_only=true', timeout=5)
+            images = images_resp.json()
+
+            # Find video index and calculate next item
+            video_index = None
+            for i, item in enumerate(images):
+                if item.get('name') == video_id:
+                    video_index = i
+                    break
+
+            if video_index is not None and len(images) > 1:
+                next_index = (video_index + 1) % len(images)
+                video_next_item = images[next_index].get('name')
+                print(f"Next item after video: {video_next_item} (index {next_index})", flush=True)
+            else:
+                video_next_item = None
+                print(f"Could not find video in list or list too short", flush=True)
+        except Exception as e:
+            print(f"Error calculating next item: {e}", flush=True)
+            video_next_item = None
+    else:
+        video_next_item = None
 
     if not url:
         return jsonify({'error': 'URL is required'}), 400

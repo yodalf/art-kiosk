@@ -185,6 +185,118 @@ def test_video_auto_transition():
             pass
 
 
+def get_images_list():
+    """Get the current images list in order."""
+    response = requests.get(f"{BASE_URL}/api/images?enabled_only=true", timeout=5)
+    if response.status_code == 200:
+        return response.json()
+    return []
+
+
+@pytest.mark.integration
+def test_video_auto_transition_to_next_item():
+    """
+    Test that after video auto-transition, the kiosk shows the NEXT item
+    in the list, not the first item.
+
+    Steps:
+    1. Get the current images list (in randomized order)
+    2. Find a video and note its position
+    3. Set a short interval
+    4. Jump to the video
+    5. Wait for auto-transition
+    6. Verify the kiosk shows the item AFTER the video in the list
+    """
+    original_interval = None
+    TEST_INTERVAL = 10  # 10 seconds for testing
+
+    try:
+        # Step 1: Save original interval
+        print("\nStep 1: Saving original interval...")
+        themes_data = get_themes()
+        all_images_theme = themes_data.get('themes', {}).get('All Images', {})
+        original_interval = all_images_theme.get('interval', 3600)
+        print(f"  Original interval: {original_interval} seconds")
+
+        # Step 2: Set short test interval
+        print(f"\nStep 2: Setting test interval to {TEST_INTERVAL} seconds...")
+        assert set_theme_interval('All Images', TEST_INTERVAL), "Failed to set theme interval"
+
+        # Step 3: Get images list and find video position
+        print("\nStep 3: Getting images list...")
+        images = get_images_list()
+        if len(images) < 2:
+            pytest.skip("Need at least 2 items for this test")
+
+        # Find a video in the list
+        video_index = None
+        video_id = None
+        for i, item in enumerate(images):
+            if item.get('type') == 'video':
+                video_index = i
+                video_id = item.get('name')
+                break
+
+        if video_id is None:
+            pytest.skip("No videos available for testing")
+
+        # Get the next item after the video
+        next_index = (video_index + 1) % len(images)
+        next_item = images[next_index]
+        next_item_name = next_item.get('name')
+
+        print(f"  Video: {video_id} at index {video_index}")
+        print(f"  Next item: {next_item_name} at index {next_index}")
+        print(f"  Total items: {len(images)}")
+
+        # Step 4: Jump to video
+        print("\nStep 4: Jumping to video...")
+        response = requests.post(
+            f"{BASE_URL}/api/control/send",
+            json={'command': 'jump', 'image_name': video_id},
+            timeout=5
+        )
+        assert response.status_code == 200, f"Failed to send jump command"
+        time.sleep(5)  # Wait for video to start
+
+        # Verify video is playing
+        initial_state = get_current_kiosk_state()
+        initial_image = initial_state.get('current_image') if initial_state else None
+        assert initial_image == video_id, f"Video did not start! Got {initial_image}"
+        print(f"  ✓ Video {video_id} is playing")
+
+        # Step 5: Wait for interval + buffer
+        wait_time = TEST_INTERVAL + 5
+        print(f"\nStep 5: Waiting {wait_time} seconds for auto-transition...")
+        time.sleep(wait_time)
+
+        # Step 6: Check that it transitioned to the NEXT item
+        print("\nStep 6: Checking transition to next item...")
+        final_state = get_current_kiosk_state()
+        final_image = final_state.get('current_image') if final_state else None
+        print(f"  Final state: {final_image}")
+        print(f"  Expected: {next_item_name}")
+
+        assert final_image == next_item_name, \
+            f"Did not transition to next item! Expected {next_item_name}, got {final_image}"
+        print(f"  ✓ Correctly transitioned to next item: {next_item_name}")
+
+        print("\n✓ Video auto-transition to next item test PASSED!")
+
+    finally:
+        # Restore original interval
+        if original_interval is not None:
+            print(f"\nCleanup: Restoring original interval ({original_interval} seconds)...")
+            set_theme_interval('All Images', original_interval)
+            print("  Cleanup complete")
+
+        # Stop any playing video
+        try:
+            requests.post(f"{BASE_URL}/api/videos/stop-mpv", timeout=5)
+        except:
+            pass
+
+
 @pytest.mark.integration
 def test_video_auto_transition_with_playwright():
     """
