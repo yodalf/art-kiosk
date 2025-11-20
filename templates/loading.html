@@ -41,9 +41,13 @@
         const socket = io();
 
         // Listen for show_kiosk event to navigate back to slideshow
-        socket.on('show_kiosk', () => {
-            console.log('Navigating back to kiosk view...');
-            window.location.href = '/view';
+        socket.on('show_kiosk', (data) => {
+            console.log('Navigating back to kiosk view...', data);
+            if (data && data.start_image) {
+                window.location.href = '/view?image=' + encodeURIComponent(data.start_image);
+            } else {
+                window.location.href = '/view';
+            }
         });
     </script>
 </body>

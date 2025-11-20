@@ -2314,16 +2314,14 @@ def stop_mpv():
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
             time.sleep(0.3)
 
-            # STEP 2: Navigate Firefox to kiosk view (still in background)
-            print("Showing kiosk view...")
-            socketio.emit('show_kiosk')
-
-            # STEP 3: Wait for kiosk to load and jump to image if specified
+            # STEP 2: Navigate Firefox to kiosk view with target image
             if target_image:
-                time.sleep(1)  # Wait for kiosk.html to load and connect
-                print(f"Jumping to image: {target_image}")
-                socketio.emit('remote_command', {'command': 'jump', 'image_name': target_image})
-                time.sleep(0.5)  # Wait for image to load
+                print(f"Showing kiosk view with target: {target_image}")
+                socketio.emit('show_kiosk', {'start_image': target_image})
+                time.sleep(1.5)  # Wait for kiosk.html to load with target image
+            else:
+                print("Showing kiosk view...")
+                socketio.emit('show_kiosk')
 
             # STEP 4: Bring Firefox window to foreground (after new image is ready)
             print("Bringing Firefox to foreground...")
