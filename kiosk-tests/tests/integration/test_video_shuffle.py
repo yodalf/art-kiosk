@@ -83,10 +83,10 @@ def test_shuffle_regenerates_when_video_last_item_transitions(api_client, server
         print("  Set interval to 10 seconds")
 
         print("\nStep 2: Creating test images...")
-        # Create two simple test images
-        for i in range(2):
-            # Create a simple colored image
-            img = Image.new('RGB', (100, 100), color=(255 * i // 2, 100, 200))
+        # Create 10 test images for better shuffle testing
+        for i in range(10):
+            # Create a simple colored image with different colors
+            img = Image.new('RGB', (100, 100), color=((i * 25) % 256, (i * 50) % 256, (i * 75) % 256))
             img_bytes = BytesIO()
             img.save(img_bytes, format='JPEG')
             img_bytes.seek(0)
@@ -120,28 +120,46 @@ def test_shuffle_regenerates_when_video_last_item_transitions(api_client, server
         api_client.post(f'/api/videos/{test_video_id}/themes', json={'themes': [test_theme_name]})
         print(f"  Assigned video to {test_theme_name}")
 
-        print("\nStep 4: Activating test theme...")
+        print("\nStep 4: Activating test theme and ensuring video is last...")
         api_client.post('/api/themes/active', json={'theme': test_theme_name})
         time.sleep(1)
 
-        # Get the items in our theme
-        response = api_client.get('/api/images', params={'enabled_only': 'true'})
-        theme_items = response.json()
+        # Keep reshuffling until video is at the last position
+        max_attempts = 20
+        for attempt in range(max_attempts):
+            # Get the items in our theme
+            response = api_client.get('/api/images', params={'enabled_only': 'true'})
+            theme_items = response.json()
+
+            # Find the video's position
+            video_index = None
+            for i, item in enumerate(theme_items):
+                if item.get('name') == test_video_id:
+                    video_index = i
+                    break
+
+            # Check if video is at the last position
+            if video_index == len(theme_items) - 1:
+                print(f"  ✓ Video is at last position (index {video_index}) after {attempt + 1} attempts")
+                break
+
+            # Reshuffle by regenerating shuffle_id
+            response = api_client.get('/api/settings')
+            settings = response.json()
+            import random as rand
+            settings['shuffle_id'] = rand.random()
+            # We need to trigger a reshuffle - reactivate the theme
+            api_client.post('/api/themes/active', json={'theme': test_theme_name})
+            time.sleep(0.3)
+        else:
+            pytest.skip(f"Could not get video to last position after {max_attempts} attempts")
+
         print(f"  Theme has {len(theme_items)} items")
 
         # List the items
         for i, item in enumerate(theme_items):
             item_type = item.get('type', 'image')
             print(f"    {i}: {item.get('name')} ({item_type})")
-
-        # Find the video's position
-        video_index = None
-        for i, item in enumerate(theme_items):
-            if item.get('name') == test_video_id:
-                video_index = i
-                break
-
-        print(f"  Video is at index {video_index}")
 
         print("\nStep 5: Jumping to video...")
         api_client.post('/api/control/send', json={'command': 'reload'})

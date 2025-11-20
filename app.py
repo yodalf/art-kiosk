@@ -160,6 +160,7 @@ mpv_process = None
 current_video_id = None  # Track which video is currently playing
 video_transition_timer = None  # Timer for auto-transitioning after video interval
 video_next_item = None  # Track the next item to show after video ends
+video_is_last_item = False  # Track if current video is at end of list (needs reshuffle)
 
 # Debug message queue (stores last 500 messages)
 from collections import deque
@@ -2293,7 +2294,7 @@ def start_video_transition_timer():
 
     def auto_transition():
         """Called when video interval expires - transition to next item."""
-        global video_transition_timer, current_video_id, video_next_item
+        global video_transition_timer, current_video_id, video_next_item, video_is_last_item
         video_transition_timer = None
 
         print(f"Video auto-transition timer fired after {interval_seconds} seconds", flush=True)
@@ -2305,12 +2306,29 @@ def start_video_transition_timer():
         # Update settings to clear current video
         settings = get_settings()
         settings['current_video_id'] = None
+
+        # If video was at last position, regenerate shuffle_id to re-shuffle the list
+        if video_is_last_item:
+            settings['shuffle_id'] = random.random()
+            print(f"Video was at end of list - regenerated shuffle_id: {settings['shuffle_id']}", flush=True)
+
         save_settings(settings)
 
-        # Navigate Firefox back to kiosk view with the next item
-        # Pass the next item name so kiosk continues from where it left off
+        # Recalculate next item if we reshuffled
         next_item = video_next_item
+        if video_is_last_item:
+            try:
+                import requests as req
+                images_resp = req.get('http://localhost/api/images?enabled_only=true', timeout=5)
+                images = images_resp.json()
+                if images:
+                    next_item = images[0].get('name')
+                    print(f"After reshuffle, first item is: {next_item}", flush=True)
+            except Exception as e:
+                print(f"Error recalculating next item after reshuffle: {e}", flush=True)
+
         video_next_item = None
+        video_is_last_item = False
 
         with app.app_context():
             if next_item:
@@ -2338,7 +2356,7 @@ def execute_mpv():
 
     print("========== execute_mpv() CALLED ==========", flush=True)
 
-    global mpv_process, current_video_id, video_next_item
+    global mpv_process, current_video_id, video_next_item, video_is_last_item
 
     data = request.get_json()
     url = data.get('url')
@@ -2369,7 +2387,18 @@ def execute_mpv():
 
             if video_index is not None and len(images) > 1:
                 next_index = (video_index + 1) % len(images)
-                video_next_item = images[next_index].get('name')
+
+                # Track if we're at the last position (will need reshuffle when video ends)
+                if next_index == 0:
+                    video_is_last_item = True
+                    # For now, set next item to first in current list
+                    # Will be recalculated after reshuffle in auto_transition
+                    video_next_item = images[0].get('name') if images else None
+                    print(f"Video is at last position - will reshuffle when transition occurs", flush=True)
+                else:
+                    video_is_last_item = False
+                    video_next_item = images[next_index].get('name')
+
                 print(f"Next item after video: {video_next_item} (index {next_index})", flush=True)
             else:
                 video_next_item = None
