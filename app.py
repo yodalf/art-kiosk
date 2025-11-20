@@ -703,7 +703,10 @@ def current_image():
         current_kiosk_image = image_name
         return jsonify({'success': True})
     else:  # GET
-        return jsonify({'current_image': current_kiosk_image})
+        return jsonify({
+            'current_image': current_kiosk_image,
+            'current_video_id': current_video_id
+        })
 
 
 @app.route('/api/kiosk/reshuffle', methods=['POST'])
