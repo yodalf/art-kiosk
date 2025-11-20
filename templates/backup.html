@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup & Restore</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #000000;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #1a1a1a;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(255, 255, 255, 0.1);
+            padding: 30px;
+        }
+
+        h1 {
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #aaaaaa;
+            margin-bottom: 30px;
+        }
+
+        .navigation {
+            display: flex;
+            gap: 0;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333333;
+        }
+
+        .nav-link {
+            padding: 12px 24px;
+            text-decoration: none;
+            color: #aaaaaa;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            color: #ffffff;
+            background: #2a2a2a;
+        }
+
+        .nav-link.active {
+            color: #ffffff;
+            border-bottom-color: #2196F3;
+        }
+
+        .nav-link.view-kiosk {
+            margin-left: auto;
+            color: #4CAF50;
+        }
+
+        .nav-link.view-kiosk:hover {
+            color: #66BB6A;
+            background: transparent;
+        }
+
+        .backup-panel {
+            background: #2a2a2a;
+            border: 2px solid #444444;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .backup-panel h2 {
+            color: #ffffff;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .backup-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .backup-btn:hover {
+            background: #66BB6A;
+            transform: translateY(-2px);
+        }
+
+        .backup-btn:disabled {
+            background: #666666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .backup-list {
+            margin-top: 20px;
+        }
+
+        .backup-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #333333;
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        .backup-info {
+            flex: 1;
+        }
+
+        .backup-name {
+            color: #ffffff;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .backup-meta {
+            color: #888888;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .backup-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .restore-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .restore-btn:hover {
+            background: #42A5F5;
+        }
+
+        .restore-btn:disabled {
+            background: #666666;
+            cursor: not-allowed;
+        }
+
+        .delete-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .delete-btn:hover {
+            background: #EF5350;
+        }
+
+        .delete-btn:disabled {
+            background: #666666;
+            cursor: not-allowed;
+        }
+
+        .empty-message {
+            color: #888888;
+            font-style: italic;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .status-message {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status-message.success {
+            background: #1B5E20;
+            color: #A5D6A7;
+            display: block;
+        }
+
+        .status-message.error {
+            background: #B71C1C;
+            color: #FFCDD2;
+            display: block;
+        }
+
+        .status-message.info {
+            background: #0D47A1;
+            color: #90CAF9;
+            display: block;
+        }
+
+        .info-box {
+            background: #263238;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #B0BEC5;
+            font-size: 14px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Backup & Restore</h1>
+        <p class="subtitle">Manage kiosk backups - settings, images, and data</p>
+
+        <nav class="navigation">
+            <a href="/" class="nav-link">Manage</a>
+            <a href="/upload" class="nav-link">Upload</a>
+            <a href="/search" class="nav-link">Search</a>
+            <a href="/extra-images" class="nav-link">Extras</a>
+            <a href="/backup" class="nav-link active">Backup</a>
+            <a href="/debug" class="nav-link">Debug</a>
+            <a href="/view" class="nav-link view-kiosk" target="_blank">View Kiosk</a>
+        </nav>
+
+        <div id="status-message" class="status-message"></div>
+
+        <div class="info-box">
+            Backups include settings.json, all images, and extra-images.
+            Maximum 3 backups are kept - older backups are automatically deleted.
+        </div>
+
+        <div class="backup-panel">
+            <h2>Create Backup</h2>
+            <button id="backup-btn" class="backup-btn" onclick="createBackup()">
+                BACKUP NOW
+            </button>
+        </div>
+
+        <div class="backup-panel">
+            <h2>Available Backups</h2>
+            <div id="backup-list" class="backup-list">
+                <div class="empty-message">Loading backups...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Format file size
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Show status message
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status-message');
+            statusEl.textContent = message;
+            statusEl.className = 'status-message ' + type;
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        // Load backups list
+        async function loadBackups() {
+            try {
+                const response = await fetch('/api/backups');
+                const data = await response.json();
+
+                const listEl = document.getElementById('backup-list');
+
+                if (data.backups.length === 0) {
+                    listEl.innerHTML = '<div class="empty-message">No backups available</div>';
+                    return;
+                }
+
+                listEl.innerHTML = data.backups.map(backup => `
+                    <div class="backup-item">
+                        <div class="backup-info">
+                            <div class="backup-name">${backup.name}</div>
+                            <div class="backup-meta">
+                                ${backup.created_formatted} - ${formatSize(backup.size)}
+                            </div>
+                        </div>
+                        <div class="backup-actions">
+                            <button class="restore-btn" onclick="restoreBackup('${backup.name}')">
+                                Restore
+                            </button>
+                            <button class="delete-btn" onclick="deleteBackup('${backup.name}')">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading backups:', error);
+                document.getElementById('backup-list').innerHTML =
+                    '<div class="empty-message">Error loading backups</div>';
+            }
+        }
+
+        // Create backup
+        async function createBackup() {
+            const btn = document.getElementById('backup-btn');
+            const originalText = btn.textContent;
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Creating backup...';
+            showStatus('Creating backup... This may take a moment.', 'info');
+
+            try {
+                const response = await fetch('/api/backup', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showStatus(`Backup created: ${data.backup.name} (${formatSize(data.backup.size)})`, 'success');
+                    loadBackups();
+                } else {
+                    showStatus('Backup failed: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Backup failed: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        // Restore backup
+        async function restoreBackup(backupName) {
+            if (!confirm(`Are you sure you want to restore from "${backupName}"?\n\nThis will replace all current settings and images.`)) {
+                return;
+            }
+
+            const buttons = document.querySelectorAll('.restore-btn, .delete-btn');
+            buttons.forEach(btn => btn.disabled = true);
+
+            showStatus('Restoring backup... Please wait.', 'info');
+
+            try {
+                const response = await fetch(`/api/backup/restore/${encodeURIComponent(backupName)}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showStatus('Backup restored successfully! Reload the page to see changes.', 'success');
+                } else {
+                    showStatus('Restore failed: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Restore failed: ' + error.message, 'error');
+            } finally {
+                buttons.forEach(btn => btn.disabled = false);
+            }
+        }
+
+        // Delete backup
+        async function deleteBackup(backupName) {
+            if (!confirm(`Are you sure you want to delete "${backupName}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/backup/${encodeURIComponent(backupName)}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showStatus('Backup deleted', 'success');
+                    loadBackups();
+                } else {
+                    showStatus('Delete failed: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Delete failed: ' + error.message, 'error');
+            }
+        }
+
+        // Load backups on page load
+        loadBackups();
+    </script>
+</body>
+</html>

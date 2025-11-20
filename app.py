@@ -2479,6 +2479,202 @@ def get_playback_status():
         'video_id': current_video_id if is_playing else None
     })
 
+
+# ====================================================================
+# BACKUP AND RESTORE
+# ====================================================================
+
+BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
+MAX_BACKUPS = 3
+
+@app.route('/backup')
+def backup_page():
+    """Serve the backup management page."""
+    return render_template('backup.html')
+
+
+@app.route('/api/backups', methods=['GET'])
+def list_backups():
+    """List all available backups."""
+    if not os.path.exists(BACKUP_DIR):
+        return jsonify({'backups': []})
+
+    backups = []
+    for filename in os.listdir(BACKUP_DIR):
+        if filename.endswith('.tgz'):
+            filepath = os.path.join(BACKUP_DIR, filename)
+            stat = os.stat(filepath)
+            backups.append({
+                'name': filename,
+                'size': stat.st_size,
+                'created': stat.st_mtime,
+                'created_formatted': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime))
+            })
+
+    # Sort by creation time, newest first
+    backups.sort(key=lambda x: x['created'], reverse=True)
+    return jsonify({'backups': backups})
+
+
+@app.route('/api/backup', methods=['POST'])
+def create_backup():
+    """Create a new backup of settings, images, and extra-images."""
+    import tarfile
+    import tempfile
+
+    # Ensure backup directory exists
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+
+    # Generate backup filename with timestamp
+    timestamp = time.strftime('%Y%m%d_%H%M%S')
+    backup_name = f'kiosk_backup_{timestamp}.tgz'
+    backup_path = os.path.join(BACKUP_DIR, backup_name)
+
+    try:
+        with tarfile.open(backup_path, 'w:gz') as tar:
+            # Add settings.json
+            if os.path.exists(SETTINGS_FILE):
+                tar.add(SETTINGS_FILE, arcname='settings.json')
+
+            # Add images directory
+            upload_folder = str(app.config['UPLOAD_FOLDER'])
+            if os.path.exists(upload_folder):
+                for filename in os.listdir(upload_folder):
+                    filepath = os.path.join(upload_folder, filename)
+                    if os.path.isfile(filepath):
+                        tar.add(filepath, arcname=f'images/{filename}')
+
+            # Add extra-images directory
+            extra_images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'EXTRA_IMAGES')
+            if os.path.exists(extra_images_dir):
+                for filename in os.listdir(extra_images_dir):
+                    filepath = os.path.join(extra_images_dir, filename)
+                    if os.path.isfile(filepath):
+                        tar.add(filepath, arcname=f'EXTRA_IMAGES/{filename}')
+
+        # Get backup size
+        backup_size = os.path.getsize(backup_path)
+
+        # Clean up old backups (keep only MAX_BACKUPS)
+        cleanup_old_backups()
+
+        return jsonify({
+            'success': True,
+            'backup': {
+                'name': backup_name,
+                'size': backup_size,
+                'created': os.path.getmtime(backup_path),
+                'created_formatted': time.strftime('%Y-%m-%d %H:%M:%S')
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def cleanup_old_backups():
+    """Remove old backups, keeping only the newest MAX_BACKUPS."""
+    if not os.path.exists(BACKUP_DIR):
+        return
+
+    backups = []
+    for filename in os.listdir(BACKUP_DIR):
+        if filename.endswith('.tgz'):
+            filepath = os.path.join(BACKUP_DIR, filename)
+            backups.append((filepath, os.path.getmtime(filepath)))
+
+    # Sort by modification time, oldest first
+    backups.sort(key=lambda x: x[1])
+
+    # Remove oldest backups if we have more than MAX_BACKUPS
+    while len(backups) > MAX_BACKUPS:
+        oldest = backups.pop(0)
+        try:
+            os.remove(oldest[0])
+            print(f"Removed old backup: {oldest[0]}")
+        except Exception as e:
+            print(f"Error removing old backup {oldest[0]}: {e}")
+
+
+@app.route('/api/backup/restore/<backup_name>', methods=['POST'])
+def restore_backup(backup_name):
+    """Restore from a backup file."""
+    import tarfile
+    import shutil
+
+    backup_path = os.path.join(BACKUP_DIR, backup_name)
+
+    if not os.path.exists(backup_path):
+        return jsonify({'success': False, 'error': 'Backup not found'}), 404
+
+    try:
+        with tarfile.open(backup_path, 'r:gz') as tar:
+            # Extract to a temporary directory first
+            import tempfile
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tar.extractall(tmpdir)
+
+                # Restore settings.json
+                settings_src = os.path.join(tmpdir, 'settings.json')
+                if os.path.exists(settings_src):
+                    shutil.copy2(settings_src, SETTINGS_FILE)
+
+                # Restore images
+                images_src = os.path.join(tmpdir, 'images')
+                upload_folder = str(app.config['UPLOAD_FOLDER'])
+                if os.path.exists(images_src):
+                    # Clear existing images
+                    if os.path.exists(upload_folder):
+                        for f in os.listdir(upload_folder):
+                            os.remove(os.path.join(upload_folder, f))
+                    else:
+                        os.makedirs(upload_folder, exist_ok=True)
+
+                    # Copy restored images
+                    for filename in os.listdir(images_src):
+                        src = os.path.join(images_src, filename)
+                        dst = os.path.join(upload_folder, filename)
+                        shutil.copy2(src, dst)
+
+                # Restore extra-images
+                extra_src = os.path.join(tmpdir, 'EXTRA_IMAGES')
+                extra_dst = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'EXTRA_IMAGES')
+                if os.path.exists(extra_src):
+                    # Clear existing extra images
+                    if os.path.exists(extra_dst):
+                        for f in os.listdir(extra_dst):
+                            os.remove(os.path.join(extra_dst, f))
+                    else:
+                        os.makedirs(extra_dst, exist_ok=True)
+
+                    # Copy restored extra images
+                    for filename in os.listdir(extra_src):
+                        src = os.path.join(extra_src, filename)
+                        dst = os.path.join(extra_dst, filename)
+                        shutil.copy2(src, dst)
+
+        return jsonify({
+            'success': True,
+            'message': f'Restored from {backup_name}'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/backup/<backup_name>', methods=['DELETE'])
+def delete_backup(backup_name):
+    """Delete a specific backup."""
+    backup_path = os.path.join(BACKUP_DIR, backup_name)
+
+    if not os.path.exists(backup_path):
+        return jsonify({'success': False, 'error': 'Backup not found'}), 404
+
+    try:
+        os.remove(backup_path)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     # Load and log settings on startup
     settings = get_settings()
