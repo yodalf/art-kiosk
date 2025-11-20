@@ -2500,7 +2500,7 @@ def get_playback_status():
 
 BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
 MAX_BACKUPS = 3  # Regular backups
-MAX_TESTING_BACKUPS = 1  # Testing backups (separate from regular)
+MAX_TESTING_BACKUPS = 2  # Testing backups (separate from regular)
 TESTING_BACKUP_PREFIX = 'kiosk_testing_backup_'
 REGULAR_BACKUP_PREFIX = 'kiosk_backup_'
 
@@ -2540,7 +2540,7 @@ def create_backup():
     import tempfile
 
     # Check if this is a testing backup
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
     is_testing = data.get('testing', False)
 
     # Ensure backup directory exists
@@ -2715,6 +2715,9 @@ def restore_backup(backup_name):
                         src = os.path.join(thumbnails_src, filename)
                         dst = THUMBNAILS_FOLDER / filename
                         shutil.copy2(src, dst)
+
+        # Emit reload event to kiosk so it picks up the restored settings/images
+        socketio.emit('remote_command', {'command': 'reload'})
 
         return jsonify({
             'success': True,
