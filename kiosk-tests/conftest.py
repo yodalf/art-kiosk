@@ -109,6 +109,29 @@ def cleanup_mpv_at_end(api_client):
         pass
 
 
+@pytest.fixture(autouse=True)
+def stop_mpv_before_each_test(api_client, request):
+    """
+    Autouse fixture that stops any running mpv before EACH test.
+    This ensures only one video plays at a time and prevents orphaned processes.
+    """
+    # Stop any running video before test starts
+    try:
+        api_client.post('/api/videos/stop-mpv')
+        time.sleep(0.3)
+    except:
+        pass
+
+    yield
+
+    # Also stop after test (belt and suspenders)
+    try:
+        api_client.post('/api/videos/stop-mpv')
+        time.sleep(0.3)
+    except:
+        pass
+
+
 @pytest.fixture(scope="session", autouse=True)
 def manage_day_scheduling(api_client):
     """
