@@ -394,10 +394,7 @@ def test_video_stops_on_jump_to_another_video(api_client, video_setup, stop_all_
 @pytest.mark.video
 def test_video_stops_on_interval_advance(api_client, server_state, video_setup, stop_all_videos):
     """Video SHALL stop when slideshow interval advances automatically."""
-    # Set very short interval
-    api_client.post(f'/api/themes/{video_setup["theme"]}/interval', json={'interval': 5})
-
-    # Start video
+    # Start video first with long interval
     api_client.post('/api/themes/active', json={'theme': video_setup['theme']})
     time.sleep(0.5)
     api_client.post('/api/control/send', json={'command': 'reload'})
@@ -409,6 +406,9 @@ def test_video_stops_on_interval_advance(api_client, server_state, video_setup, 
         pytest.skip("Video did not start playing")
 
     assert is_mpv_running(), "mpv should be running"
+
+    # NOW set short interval after video is verified playing
+    api_client.post(f'/api/themes/{video_setup["theme"]}/interval', json={'interval': 5})
 
     # Wait for interval to elapse (5 seconds + buffer)
     time.sleep(7)

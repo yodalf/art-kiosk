@@ -141,11 +141,16 @@ def test_video_auto_transition():
             timeout=5
         )
         assert response.status_code == 200, f"Failed to send jump command: {response.status_code}"
-        time.sleep(5)  # Wait for video to start
 
-        # Get initial state - should show the video
-        initial_state = get_current_kiosk_state()
-        initial_image = initial_state.get('current_image') if initial_state else None
+        # Wait for video to start (YouTube videos need time for yt-dlp to resolve and buffer)
+        # Poll for up to 15 seconds for the video to be playing
+        initial_image = None
+        for _ in range(15):
+            time.sleep(1)
+            initial_state = get_current_kiosk_state()
+            initial_image = initial_state.get('current_image') if initial_state else None
+            if initial_image == video_id:
+                break
         print(f"  Initial state: {initial_image}")
 
         # Verify the video is actually playing
@@ -257,11 +262,16 @@ def test_video_auto_transition_to_next_item():
             timeout=5
         )
         assert response.status_code == 200, f"Failed to send jump command"
-        time.sleep(5)  # Wait for video to start
 
-        # Verify video is playing
-        initial_state = get_current_kiosk_state()
-        initial_image = initial_state.get('current_image') if initial_state else None
+        # Poll for up to 15 seconds for the video to be playing
+        initial_image = None
+        for _ in range(15):
+            time.sleep(1)
+            initial_state = get_current_kiosk_state()
+            initial_image = initial_state.get('current_image') if initial_state else None
+            if initial_image == video_id:
+                break
+
         assert initial_image == video_id, f"Video did not start! Got {initial_image}"
         print(f"  ✓ Video {video_id} is playing")
 
@@ -342,7 +352,14 @@ def test_video_auto_transition_with_playwright():
             # Step 5: Jump to video
             print("\nStep 5: Jumping to video...")
             assert jump_to_video(video_id), "Failed to jump to video"
-            time.sleep(3)  # Wait for video to start
+
+            # Wait for video to start (poll for up to 15 seconds)
+            for _ in range(15):
+                time.sleep(1)
+                state = get_current_kiosk_state()
+                if state and state.get('current_image') == video_id:
+                    break
+            print(f"  Video started")
 
             # Take initial screenshot
             screenshot1 = page.screenshot()
