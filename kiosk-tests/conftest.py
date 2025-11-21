@@ -756,11 +756,11 @@ def isolated_test_data(api_client):
 
     Creates:
     - 20 images (including one suitable for crop tests)
-    - 3 videos
+    - 5 videos
     - 4 themes:
       - 'TestTheme10Images': 10 images
       - 'TestTheme15Images': 15 images
-      - 'TestThemeVideosOnly': 3 videos only
+      - 'TestThemeVideosOnly': 5 videos only
       - 'TestTheme19ImagesVideoEnd': 19 images + 1 video at end
     - 2 atmospheres:
       - 'TestAtmosphereImageThemes': points to the 2 image themes
@@ -872,12 +872,14 @@ def isolated_test_data(api_client):
 
         print(f"  Total images created: {len(created_data['images'])}")
 
-        # Step 2: Add 3 videos
-        print("\nStep 2: Adding 3 test videos...")
+        # Step 2: Add 5 videos
+        print("\nStep 2: Adding 5 test videos...")
         test_video_urls = [
             "https://www.youtube.com/watch?v=jNQXAC9IVRw",  # "Me at the zoo"
             "https://www.youtube.com/watch?v=9bZkp7q19f0",  # Gangnam Style
             "https://www.youtube.com/watch?v=dQw4w9WgXcQ",  # Never Gonna Give You Up
+            "https://www.youtube.com/watch?v=kJQP7kiw5Fk",  # Despacito
+            "https://www.youtube.com/watch?v=JGwWNGJdvx8",  # Shape of You
         ]
 
         for i, url in enumerate(test_video_urls):
