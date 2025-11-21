@@ -50,6 +50,9 @@ def test_isolated_data_setup(isolated_test_data):
 @pytest.mark.integration
 def test_isolated_data_theme_activation(isolated_test_data, api_client):
     """Test that we can activate themes from isolated data."""
+    # Disable day scheduling (it overrides theme filtering)
+    api_client.post('/api/day/disable')
+
     # Activate one of our test themes
     theme_name = 'TestTheme10Images'
     response = api_client.post('/api/themes/active', json={'theme': theme_name})

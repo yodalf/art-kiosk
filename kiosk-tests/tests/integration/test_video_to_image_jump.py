@@ -1,20 +1,37 @@
 """Test video to image jump transition."""
 import pytest
 import time
-import requests
+import subprocess
+from pathlib import Path
 
-# Test configuration
-BASE_URL = "http://raspberrypi.local"
+
+def load_device_config():
+    """Load device configuration from device.txt."""
+    device_file = Path(__file__).parent.parent.parent.parent / "device.txt"
+    if device_file.exists():
+        config = {}
+        with open(device_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and '=' in line:
+                    key, value = line.split('=', 1)
+                    config[key.strip()] = value.strip()
+        return config
+    return {}
+
+
+device_config = load_device_config()
 
 
 def is_mpv_running():
-    """Check if mpv is running on the device."""
-    try:
-        response = requests.get(f"{BASE_URL}/api/videos/playback-status", timeout=5)
-        data = response.json()
-        return data.get('playing', False)
-    except:
-        return False
+    """Check if mpv is running on the remote device via SSH."""
+    hostname = device_config.get('hostname', 'raspberrypi.local')
+    username = device_config.get('username', 'realo')
+    password = device_config.get('password', 'toto')
+
+    cmd = f"sshpass -p '{password}' ssh -o StrictHostKeyChecking=no {username}@{hostname} 'ps aux | grep \"[m]pv\" | grep -v defunct | grep -v grep'"
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    return result.returncode == 0 and result.stdout.strip() != ''
 
 
 def wait_for_video_playing(timeout=30):
@@ -23,11 +40,11 @@ def wait_for_video_playing(timeout=30):
     while time.time() - start < timeout:
         if is_mpv_running():
             return True
-        time.sleep(0.5)
+        time.sleep(1.0)
     return False
 
 
-def wait_for_video_stopped(timeout=10):
+def wait_for_video_stopped(timeout=15):
     """Wait for video to stop."""
     start = time.time()
     while time.time() - start < timeout:
@@ -37,54 +54,52 @@ def wait_for_video_stopped(timeout=10):
     return False
 
 
-def get_current_image():
-    """Get the current image being displayed."""
-    response = requests.get(f"{BASE_URL}/api/kiosk/current-image", timeout=5)
-    return response.json()
-
-
-def get_enabled_images():
-    """Get list of enabled images."""
-    response = requests.get(f"{BASE_URL}/api/images?enabled_only=true", timeout=5)
-    return response.json()
-
-
-def get_videos():
-    """Get list of videos."""
-    response = requests.get(f"{BASE_URL}/api/videos", timeout=5)
-    return response.json()
-
-
 @pytest.mark.integration
-def test_video_to_image_jump():
+def test_video_to_image_jump(api_client, isolated_test_data):
     """
     Test that clicking an image while video is playing:
     1. Stops the video
     2. Shows the CORRECT clicked image (not first image)
     3. Does not show spinner
     """
-    # Get available images and videos
-    images = get_enabled_images()
-    videos = get_videos()
+    # Use isolated test data
+    images = isolated_test_data['images']
+    videos = isolated_test_data['videos']
 
     assert len(images) >= 3, f"Need at least 3 images, got {len(images)}"
     assert len(videos) >= 1, f"Need at least 1 video, got {len(videos)}"
 
     # Pick the third image (not first, not second)
-    target_image = images[2]['name']
-    first_image = images[0]['name']
-    video = videos[0]
+    target_image = images[2]
+    first_image = images[0]
+    video_id = videos[0]
+
+    # Get video URL
+    response = api_client.get('/api/videos')
+    videos_data = response.json()
+    video = next((v for v in videos_data if v['id'] == video_id), None)
+
+    if not video:
+        pytest.skip(f"Video {video_id} not found")
 
     print(f"\nTest setup:")
     print(f"  Target image (3rd): {target_image}")
     print(f"  First image: {first_image}")
-    print(f"  Video: {video['id']}")
+    print(f"  Video: {video_id}")
+
+    # Activate theme with our test images so jump works correctly
+    print("\nActivating test theme...")
+    api_client.post('/api/themes/active', json={'theme': 'TestTheme19ImagesVideoEnd'})
+
+    # Reload kiosk to pick up theme change
+    api_client.post('/api/control/send', json={'command': 'reload'})
+    time.sleep(2)
 
     # Step 1: Start video playback
     print("\nStep 1: Starting video...")
-    response = requests.post(
-        f"{BASE_URL}/api/videos/execute-mpv",
-        json={'url': video['url'], 'video_id': video['id']},
+    response = api_client.post(
+        '/api/videos/execute-mpv',
+        json={'url': video['url'], 'video_id': video_id},
         timeout=10
     )
     assert response.status_code == 200, f"Failed to start video: {response.text}"
@@ -98,16 +113,15 @@ def test_video_to_image_jump():
 
     # Step 2: Stop video and jump to specific image
     print(f"\nStep 2: Stopping video and jumping to {target_image}...")
-    response = requests.post(
-        f"{BASE_URL}/api/videos/stop-mpv",
+    response = api_client.post(
+        '/api/videos/stop-mpv',
         json={'jump_to': target_image},
-        headers={'Content-Type': 'application/json'},
         timeout=10
     )
     assert response.status_code == 200, f"Failed to stop video: {response.text}"
 
     # Wait for video to stop
-    assert wait_for_video_stopped(timeout=10), "Video did not stop"
+    assert wait_for_video_stopped(timeout=15), "Video did not stop"
     print("  Video stopped")
 
     # Wait for jump to complete
@@ -115,7 +129,8 @@ def test_video_to_image_jump():
 
     # Step 3: Verify correct image is shown
     print("\nStep 3: Verifying correct image...")
-    current = get_current_image()
+    response = api_client.get('/api/kiosk/current-image')
+    current = response.json()
     current_image = current.get('current_image')
 
     print(f"  Current image: {current_image}")
@@ -134,7 +149,3 @@ def test_video_to_image_jump():
         f"Kiosk is showing spinner/loading state: {current_image}"
 
     print("\n✓ Test passed! Correct image is displayed")
-
-
-if __name__ == "__main__":
-    test_video_to_image_jump()

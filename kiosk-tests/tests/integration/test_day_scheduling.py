@@ -149,25 +149,25 @@ def test_rapid_hour_transitions(test_mode, api_client):
 
 @pytest.mark.integration
 @pytest.mark.day_scheduling
-def test_time_period_atmosphere_assignment(api_client, server_state):
+def test_time_period_atmosphere_assignment(api_client, server_state, isolated_test_data):
     """Test assigning atmospheres to time periods."""
     # Enable day scheduling
     server_state.enable_day_scheduling()
 
-    # Create test atmospheres
-    server_state.create_atmosphere('Morning')
-    server_state.create_atmosphere('Evening')
+    # Use atmospheres from isolated test data
+    morning_atmosphere = 'TestAtmosphereImageThemes'
+    evening_atmosphere = 'TestAtmosphereAllThemes'
 
     # Assign atmosphere to time period 1
     response = api_client.post('/api/day/time-periods/1', json={
-        'atmospheres': ['Morning']
+        'atmospheres': [morning_atmosphere]
     })
     assert response.status_code == 200
 
     # Verify assignment
     status = api_client.get('/api/day/status').json()
     period_1 = status['time_periods']['1']
-    assert 'Morning' in period_1['atmospheres']
+    assert morning_atmosphere in period_1['atmospheres']
 
     # Cleanup
     server_state.disable_day_scheduling()

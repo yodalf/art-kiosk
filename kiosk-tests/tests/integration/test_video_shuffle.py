@@ -69,6 +69,9 @@ def test_shuffle_regenerates_when_video_last_item_transitions(api_client, isolat
     print(f"  Images: {len(test_images)}")
     print(f"  Video: {test_video}")
 
+    # Disable day scheduling (it overrides theme filtering)
+    api_client.post('/api/day/disable')
+
     # Step 1: Activate test theme
     print("\nStep 1: Activating test theme...")
     api_client.post('/api/themes/active', json={'theme': theme_name})
@@ -187,6 +190,9 @@ def test_shuffle_id_changes_on_list_wrap(api_client, isolated_test_data):
     theme_name = 'TestTheme10Images'
 
     print(f"\nUsing theme: {theme_name}")
+
+    # Disable day scheduling (it overrides theme filtering)
+    api_client.post('/api/day/disable')
 
     # Activate theme
     api_client.post('/api/themes/active', json={'theme': theme_name})

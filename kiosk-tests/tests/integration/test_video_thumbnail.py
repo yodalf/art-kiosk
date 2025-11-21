@@ -118,19 +118,17 @@ def test_req_video_015_thumbnail_generation(api_client):
 
 @pytest.mark.integration
 @pytest.mark.video
-def test_video_thumbnail_in_api_response(api_client):
+def test_video_thumbnail_in_api_response(api_client, isolated_test_data):
     """
     Test that video thumbnail path is included in API responses.
     """
-    # Use existing video if available
-    response = api_client.get('/api/videos')
-    videos = response.json()
+    # Use video from isolated test data
+    videos = isolated_test_data['videos']
 
     if not videos:
         pytest.skip("No videos available to test thumbnail API response")
 
-    video = videos[0]
-    video_id = video.get('id')
+    video_id = videos[0]
 
     # Check if thumbnail field is present
     # The API should include thumbnail information for videos
