@@ -85,7 +85,7 @@ def send_command(command):
 
 
 @pytest.mark.integration
-def test_video_auto_transition():
+def test_video_auto_transition(isolated_test_data):
     """
     Test that a video automatically transitions to the next item after the interval.
 
@@ -93,7 +93,7 @@ def test_video_auto_transition():
     a video, then verifies the kiosk auto-transitions after the interval expires.
 
     Steps:
-    1. Get the current "All Images" interval and save it
+    1. Disable day scheduling and activate test theme
     2. Set a short interval (15 seconds)
     3. Get list of videos
     4. Jump to a video using jump command
@@ -101,35 +101,40 @@ def test_video_auto_transition():
     6. Verify kiosk has transitioned to a different item
     7. Restore original interval
     """
+    # Use test theme with videos
+    theme_name = 'TestTheme19ImagesVideoEnd'
     original_interval = None
     TEST_INTERVAL = 15  # 15 seconds for testing
 
     try:
-        # Step 1: Save original interval
-        print("\nStep 1: Saving original interval...")
+        # Step 1: Disable day scheduling and activate test theme
+        print("\nStep 1: Setting up test theme...")
+        requests.post(f"{BASE_URL}/api/day/disable", timeout=5)
+        requests.post(f"{BASE_URL}/api/themes/active", json={'theme': theme_name}, timeout=5)
+
+        # Save original interval
         themes_data = get_themes()
-        all_images_theme = themes_data.get('themes', {}).get('All Images', {})
-        original_interval = all_images_theme.get('interval', 3600)
+        test_theme = themes_data.get('themes', {}).get(theme_name, {})
+        original_interval = test_theme.get('interval', 3600)
         print(f"  Original interval: {original_interval} seconds")
 
         # Step 2: Set short test interval
         print(f"\nStep 2: Setting test interval to {TEST_INTERVAL} seconds...")
-        assert set_theme_interval('All Images', TEST_INTERVAL), "Failed to set theme interval"
+        assert set_theme_interval(theme_name, TEST_INTERVAL), "Failed to set theme interval"
 
         # Verify it was set
         themes_data = get_themes()
-        new_interval = themes_data.get('themes', {}).get('All Images', {}).get('interval')
+        new_interval = themes_data.get('themes', {}).get(theme_name, {}).get('interval')
         assert new_interval == TEST_INTERVAL, f"Interval not set correctly: {new_interval}"
         print(f"  Interval set to: {new_interval} seconds")
 
-        # Step 3: Get videos
+        # Step 3: Get videos from isolated test data
         print("\nStep 3: Getting video list...")
-        videos = get_videos()
+        videos = isolated_test_data['themes'][theme_name]['videos']
         if not videos:
             pytest.skip("No videos available for testing")
 
-        video = videos[0]
-        video_id = video.get('id')
+        video_id = videos[0]
         print(f"  Found video: {video_id}")
 
         # Step 4: Jump to video using jump command (same as manage.html Play button)
@@ -199,33 +204,38 @@ def get_images_list():
 
 
 @pytest.mark.integration
-def test_video_auto_transition_to_next_item():
+def test_video_auto_transition_to_next_item(isolated_test_data):
     """
     Test that after video auto-transition, the kiosk shows the NEXT item
     in the list, not the first item.
 
     Steps:
-    1. Get the current images list (in randomized order)
-    2. Find a video and note its position
-    3. Set a short interval
+    1. Disable day scheduling and activate test theme
+    2. Set a short interval
+    3. Get images list and find video position
     4. Jump to the video
     5. Wait for auto-transition
     6. Verify the kiosk shows the item AFTER the video in the list
     """
+    theme_name = 'TestTheme19ImagesVideoEnd'
     original_interval = None
     TEST_INTERVAL = 10  # 10 seconds for testing
 
     try:
-        # Step 1: Save original interval
-        print("\nStep 1: Saving original interval...")
+        # Step 1: Disable day scheduling and activate test theme
+        print("\nStep 1: Setting up test theme...")
+        requests.post(f"{BASE_URL}/api/day/disable", timeout=5)
+        requests.post(f"{BASE_URL}/api/themes/active", json={'theme': theme_name}, timeout=5)
+
+        # Save original interval
         themes_data = get_themes()
-        all_images_theme = themes_data.get('themes', {}).get('All Images', {})
-        original_interval = all_images_theme.get('interval', 3600)
+        test_theme = themes_data.get('themes', {}).get(theme_name, {})
+        original_interval = test_theme.get('interval', 3600)
         print(f"  Original interval: {original_interval} seconds")
 
         # Step 2: Set short test interval
         print(f"\nStep 2: Setting test interval to {TEST_INTERVAL} seconds...")
-        assert set_theme_interval('All Images', TEST_INTERVAL), "Failed to set theme interval"
+        assert set_theme_interval(theme_name, TEST_INTERVAL), "Failed to set theme interval"
 
         # Step 3: Get images list and find video position
         print("\nStep 3: Getting images list...")
@@ -233,11 +243,12 @@ def test_video_auto_transition_to_next_item():
         if len(images) < 2:
             pytest.skip("Need at least 2 items for this test")
 
-        # Find a video in the list
+        # Find a video from isolated test data in the list
+        test_videos = isolated_test_data['themes'][theme_name]['videos']
         video_index = None
         video_id = None
         for i, item in enumerate(images):
-            if item.get('type') == 'video':
+            if item.get('name') in test_videos:
                 video_index = i
                 video_id = item.get('name')
                 break
@@ -297,7 +308,7 @@ def test_video_auto_transition_to_next_item():
         # Restore original interval
         if original_interval is not None:
             print(f"\nCleanup: Restoring original interval ({original_interval} seconds)...")
-            set_theme_interval('All Images', original_interval)
+            set_theme_interval(theme_name, original_interval)
             print("  Cleanup complete")
 
         # Stop any playing video
@@ -308,12 +319,13 @@ def test_video_auto_transition_to_next_item():
 
 
 @pytest.mark.integration
-def test_video_auto_transition_with_playwright():
+def test_video_auto_transition_with_playwright(isolated_test_data):
     """
     Test video auto-transition using Playwright to observe actual display.
 
     This test uses a browser to verify the visual transition.
     """
+    theme_name = 'TestTheme19ImagesVideoEnd'
     original_interval = None
     TEST_INTERVAL = 10  # 10 seconds for testing
 
@@ -322,26 +334,29 @@ def test_video_auto_transition_with_playwright():
         page = browser.new_page(viewport={'width': 1920, 'height': 1080})
 
         try:
-            # Step 1: Save original interval
-            print("\nStep 1: Saving original interval...")
+            # Step 1: Disable day scheduling and activate test theme
+            print("\nStep 1: Setting up test theme...")
+            requests.post(f"{BASE_URL}/api/day/disable", timeout=5)
+            requests.post(f"{BASE_URL}/api/themes/active", json={'theme': theme_name}, timeout=5)
+
+            # Save original interval
             themes_data = get_themes()
-            all_images_theme = themes_data.get('themes', {}).get('All Images', {})
-            original_interval = all_images_theme.get('interval', 3600)
+            test_theme = themes_data.get('themes', {}).get(theme_name, {})
+            original_interval = test_theme.get('interval', 3600)
             print(f"  Original interval: {original_interval} seconds")
 
             # Step 2: Set short test interval
             print(f"\nStep 2: Setting test interval to {TEST_INTERVAL} seconds...")
-            assert set_theme_interval('All Images', TEST_INTERVAL), "Failed to set theme interval"
+            assert set_theme_interval(theme_name, TEST_INTERVAL), "Failed to set theme interval"
             print(f"  Interval set to: {TEST_INTERVAL} seconds")
 
-            # Step 3: Get videos
+            # Step 3: Get videos from isolated test data
             print("\nStep 3: Getting video list...")
-            videos = get_videos()
+            videos = isolated_test_data['themes'][theme_name]['videos']
             if not videos:
                 pytest.skip("No videos available for testing")
 
-            video = videos[0]
-            video_id = video.get('id')
+            video_id = videos[0]
             print(f"  Found video: {video_id}")
 
             # Step 4: Navigate to kiosk view
@@ -404,7 +419,7 @@ def test_video_auto_transition_with_playwright():
             # Restore original interval
             if original_interval is not None:
                 print(f"\nCleanup: Restoring original interval ({original_interval} seconds)...")
-                set_theme_interval('All Images', original_interval)
+                set_theme_interval(theme_name, original_interval)
                 print("  Cleanup complete")
 
 
