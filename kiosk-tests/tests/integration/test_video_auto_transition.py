@@ -112,6 +112,10 @@ def test_video_auto_transition(isolated_test_data):
         requests.post(f"{BASE_URL}/api/day/disable", timeout=5)
         requests.post(f"{BASE_URL}/api/themes/active", json={'theme': theme_name}, timeout=5)
 
+        # Reload kiosk to pick up theme change
+        requests.post(f"{BASE_URL}/api/control/send", json={'command': 'reload'}, timeout=5)
+        time.sleep(2)
+
         # Save original interval
         themes_data = get_themes()
         test_theme = themes_data.get('themes', {}).get(theme_name, {})
@@ -185,7 +189,7 @@ def test_video_auto_transition(isolated_test_data):
         # Restore original interval
         if original_interval is not None:
             print(f"\nCleanup: Restoring original interval ({original_interval} seconds)...")
-            set_theme_interval('All Images', original_interval)
+            set_theme_interval(theme_name, original_interval)
             print("  Cleanup complete")
 
         # Stop any playing video
@@ -226,6 +230,10 @@ def test_video_auto_transition_to_next_item(isolated_test_data):
         print("\nStep 1: Setting up test theme...")
         requests.post(f"{BASE_URL}/api/day/disable", timeout=5)
         requests.post(f"{BASE_URL}/api/themes/active", json={'theme': theme_name}, timeout=5)
+
+        # Reload kiosk to pick up theme change
+        requests.post(f"{BASE_URL}/api/control/send", json={'command': 'reload'}, timeout=5)
+        time.sleep(2)
 
         # Save original interval
         themes_data = get_themes()
@@ -338,6 +346,10 @@ def test_video_auto_transition_with_playwright(isolated_test_data):
             print("\nStep 1: Setting up test theme...")
             requests.post(f"{BASE_URL}/api/day/disable", timeout=5)
             requests.post(f"{BASE_URL}/api/themes/active", json={'theme': theme_name}, timeout=5)
+
+            # Reload kiosk to pick up theme change
+            requests.post(f"{BASE_URL}/api/control/send", json={'command': 'reload'}, timeout=5)
+            time.sleep(2)
 
             # Save original interval
             themes_data = get_themes()
