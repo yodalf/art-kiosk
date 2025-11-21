@@ -772,6 +772,20 @@ def isolated_test_data(api_client):
         print("SETTING UP ISOLATED TEST DATA")
         print("="*60)
 
+        # Pre-cleanup: Delete any leftover test themes/atmospheres from previous runs
+        print("\nPre-cleanup: Removing any leftover test data...")
+        for atm_name in ['TestAtmosphereImageThemes', 'TestAtmosphereAllThemes']:
+            try:
+                api_client.delete(f'/api/atmospheres/{atm_name}')
+            except:
+                pass
+        for theme_name in ['TestTheme10Images', 'TestTheme15Images', 'TestThemeVideosOnly', 'TestTheme19ImagesVideoEnd']:
+            try:
+                api_client.delete(f'/api/themes/{theme_name}')
+            except:
+                pass
+        print("  Pre-cleanup complete")
+
         # Step 1: Create 20 test images
         print("\nStep 1: Creating 20 test images...")
         for i in range(20):
