@@ -2,6 +2,7 @@
 Integration tests for Atmosphere Management (REQ-ATM-001 through REQ-ATM-009).
 
 Tests atmosphere creation, assignment, cadence, and theme relationships.
+Uses isolated_test_data for pre-created themes and images.
 """
 
 import pytest
@@ -9,7 +10,7 @@ import pytest
 
 @pytest.mark.integration
 @pytest.mark.atmospheres
-def test_req_atm_001_create_atmosphere(api_client, server_state):
+def test_req_atm_001_create_atmosphere(api_client):
     """REQ-ATM-001: POST /api/atmospheres SHALL create new atmosphere."""
     response = api_client.post('/api/atmospheres', json={
         'name': 'SunnyDay',
@@ -23,108 +24,102 @@ def test_req_atm_001_create_atmosphere(api_client, server_state):
 
 @pytest.mark.integration
 @pytest.mark.atmospheres
-def test_req_atm_002_default_cadence(api_client, server_state):
+def test_req_atm_002_default_cadence(api_client):
     """REQ-ATM-002: New atmospheres SHALL have default interval of 3600 seconds."""
-    server_state.create_atmosphere('DefaultCadence')
+    response = api_client.post('/api/atmospheres', json={'name': 'DefaultCadence'})
+    assert response.status_code == 200
 
     settings = api_client.get('/api/settings').json()
     atmosphere = settings['atmospheres']['DefaultCadence']
 
     assert atmosphere['interval'] == 3600
 
+    # Cleanup
+    api_client.delete('/api/atmospheres/DefaultCadence')
+
 
 @pytest.mark.integration
 @pytest.mark.atmospheres
-def test_req_atm_003_atmosphere_themes_many_to_many(api_client, server_state):
+def test_req_atm_003_atmosphere_themes_many_to_many(api_client, isolated_test_data):
     """REQ-ATM-003: Atmospheres contain multiple themes (many-to-many)."""
-    server_state.create_atmosphere('MultiTheme')
-    server_state.create_theme('Theme1')
-    server_state.create_theme('Theme2')
-
-    # Assign multiple themes to atmosphere
-    response = api_client.post('/api/atmospheres/MultiTheme/themes', json={
-        'themes': ['Theme1', 'Theme2']
-    })
-    assert response.status_code == 200
-
-    # Verify
+    # Use existing atmosphere from isolated data
     settings = api_client.get('/api/settings').json()
-    atm_themes = settings['atmosphere_themes'].get('MultiTheme', [])
+    atm_themes = settings['atmosphere_themes'].get('TestAtmosphereImageThemes', [])
 
-    assert 'Theme1' in atm_themes
-    assert 'Theme2' in atm_themes
+    # Should have 2 themes
+    assert 'TestTheme10Images' in atm_themes
+    assert 'TestTheme15Images' in atm_themes
 
 
 @pytest.mark.integration
 @pytest.mark.atmospheres
-def test_req_atm_004_active_atmosphere_selection(api_client, server_state):
+def test_req_atm_004_active_atmosphere_selection(api_client, isolated_test_data):
     """REQ-ATM-004: POST /api/atmospheres/active SHALL set active atmosphere."""
-    server_state.create_atmosphere('ActiveAtm')
+    atm_name = 'TestAtmosphereImageThemes'
 
     response = api_client.post('/api/atmospheres/active', json={
-        'atmosphere': 'ActiveAtm'
+        'atmosphere': atm_name
     })
     assert response.status_code == 200
 
     # Verify
     settings = api_client.get('/api/settings').json()
-    assert settings.get('active_atmosphere') == 'ActiveAtm'
+    assert settings.get('active_atmosphere') == atm_name
 
 
 @pytest.mark.integration
 @pytest.mark.atmospheres
-def test_req_atm_005_atmosphere_combines_themes(api_client, image_uploader, server_state):
+def test_req_atm_005_atmosphere_combines_themes(api_client, isolated_test_data):
     """REQ-ATM-005: Active atmosphere SHALL combine images from all assigned themes."""
-    # Create atmosphere with two themes
-    server_state.create_atmosphere('Combined')
-    server_state.create_theme('ThemeA')
-    server_state.create_theme('ThemeB')
-
-    # Upload images for each theme
-    img1 = image_uploader.upload_test_image(color=(255, 0, 0))
-    img2 = image_uploader.upload_test_image(color=(0, 255, 0))
-
-    api_client.post(f'/api/images/{img1}/themes', json={'themes': ['ThemeA']})
-    api_client.post(f'/api/images/{img2}/themes', json={'themes': ['ThemeB']})
-
-    # Assign both themes to atmosphere
-    api_client.post('/api/atmospheres/Combined/themes', json={
-        'themes': ['ThemeA', 'ThemeB']
-    })
-
-    # Activate atmosphere
-    api_client.post('/api/atmospheres/active', json={'atmosphere': 'Combined'})
+    # Activate atmosphere with 2 image themes
+    api_client.post('/api/atmospheres/active', json={'atmosphere': 'TestAtmosphereImageThemes'})
 
     # Get images
     response = api_client.get('/api/images?enabled_only=true')
     images = response.json()
     image_names = [img['name'] for img in images]
 
-    # Both images should be present
-    assert img1 in image_names or img2 in image_names  # At least one should be there
+    # Should have images from both TestTheme10Images and TestTheme15Images
+    # TestTheme15Images has images 0-14, TestTheme10Images has images 0-9
+    # Combined should have images 0-14 (15 unique images)
+    theme10_images = isolated_test_data['themes']['TestTheme10Images']['images']
+    theme15_images = isolated_test_data['themes']['TestTheme15Images']['images']
+
+    # All images from TestTheme10Images should be present
+    for img_id in theme10_images:
+        assert img_id in image_names, f"Image {img_id} should be in combined atmosphere"
 
 
 @pytest.mark.integration
 @pytest.mark.atmospheres
-def test_req_atm_006_update_cadence(api_client, server_state):
+def test_req_atm_006_update_cadence(api_client, isolated_test_data):
     """REQ-ATM-006: POST /api/atmospheres/<name>/interval SHALL update interval."""
-    server_state.create_atmosphere('CadenceUpdate')
+    atm_name = 'TestAtmosphereImageThemes'
 
-    response = api_client.post('/api/atmospheres/CadenceUpdate/interval', json={
+    # Get original interval
+    settings = api_client.get('/api/settings').json()
+    original_interval = settings['atmospheres'][atm_name]['interval']
+
+    # Update interval
+    response = api_client.post(f'/api/atmospheres/{atm_name}/interval', json={
         'interval': 1800
     })
     assert response.status_code == 200
 
     # Verify
     settings = api_client.get('/api/settings').json()
-    assert settings['atmospheres']['CadenceUpdate']['interval'] == 1800
+    assert settings['atmospheres'][atm_name]['interval'] == 1800
+
+    # Restore original
+    api_client.post(f'/api/atmospheres/{atm_name}/interval', json={'interval': original_interval})
 
 
 @pytest.mark.integration
 @pytest.mark.atmospheres
-def test_req_atm_007_delete_atmosphere(api_client, server_state):
+def test_req_atm_007_delete_atmosphere(api_client):
     """REQ-ATM-007: DELETE /api/atmospheres/<name> SHALL remove atmosphere."""
-    server_state.create_atmosphere('DeleteAtm')
+    # Create atmosphere for deletion
+    api_client.post('/api/atmospheres', json={'name': 'DeleteAtm'})
 
     response = api_client.delete('/api/atmospheres/DeleteAtm')
     assert response.status_code == 200
@@ -133,20 +128,17 @@ def test_req_atm_007_delete_atmosphere(api_client, server_state):
     settings = api_client.get('/api/settings').json()
     assert 'DeleteAtm' not in settings.get('atmospheres', {})
 
-    # Don't cleanup in fixture
-    server_state.created_atmospheres.remove('DeleteAtm')
-
 
 @pytest.mark.integration
 @pytest.mark.atmospheres
-def test_req_atm_008_delete_resets_if_active(api_client, server_state):
+def test_req_atm_008_delete_resets_if_active(api_client):
     """REQ-ATM-008: Deleting active atmosphere SHALL reset to no atmosphere."""
-    server_state.create_atmosphere('ActiveDelete')
+    # Create and activate atmosphere
+    api_client.post('/api/atmospheres', json={'name': 'ActiveDelete'})
     api_client.post('/api/atmospheres/active', json={'atmosphere': 'ActiveDelete'})
 
     # Delete it
     api_client.delete('/api/atmospheres/ActiveDelete')
-    server_state.created_atmospheres.remove('ActiveDelete')
 
     # Verify reset
     settings = api_client.get('/api/settings').json()
@@ -155,23 +147,17 @@ def test_req_atm_008_delete_resets_if_active(api_client, server_state):
 
 @pytest.mark.integration
 @pytest.mark.atmospheres
-def test_req_atm_009_cadence_controls_transitions(test_mode, api_client, server_state):
+def test_req_atm_009_cadence_controls_transitions(api_client, isolated_test_data):
     """REQ-ATM-009: Atmosphere interval SHALL control theme transition timing."""
-    server_state.create_atmosphere('FastCadence', interval=5)
-    server_state.create_theme('FastTheme1')
-    server_state.create_theme('FastTheme2')
-
-    # Assign themes to atmosphere
-    api_client.post('/api/atmospheres/FastCadence/themes', json={
-        'themes': ['FastTheme1', 'FastTheme2']
-    })
+    # Use TestAtmosphereAllThemes which has all 4 themes
+    atm_name = 'TestAtmosphereAllThemes'
 
     # Activate atmosphere
-    api_client.post('/api/atmospheres/active', json={'atmosphere': 'FastCadence'})
+    api_client.post('/api/atmospheres/active', json={'atmosphere': atm_name})
 
     # Get the interval value
     settings = api_client.get('/api/settings').json()
-    interval = settings['atmospheres']['FastCadence']['interval']
+    interval = settings['atmospheres'][atm_name]['interval']
 
     # Verify interval is set
-    assert interval == 5
+    assert interval == 600  # As configured in fixture
