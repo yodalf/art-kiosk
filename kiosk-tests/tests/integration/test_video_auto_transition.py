@@ -7,8 +7,7 @@ import pytest
 import requests
 import os
 import time
-import asyncio
-from playwright.async_api import async_playwright
+from playwright.sync_api import sync_playwright
 
 # Load device configuration
 def load_device_config():
@@ -328,8 +327,7 @@ def test_video_auto_transition_to_next_item(isolated_test_data):
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
-async def test_video_auto_transition_with_playwright(isolated_test_data):
+def test_video_auto_transition_with_playwright(isolated_test_data):
     """
     Test video auto-transition using Playwright to observe actual display.
 
@@ -339,9 +337,9 @@ async def test_video_auto_transition_with_playwright(isolated_test_data):
     original_interval = None
     TEST_INTERVAL = 10  # 10 seconds for testing
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page(viewport={'width': 1920, 'height': 1080})
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport={'width': 1920, 'height': 1080})
 
         try:
             # Step 1: Disable day scheduling and activate test theme
@@ -375,8 +373,8 @@ async def test_video_auto_transition_with_playwright(isolated_test_data):
 
             # Step 4: Navigate to kiosk view
             print("\nStep 4: Navigating to kiosk view...")
-            await page.goto(f"{BASE_URL}/view")
-            await asyncio.sleep(3)  # Wait for page to load
+            page.goto(f"{BASE_URL}/view")
+            time.sleep(3)  # Wait for page to load
 
             # Step 5: Jump to video
             print("\nStep 5: Jumping to video...")
@@ -384,23 +382,23 @@ async def test_video_auto_transition_with_playwright(isolated_test_data):
 
             # Wait for video to start (poll for up to 15 seconds)
             for _ in range(15):
-                await asyncio.sleep(1)
+                time.sleep(1)
                 state = get_current_kiosk_state()
                 if state and state.get('current_image') == video_id:
                     break
             print(f"  Video started")
 
             # Take initial screenshot
-            screenshot1 = await page.screenshot()
+            screenshot1 = page.screenshot()
             print("  Took initial screenshot")
 
             # Step 6: Wait for interval + buffer
             wait_time = TEST_INTERVAL + 5
             print(f"\nStep 6: Waiting {wait_time} seconds for auto-transition...")
-            await asyncio.sleep(wait_time)
+            time.sleep(wait_time)
 
             # Take final screenshot
-            screenshot2 = await page.screenshot()
+            screenshot2 = page.screenshot()
             print("  Took final screenshot")
 
             # Step 7: Compare screenshots
@@ -428,7 +426,7 @@ async def test_video_auto_transition_with_playwright(isolated_test_data):
             print("\n✓ Video auto-transition (Playwright) test PASSED!")
 
         finally:
-            await browser.close()
+            browser.close()
 
             # Restore original interval
             if original_interval is not None:

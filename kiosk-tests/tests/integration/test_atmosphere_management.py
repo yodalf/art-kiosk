@@ -27,11 +27,13 @@ def test_req_atm_001_create_atmosphere(api_client):
 def test_req_atm_002_default_cadence(api_client):
     """REQ-ATM-002: New atmospheres SHALL have default interval of 3600 seconds."""
     response = api_client.post('/api/atmospheres', json={'name': 'DefaultCadence'})
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Failed to create atmosphere: {response.text}"
 
     settings = api_client.get('/api/settings').json()
-    atmosphere = settings['atmospheres']['DefaultCadence']
+    assert 'DefaultCadence' in settings.get('atmospheres', {}), \
+        f"Atmosphere 'DefaultCadence' not found in settings. Available: {list(settings.get('atmospheres', {}).keys())}"
 
+    atmosphere = settings['atmospheres']['DefaultCadence']
     assert atmosphere['interval'] == 3600
 
     # Cleanup
