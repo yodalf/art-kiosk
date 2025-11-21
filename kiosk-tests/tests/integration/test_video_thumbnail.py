@@ -6,7 +6,7 @@ Tests that video thumbnails are automatically generated after 20 seconds of play
 
 import pytest
 import time
-import subprocess
+import requests
 from pathlib import Path
 
 
@@ -26,17 +26,21 @@ def load_device_config():
 
 
 device_config = load_device_config()
+BASE_URL = f"http://{device_config.get('hostname', 'raspberrypi.local')}"
 
 
 def check_thumbnail_exists(video_id):
-    """Check if thumbnail exists on remote device."""
-    hostname = device_config.get('hostname', 'raspberrypi.local')
-    username = device_config.get('username', 'realo')
-    password = device_config.get('password', 'toto')
-
-    cmd = f"sshpass -p '{password}' ssh -o StrictHostKeyChecking=no {username}@{hostname} 'test -f ~/kiosk_images/thumbnails/{video_id}.jpg && echo exists'"
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    return 'exists' in result.stdout
+    """Check if thumbnail exists by requesting it via HTTP."""
+    # Try both jpg and png extensions (code may use either)
+    for ext in ['jpg', 'png']:
+        try:
+            response = requests.get(f"{BASE_URL}/thumbnails/{video_id}.{ext}", timeout=5)
+            # Check status and that we got actual image data
+            if response.status_code == 200 and len(response.content) > 1000:
+                return True
+        except:
+            pass
+    return False
 
 
 @pytest.mark.integration
@@ -71,22 +75,29 @@ def test_req_video_015_thumbnail_generation(api_client):
         initial_exists = check_thumbnail_exists(video_id)
         print(f"  Initial thumbnail exists: {initial_exists}")
 
-        print("\nStep 2: Waiting for thumbnail generation (30 seconds)...")
-        print("  (Video plays for 20 seconds, then screenshot is captured)")
+        print("\nStep 2: Waiting for thumbnail generation (60 seconds max)...")
+        print("  (Background task plays video for 20s, then captures screenshot)")
 
-        # Wait for thumbnail generation
-        # 20 seconds for playback + 10 seconds buffer for processing
-        for i in range(30):
+        # Wait for thumbnail generation with polling
+        # Thumbnail generation is automatic after video is added
+        # Need to wait for: yt-dlp resolution + 20s playback + screenshot capture
+        thumbnail_exists = False
+        for i in range(60):
             time.sleep(1)
             if (i + 1) % 5 == 0:
-                print(f"  Waited {i + 1} seconds...")
+                # Check periodically if thumbnail exists
+                thumbnail_exists = check_thumbnail_exists(video_id)
+                print(f"  Waited {i + 1} seconds... thumbnail exists: {thumbnail_exists}")
+                if thumbnail_exists:
+                    break
 
-        print("\nStep 3: Checking for thumbnail...")
-        thumbnail_exists = check_thumbnail_exists(video_id)
+        print("\nStep 3: Final thumbnail check...")
+        if not thumbnail_exists:
+            thumbnail_exists = check_thumbnail_exists(video_id)
         print(f"  Thumbnail exists: {thumbnail_exists}")
 
         # Verify thumbnail was created
-        assert thumbnail_exists, f"Thumbnail should exist at thumbnails/{video_id}.jpg"
+        assert thumbnail_exists, f"Thumbnail should exist at thumbnails/{video_id}.(jpg|png)"
 
         print("\n✓ Video thumbnail generation test PASSED!")
 
@@ -106,14 +117,8 @@ def test_req_video_015_thumbnail_generation(api_client):
             else:
                 print(f"  Warning: Failed to delete video: {response.text}")
 
-            # Also delete the thumbnail
-            hostname = device_config.get('hostname', 'raspberrypi.local')
-            username = device_config.get('username', 'realo')
-            password = device_config.get('password', 'toto')
-
-            cmd = f"sshpass -p '{password}' ssh -o StrictHostKeyChecking=no {username}@{hostname} 'rm -f ~/kiosk_images/thumbnails/{video_id}.jpg'"
-            subprocess.run(cmd, shell=True, capture_output=True)
-            print("  Thumbnail deleted")
+            # Thumbnail will be deleted when video is deleted
+            print("  Cleanup complete")
 
 
 @pytest.mark.integration
