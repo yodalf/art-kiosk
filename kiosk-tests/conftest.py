@@ -94,6 +94,22 @@ def api_client():
 
 
 @pytest.fixture(scope="session", autouse=True)
+def cleanup_mpv_at_end(api_client):
+    """
+    Session-scoped fixture that ensures mpv is stopped at the end of tests.
+    This runs ONCE at the end of the test session.
+    autouse=True means it runs automatically.
+    """
+    yield
+    # Always stop mpv at end of session
+    try:
+        api_client.post('/api/videos/stop-mpv')
+        time.sleep(0.5)
+    except:
+        pass
+
+
+@pytest.fixture(scope="session", autouse=True)
 def manage_day_scheduling(api_client):
     """
     Session-scoped fixture that saves and restores day scheduling state.
