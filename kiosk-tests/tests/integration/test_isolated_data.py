@@ -16,8 +16,8 @@ def test_isolated_data_setup(isolated_test_data):
         f"Expected 20 images, got {len(isolated_test_data['images'])}"
 
     # Check videos
-    assert len(isolated_test_data['videos']) == 3, \
-        f"Expected 3 videos, got {len(isolated_test_data['videos'])}"
+    assert len(isolated_test_data['videos']) == 5, \
+        f"Expected 5 videos, got {len(isolated_test_data['videos'])}"
 
     # Check themes
     assert len(isolated_test_data['themes']) == 4, \
@@ -31,7 +31,7 @@ def test_isolated_data_setup(isolated_test_data):
     assert len(isolated_test_data['themes']['TestTheme15Images']['images']) == 15
 
     assert 'TestThemeVideosOnly' in isolated_test_data['themes']
-    assert len(isolated_test_data['themes']['TestThemeVideosOnly']['videos']) == 3
+    assert len(isolated_test_data['themes']['TestThemeVideosOnly']['videos']) == 5
 
     assert 'TestTheme19ImagesVideoEnd' in isolated_test_data['themes']
     assert len(isolated_test_data['themes']['TestTheme19ImagesVideoEnd']['images']) == 19
