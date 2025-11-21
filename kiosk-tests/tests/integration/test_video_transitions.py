@@ -433,13 +433,13 @@ def test_video_stops_on_interval_advance(api_client, isolated_test_data, stop_al
     assert is_mpv_running(), "mpv should be running"
 
     # NOW set short interval after video is verified playing
-    api_client.post(f'/api/themes/{theme_name}/interval', json={'interval': 8})
+    api_client.post(f'/api/themes/{theme_name}/interval', json={'interval': 10})
 
-    # Wait for interval to elapse (8 seconds + buffer)
-    time.sleep(12)
+    # Wait for interval to elapse (10 seconds + buffer for kiosk to pick up change)
+    time.sleep(15)
 
     # Video should have stopped when slideshow advanced
-    assert wait_for_mpv_stopped(timeout=15), "mpv should stop when interval advances slideshow"
+    assert wait_for_mpv_stopped(timeout=10), "mpv should stop when interval advances slideshow"
 
 
 @pytest.mark.integration

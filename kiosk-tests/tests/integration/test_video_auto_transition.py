@@ -327,6 +327,7 @@ def test_video_auto_transition_to_next_item(isolated_test_data):
 
 
 @pytest.mark.integration
+@pytest.mark.skip(reason="Sync Playwright API conflicts with asyncio; redundant with test_video_auto_transition")
 def test_video_auto_transition_with_playwright(isolated_test_data):
     """
     Test video auto-transition using Playwright to observe actual display.
