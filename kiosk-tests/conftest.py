@@ -708,3 +708,286 @@ def image_uploader(api_client, test_image_generator):
     finally:
         # CRITICAL: Cleanup ALWAYS runs, even if test fails
         uploader.cleanup()
+
+
+@pytest.fixture(scope="session")
+def isolated_test_data(api_client):
+    """
+    Session-scoped fixture providing completely isolated synthetic test data.
+
+    Creates:
+    - 20 images (including one suitable for crop tests)
+    - 3 videos
+    - 4 themes:
+      - 'TestTheme10Images': 10 images
+      - 'TestTheme15Images': 15 images
+      - 'TestThemeVideosOnly': 3 videos only
+      - 'TestTheme19ImagesVideoEnd': 19 images + 1 video at end
+    - 2 atmospheres:
+      - 'TestAtmosphereImageThemes': points to the 2 image themes
+      - 'TestAtmosphereAllThemes': points to all 4 themes
+
+    All data is cleaned up after the session.
+
+    Usage:
+        def test_something(isolated_test_data):
+            images = isolated_test_data['images']
+            themes = isolated_test_data['themes']
+    """
+    from PIL import Image, ImageDraw
+    from io import BytesIO
+    import random
+
+    created_data = {
+        'images': [],
+        'videos': [],
+        'themes': {},
+        'atmospheres': {},
+        'original_settings': None
+    }
+
+    try:
+        # Save original settings
+        response = api_client.get('/api/settings')
+        if response.status_code == 200:
+            created_data['original_settings'] = response.json()
+
+        print("\n" + "="*60)
+        print("SETTING UP ISOLATED TEST DATA")
+        print("="*60)
+
+        # Step 1: Create 20 test images
+        print("\nStep 1: Creating 20 test images...")
+        for i in range(20):
+            # Create varied images - some solid colors, some with patterns
+            if i == 0:
+                # First image: gradient with shapes (good for crop tests)
+                img = Image.new('RGB', (800, 600), (255, 255, 255))
+                draw = ImageDraw.Draw(img)
+                # Add gradient background
+                for y in range(600):
+                    r = int(255 * y / 600)
+                    g = int(255 * (600 - y) / 600)
+                    b = 128
+                    draw.line([(0, y), (800, y)], fill=(r, g, b))
+                # Add shapes
+                draw.rectangle([100, 100, 300, 300], fill=(255, 0, 0))
+                draw.ellipse([400, 200, 600, 400], fill=(0, 255, 0))
+                draw.polygon([(650, 100), (750, 300), (550, 300)], fill=(0, 0, 255))
+            elif i % 3 == 0:
+                # Striped pattern
+                img = Image.new('RGB', (400, 400), (255, 255, 255))
+                draw = ImageDraw.Draw(img)
+                for stripe in range(0, 400, 20):
+                    color = ((i * 30) % 256, (stripe * 3) % 256, ((i + stripe) * 2) % 256)
+                    draw.rectangle([0, stripe, 400, stripe + 10], fill=color)
+            elif i % 3 == 1:
+                # Checkered pattern
+                img = Image.new('RGB', (400, 400), (255, 255, 255))
+                draw = ImageDraw.Draw(img)
+                for x in range(0, 400, 40):
+                    for y in range(0, 400, 40):
+                        if (x // 40 + y // 40) % 2 == 0:
+                            color = ((i * 25) % 256, (i * 50) % 256, (i * 75) % 256)
+                            draw.rectangle([x, y, x + 40, y + 40], fill=color)
+            else:
+                # Solid color with border
+                color = ((i * 30) % 256, (i * 60) % 256, (i * 90) % 256)
+                img = Image.new('RGB', (400, 400), color)
+                draw = ImageDraw.Draw(img)
+                draw.rectangle([10, 10, 390, 390], outline=(255, 255, 255), width=5)
+
+            # Convert to bytes
+            img_bytes = BytesIO()
+            img.save(img_bytes, format='JPEG', quality=85)
+            img_bytes.seek(0)
+
+            # Upload
+            files = {'file': (f'test_image_{i:02d}.jpg', img_bytes, 'image/jpeg')}
+            response = api_client.post('/api/images', files=files)
+
+            if response.status_code == 200:
+                data = response.json()
+                image_id = data.get('filename')
+                created_data['images'].append(image_id)
+                if i == 0:
+                    print(f"  ✓ Created crop-test image: {image_id}")
+                elif (i + 1) % 5 == 0:
+                    print(f"  ✓ Created {i + 1} images...")
+            else:
+                print(f"  ✗ Failed to create image {i}: {response.text}")
+
+        print(f"  Total images created: {len(created_data['images'])}")
+
+        # Step 2: Add 3 videos
+        print("\nStep 2: Adding 3 test videos...")
+        test_video_urls = [
+            "https://www.youtube.com/watch?v=jNQXAC9IVRw",  # "Me at the zoo"
+            "https://www.youtube.com/watch?v=9bZkp7q19f0",  # Gangnam Style
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",  # Never Gonna Give You Up
+        ]
+
+        for i, url in enumerate(test_video_urls):
+            response = api_client.post('/api/videos', json={'url': url})
+            if response.status_code == 200:
+                data = response.json()
+                video_id = data.get('id')
+                created_data['videos'].append(video_id)
+                print(f"  ✓ Added video {i + 1}: {video_id}")
+            else:
+                print(f"  ✗ Failed to add video {i + 1}: {response.text}")
+
+        print(f"  Total videos created: {len(created_data['videos'])}")
+
+        # Step 3: Create themes
+        print("\nStep 3: Creating themes...")
+
+        # Create all themes first
+        theme_names = ['TestTheme10Images', 'TestTheme15Images', 'TestThemeVideosOnly', 'TestTheme19ImagesVideoEnd']
+        theme_intervals = [30, 30, 60, 15]
+
+        for theme_name, interval in zip(theme_names, theme_intervals):
+            response = api_client.post('/api/themes', json={'name': theme_name, 'interval': interval})
+            if response.status_code == 200:
+                created_data['themes'][theme_name] = {'images': [], 'videos': []}
+
+        # Build theme assignments for each image (accumulate, don't replace)
+        image_themes = {img_id: [] for img_id in created_data['images']}
+        video_themes = {vid_id: [] for vid_id in created_data['videos']}
+
+        # Theme 1: 10 images (first 10)
+        for img_id in created_data['images'][:10]:
+            image_themes[img_id].append('TestTheme10Images')
+            created_data['themes']['TestTheme10Images']['images'].append(img_id)
+
+        # Theme 2: 15 images (first 15)
+        for img_id in created_data['images'][:15]:
+            image_themes[img_id].append('TestTheme15Images')
+            created_data['themes']['TestTheme15Images']['images'].append(img_id)
+
+        # Theme 3: Videos only
+        for video_id in created_data['videos']:
+            video_themes[video_id].append('TestThemeVideosOnly')
+            created_data['themes']['TestThemeVideosOnly']['videos'].append(video_id)
+
+        # Theme 4: 19 images + 1 video
+        for img_id in created_data['images'][:19]:
+            image_themes[img_id].append('TestTheme19ImagesVideoEnd')
+            created_data['themes']['TestTheme19ImagesVideoEnd']['images'].append(img_id)
+
+        if created_data['videos']:
+            video_id = created_data['videos'][0]
+            video_themes[video_id].append('TestTheme19ImagesVideoEnd')
+            created_data['themes']['TestTheme19ImagesVideoEnd']['videos'].append(video_id)
+
+        # Now apply all theme assignments at once for each image
+        for img_id, themes in image_themes.items():
+            if themes:
+                api_client.post(f'/api/images/{img_id}/themes', json={'themes': themes})
+
+        # Apply video theme assignments
+        for video_id, themes in video_themes.items():
+            if themes:
+                api_client.post(f'/api/videos/{video_id}/themes', json={'themes': themes})
+
+        print(f"  ✓ Created 'TestTheme10Images' with 10 images")
+        print(f"  ✓ Created 'TestTheme15Images' with 15 images")
+        print(f"  ✓ Created 'TestThemeVideosOnly' with 3 videos")
+        print(f"  ✓ Created 'TestTheme19ImagesVideoEnd' with 19 images + 1 video")
+        print(f"  Total themes created: {len(created_data['themes'])}")
+
+        # Step 4: Create atmospheres
+        print("\nStep 4: Creating atmospheres...")
+
+        # Atmosphere 1: Points to 2 image themes
+        atm_name = 'TestAtmosphereImageThemes'
+        response = api_client.post('/api/atmospheres', json={'name': atm_name, 'cadence': 300})
+        if response.status_code == 200:
+            # Assign themes
+            theme_list = ['TestTheme10Images', 'TestTheme15Images']
+            api_client.post(f'/api/atmospheres/{atm_name}/themes', json={'themes': theme_list})
+            created_data['atmospheres'][atm_name] = {'themes': theme_list}
+            print(f"  ✓ Created '{atm_name}' with 2 image themes")
+
+        # Atmosphere 2: Points to all 4 themes (like "All Images")
+        atm_name = 'TestAtmosphereAllThemes'
+        response = api_client.post('/api/atmospheres', json={'name': atm_name, 'cadence': 600})
+        if response.status_code == 200:
+            # Assign all themes
+            theme_list = list(created_data['themes'].keys())
+            api_client.post(f'/api/atmospheres/{atm_name}/themes', json={'themes': theme_list})
+            created_data['atmospheres'][atm_name] = {'themes': theme_list}
+            print(f"  ✓ Created '{atm_name}' with all 4 themes")
+
+        print(f"  Total atmospheres created: {len(created_data['atmospheres'])}")
+
+        print("\n" + "="*60)
+        print("ISOLATED TEST DATA SETUP COMPLETE")
+        print(f"  Images: {len(created_data['images'])}")
+        print(f"  Videos: {len(created_data['videos'])}")
+        print(f"  Themes: {len(created_data['themes'])}")
+        print(f"  Atmospheres: {len(created_data['atmospheres'])}")
+        print("="*60 + "\n")
+
+        yield created_data
+
+    finally:
+        # Cleanup ALL created data
+        print("\n" + "="*60)
+        print("CLEANING UP ISOLATED TEST DATA")
+        print("="*60)
+
+        # Stop any playing videos
+        api_client.post('/api/videos/stop-mpv')
+        time.sleep(0.5)
+
+        # Delete atmospheres
+        for atm_name in created_data['atmospheres']:
+            try:
+                response = api_client.delete(f'/api/atmospheres/{atm_name}')
+                if response.status_code == 200:
+                    print(f"  ✓ Deleted atmosphere: {atm_name}")
+            except Exception as e:
+                print(f"  ✗ Failed to delete atmosphere {atm_name}: {e}")
+
+        # Delete themes
+        for theme_name in created_data['themes']:
+            try:
+                response = api_client.delete(f'/api/themes/{theme_name}')
+                if response.status_code == 200:
+                    print(f"  ✓ Deleted theme: {theme_name}")
+            except Exception as e:
+                print(f"  ✗ Failed to delete theme {theme_name}: {e}")
+
+        # Delete videos
+        for video_id in created_data['videos']:
+            try:
+                response = api_client.delete(f'/api/videos/{video_id}')
+                if response.status_code == 200:
+                    print(f"  ✓ Deleted video: {video_id}")
+            except Exception as e:
+                print(f"  ✗ Failed to delete video {video_id}: {e}")
+
+        # Delete images
+        deleted_images = 0
+        for image_id in created_data['images']:
+            try:
+                response = api_client.delete(f'/api/images/{image_id}')
+                if response.status_code == 200:
+                    deleted_images += 1
+            except Exception as e:
+                pass
+        print(f"  ✓ Deleted {deleted_images} images")
+
+        # Restore original settings if needed
+        if created_data['original_settings']:
+            try:
+                original = created_data['original_settings']
+                if original.get('active_theme'):
+                    api_client.post('/api/themes/active', json={'theme': original['active_theme']})
+            except:
+                pass
+
+        print("="*60)
+        print("CLEANUP COMPLETE")
+        print("="*60 + "\n")

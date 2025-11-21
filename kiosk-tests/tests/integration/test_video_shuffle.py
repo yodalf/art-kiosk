@@ -52,276 +52,189 @@ def wait_for_mpv_stopped(timeout=15):
 
 @pytest.mark.integration
 @pytest.mark.video
-def test_shuffle_regenerates_when_video_last_item_transitions(api_client, server_state):
+def test_shuffle_regenerates_when_video_last_item_transitions(api_client, isolated_test_data):
     """
     When the last item in a randomized list is a video and it transitions,
     the shuffle_id SHALL be regenerated to re-shuffle the list.
 
-    This test creates a controlled environment with:
-    - A test theme with exactly 2 images and 1 video
-    - Video set as the last item
-    - Short interval for quick testing
+    Uses the isolated test data with TestTheme19ImagesVideoEnd which has
+    19 images and 1 video at the end.
     """
-    import requests
-    from io import BytesIO
-    from PIL import Image
+    # Use the pre-configured theme with 19 images + 1 video
+    theme_name = 'TestTheme19ImagesVideoEnd'
+    test_images = isolated_test_data['themes'][theme_name]['images']
+    test_video = isolated_test_data['themes'][theme_name]['videos'][0]
 
-    # Track items to clean up
-    test_theme_name = "TestShuffleTheme"
-    test_image_ids = []
-    test_video_id = None
+    print(f"\nUsing theme: {theme_name}")
+    print(f"  Images: {len(test_images)}")
+    print(f"  Video: {test_video}")
 
-    try:
-        print("\nStep 1: Creating test theme...")
-        response = api_client.post('/api/themes', json={'name': test_theme_name})
-        if response.status_code != 200:
-            pytest.fail(f"Failed to create test theme: {response.text}")
-        print(f"  Created theme: {test_theme_name}")
+    # Step 1: Activate test theme
+    print("\nStep 1: Activating test theme...")
+    api_client.post('/api/themes/active', json={'theme': theme_name})
+    time.sleep(1)
 
-        # Set short interval on test theme
-        api_client.post(f'/api/themes/{test_theme_name}/interval', json={'interval': 10})
-        print("  Set interval to 10 seconds")
+    # Verify theme is active
+    response = api_client.get('/api/images', params={'enabled_only': 'true'})
+    theme_items = response.json()
+    print(f"  Theme has {len(theme_items)} items (expected 20)")
+    assert len(theme_items) == 20, f"Expected 20 items, got {len(theme_items)}"
 
-        print("\nStep 2: Creating test images...")
-        # Create 9 test images
-        for i in range(9):
-            img = Image.new('RGB', (100, 100), color=((i * 25) % 256, (i * 50) % 256, (i * 75) % 256))
-            img_bytes = BytesIO()
-            img.save(img_bytes, format='JPEG')
-            img_bytes.seek(0)
+    # Step 2: Find a shuffle_id that puts the video at the last position
+    print("\nStep 2: Finding shuffle_id that puts video last...")
 
-            files = {'file': (f'test_shuffle_{i}.jpg', img_bytes, 'image/jpeg')}
-            response = api_client.post('/api/images', files=files)
-            if response.status_code != 200:
-                pytest.fail(f"Failed to upload test image {i}: {response.text}")
+    video_index = None
+    for attempt in range(200):
+        test_shuffle_id = attempt * 0.005  # 0.0, 0.005, 0.01, ...
 
-            image_data = response.json()
-            image_id = image_data.get('filename')
-            test_image_ids.append(image_id)
-            print(f"  Created image {i+1}: {image_id}")
+        # Get full settings, update shuffle_id, save back
+        response = api_client.get('/api/settings')
+        settings = response.json()
+        settings['shuffle_id'] = test_shuffle_id
+        api_client.post('/api/settings', json=settings)
+        time.sleep(0.05)
 
-            # Assign to test theme
-            api_client.post(f'/api/images/{image_id}/themes', json={'themes': [test_theme_name]})
-
-        print("\nStep 3: Adding test video...")
-        # Use a short test video
-        test_video_url = "https://www.youtube.com/watch?v=jNQXAC9IVRw"  # "Me at the zoo"
-        response = api_client.post('/api/videos', json={'url': test_video_url})
-        if response.status_code != 200:
-            pytest.fail(f"Failed to add test video: {response.text}")
-
-        video_data = response.json()
-        test_video_id = video_data.get('id')
-        print(f"  Created video: {test_video_id}")
-
-        # Assign video to test theme
-        api_client.post(f'/api/videos/{test_video_id}/themes', json={'themes': [test_theme_name]})
-        print(f"  Assigned video to {test_theme_name}")
-
-        print("\nStep 4: Activating test theme and finding shuffle_id that puts video last...")
-        api_client.post('/api/themes/active', json={'theme': test_theme_name})
-        time.sleep(1)
-
-        # Get initial item count to verify theme filter is working
+        # Get the items in our theme
         response = api_client.get('/api/images', params={'enabled_only': 'true'})
         theme_items = response.json()
-        print(f"  Theme has {len(theme_items)} items (expected 10)")
 
-        # Deterministically find a shuffle_id that puts video at the last position
-        # Get current settings first, then update only shuffle_id
+        # Find the video's position
         video_index = None
-        for attempt in range(200):
-            test_shuffle_id = attempt * 0.005  # 0.0, 0.005, 0.01, ...
-
-            # Get full settings, update shuffle_id, save back
-            response = api_client.get('/api/settings')
-            settings = response.json()
-            settings['shuffle_id'] = test_shuffle_id
-            api_client.post('/api/settings', json=settings)
-            time.sleep(0.05)
-
-            # Get the items in our theme
-            response = api_client.get('/api/images', params={'enabled_only': 'true'})
-            theme_items = response.json()
-
-            # Find the video's position
-            video_index = None
-            for i, item in enumerate(theme_items):
-                if item.get('name') == test_video_id:
-                    video_index = i
-                    break
-
-            # Check if video is at the last position
-            if video_index == len(theme_items) - 1:
-                print(f"  ✓ Found shuffle_id={test_shuffle_id} puts video at last position (index {video_index})")
-                break
-        else:
-            # Debug: show what we have
-            print(f"  Items found: {len(theme_items)}, video at index: {video_index}")
-            pytest.fail(f"Could not find shuffle_id that puts video at last position after 200 attempts")
-
-        print(f"  Theme has {len(theme_items)} items")
-
-        # List the items
         for i, item in enumerate(theme_items):
-            item_type = item.get('type', 'image')
-            print(f"    {i}: {item.get('name')} ({item_type})")
+            if item.get('name') == test_video:
+                video_index = i
+                break
 
-        print("\nStep 5: Jumping to video...")
-        api_client.post('/api/control/send', json={'command': 'reload'})
-        time.sleep(1)
-        api_client.post('/api/control/send', json={'command': 'jump', 'image_name': test_video_id})
+        # Check if video is at the last position
+        if video_index == len(theme_items) - 1:
+            print(f"  ✓ Found shuffle_id={test_shuffle_id} puts video at last position (index {video_index})")
+            break
+    else:
+        print(f"  Items found: {len(theme_items)}, video at index: {video_index}")
+        pytest.fail(f"Could not find shuffle_id that puts video at last position after 200 attempts")
+
+    # List the last few items
+    print(f"  Theme has {len(theme_items)} items")
+    for i in range(max(0, len(theme_items) - 3), len(theme_items)):
+        item = theme_items[i]
+        item_type = item.get('type', 'image')
+        print(f"    {i}: {item.get('name')} ({item_type})")
+
+    # Step 3: Jump to video
+    print("\nStep 3: Jumping to video...")
+    api_client.post('/api/control/send', json={'command': 'reload'})
+    time.sleep(1)
+    api_client.post('/api/control/send', json={'command': 'jump', 'image_name': test_video})
+    time.sleep(5)
+
+    # Verify video started
+    if not is_mpv_running():
         time.sleep(5)
-
-        # Verify video started
         if not is_mpv_running():
-            time.sleep(5)
-            if not is_mpv_running():
-                pytest.skip("Video did not start")
+            pytest.skip("Video did not start")
 
-        print("  ✓ Video is playing")
+    print("  ✓ Video is playing")
 
-        # Get shuffle_id before transition
-        response = api_client.get('/api/settings')
-        shuffle_id_before = response.json().get('shuffle_id')
-        print(f"\nStep 6: Shuffle_id before transition: {shuffle_id_before}")
+    # Get shuffle_id before transition
+    response = api_client.get('/api/settings')
+    shuffle_id_before = response.json().get('shuffle_id')
+    print(f"\nStep 4: Shuffle_id before transition: {shuffle_id_before}")
 
-        # Wait for video to auto-transition
-        print("\nStep 7: Waiting for video auto-transition (15 seconds)...")
-        time.sleep(15)
+    # Step 5: Wait for video to auto-transition
+    print("\nStep 5: Waiting for video auto-transition (20 seconds)...")
+    time.sleep(20)
 
-        # Check mpv stopped
-        mpv_stopped = wait_for_mpv_stopped(timeout=10)
-        print(f"  mpv stopped: {mpv_stopped}")
+    # Check mpv stopped
+    mpv_stopped = wait_for_mpv_stopped(timeout=10)
+    print(f"  mpv stopped: {mpv_stopped}")
 
-        # Get shuffle_id after transition
-        response = api_client.get('/api/settings')
-        shuffle_id_after = response.json().get('shuffle_id')
-        print(f"\nStep 8: Shuffle_id after transition: {shuffle_id_after}")
+    # Get shuffle_id after transition
+    response = api_client.get('/api/settings')
+    shuffle_id_after = response.json().get('shuffle_id')
+    print(f"\nStep 6: Shuffle_id after transition: {shuffle_id_after}")
 
-        # Check current item
-        response = api_client.get('/api/kiosk/current-image')
-        current_image = response.json().get('current_image')
-        print(f"  Current item after transition: {current_image}")
+    # Check current item
+    response = api_client.get('/api/kiosk/current-image')
+    current_image = response.json().get('current_image')
+    print(f"  Current item after transition: {current_image}")
 
-        # Verify it's one of our test images (not the video)
-        is_test_image = current_image in test_image_ids
-        print(f"  Is test image: {is_test_image}")
+    # Verify it's one of our test images (not the video)
+    is_test_image = current_image in test_images
+    print(f"  Is test image: {is_test_image}")
 
-        # Check results
-        if shuffle_id_before != shuffle_id_after:
-            print("\n✓ Shuffle_id changed - list was re-shuffled!")
-        else:
-            print("\n✗ Shuffle_id did NOT change - list was NOT re-shuffled!")
+    # Check results
+    if shuffle_id_before != shuffle_id_after:
+        print("\n✓ Shuffle_id changed - list was re-shuffled!")
+    else:
+        print("\n✗ Shuffle_id did NOT change - list was NOT re-shuffled!")
 
-        assert shuffle_id_before != shuffle_id_after, \
-            f"shuffle_id should change when video (last item) transitions. Before: {shuffle_id_before}, After: {shuffle_id_after}"
+    assert shuffle_id_before != shuffle_id_after, \
+        f"shuffle_id should change when video (last item) transitions. Before: {shuffle_id_before}, After: {shuffle_id_after}"
 
-        print("\n✓ Video shuffle test PASSED!")
-
-    finally:
-        print("\nCleanup: Deleting test resources...")
-
-        # Stop any playing video
-        api_client.post('/api/videos/stop-mpv')
-        time.sleep(1)
-
-        # Switch back to All Images theme
-        api_client.post('/api/themes/active', json={'theme': 'All Images'})
-
-        # Delete test video
-        if test_video_id:
-            response = api_client.delete(f'/api/videos/{test_video_id}')
-            if response.status_code == 200:
-                print(f"  Deleted video: {test_video_id}")
-            else:
-                print(f"  Warning: Failed to delete video: {response.text}")
-
-        # Delete test images
-        for image_id in test_image_ids:
-            response = api_client.delete(f'/api/images/{image_id}')
-            if response.status_code == 200:
-                print(f"  Deleted image: {image_id}")
-            else:
-                print(f"  Warning: Failed to delete image: {response.text}")
-
-        # Delete test theme
-        response = api_client.delete(f'/api/themes/{test_theme_name}')
-        if response.status_code == 200:
-            print(f"  Deleted theme: {test_theme_name}")
-        else:
-            print(f"  Warning: Failed to delete theme: {response.text}")
-
-        print("  Cleanup complete")
+    print("\n✓ Video shuffle test PASSED!")
 
 
 @pytest.mark.integration
 @pytest.mark.video
-def test_shuffle_id_changes_on_list_wrap(api_client, server_state):
+def test_shuffle_id_changes_on_list_wrap(api_client, isolated_test_data):
     """
     Simpler test: Verify that shuffle_id changes when slideshow wraps around.
 
     This tests the general requirement that shuffle_id regenerates when
     the slideshow completes a full cycle.
     """
+    # Use TestTheme10Images for faster test (fewer items)
+    theme_name = 'TestTheme10Images'
+
+    print(f"\nUsing theme: {theme_name}")
+
+    # Activate theme
+    api_client.post('/api/themes/active', json={'theme': theme_name})
+    time.sleep(0.5)
+
     # Get initial shuffle_id
     response = api_client.get('/api/settings')
     settings = response.json()
-    original_interval = settings.get('interval', 3600)
-
-    print("\nStep 1: Getting initial shuffle_id...")
     initial_shuffle_id = settings.get('shuffle_id')
-    print(f"  Initial shuffle_id: {initial_shuffle_id}")
+    print(f"\nStep 1: Initial shuffle_id: {initial_shuffle_id}")
 
-    try:
-        # Set very short interval
-        print("\nStep 2: Setting 3-second interval...")
-        api_client.post('/api/themes/All Images/interval', json={'interval': 3})
-        api_client.post('/api/themes/active', json={'theme': 'All Images'})
-        time.sleep(0.5)
+    # Set very short interval
+    print("\nStep 2: Setting 3-second interval...")
+    api_client.post(f'/api/themes/{theme_name}/interval', json={'interval': 3})
 
-        # Get enabled items count
-        response = api_client.get('/api/images', params={'enabled_only': 'true'})
-        items = response.json()
-        item_count = len(items)
-        print(f"  Item count: {item_count}")
+    # Get enabled items count
+    response = api_client.get('/api/images', params={'enabled_only': 'true'})
+    items = response.json()
+    item_count = len(items)
+    print(f"  Item count: {item_count}")
 
-        if item_count == 0:
-            pytest.skip("No enabled items")
+    if item_count == 0:
+        pytest.skip("No enabled items")
 
-        # Calculate time to complete one full cycle
-        # Each item shows for 3 seconds
-        cycle_time = item_count * 3 + 5  # Add buffer
+    # Calculate time to complete one full cycle
+    # Each item shows for 3 seconds
+    cycle_time = item_count * 3 + 5  # Add buffer
 
-        print(f"\nStep 3: Waiting for full cycle ({cycle_time} seconds)...")
+    print(f"\nStep 3: Waiting for full cycle ({cycle_time} seconds)...")
 
-        # Reload to start fresh
-        api_client.post('/api/control/send', json={'command': 'reload'})
+    # Reload to start fresh
+    api_client.post('/api/control/send', json={'command': 'reload'})
 
-        # Wait for full cycle
-        for i in range(0, cycle_time, 5):
-            time.sleep(5)
-            print(f"  Waited {i + 5} seconds...")
+    # Wait for full cycle
+    for i in range(0, cycle_time, 5):
+        time.sleep(5)
+        print(f"  Waited {i + 5} seconds...")
 
-        # Get final shuffle_id
-        response = api_client.get('/api/settings')
-        final_shuffle_id = response.json().get('shuffle_id')
-        print(f"\nStep 4: Final shuffle_id: {final_shuffle_id}")
+    # Get final shuffle_id
+    response = api_client.get('/api/settings')
+    final_shuffle_id = response.json().get('shuffle_id')
+    print(f"\nStep 4: Final shuffle_id: {final_shuffle_id}")
 
-        # Check if changed
-        if initial_shuffle_id != final_shuffle_id:
-            print("\n✓ Shuffle_id changed after full cycle!")
-        else:
-            print("\n✗ Shuffle_id did NOT change after full cycle")
+    # Check if changed
+    if initial_shuffle_id != final_shuffle_id:
+        print("\n✓ Shuffle_id changed after full cycle!")
+    else:
+        print("\n✗ Shuffle_id did NOT change after full cycle")
 
-        # Note: This test may not always pass depending on timing
-        # The important thing is that it documents the expected behavior
-        assert initial_shuffle_id != final_shuffle_id, \
-            f"shuffle_id should change after completing a full cycle"
-
-    finally:
-        # Cleanup
-        print(f"\nCleanup: Restoring original interval ({original_interval} seconds)...")
-        api_client.post('/api/themes/All Images/interval', json={'interval': original_interval})
-        api_client.post('/api/videos/stop-mpv')
-        print("  Cleanup complete")
+    assert initial_shuffle_id != final_shuffle_id, \
+        f"shuffle_id should change after completing a full cycle"

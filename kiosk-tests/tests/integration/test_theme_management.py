@@ -2,6 +2,7 @@
 Integration tests for Theme Management (REQ-THEME-001 through REQ-THEME-014).
 
 Tests theme creation, assignment, intervals, and deletion.
+Uses isolated_test_data for pre-created images and themes.
 """
 
 import pytest
@@ -9,7 +10,7 @@ import pytest
 
 @pytest.mark.integration
 @pytest.mark.themes
-def test_req_theme_001_create_theme(api_client, server_state):
+def test_req_theme_001_create_theme(api_client):
     """REQ-THEME-001: POST /api/themes SHALL create new theme."""
     response = api_client.post('/api/themes', json={'name': 'NatureTest'})
     assert response.status_code == 200
@@ -27,27 +28,35 @@ def test_req_theme_001_create_theme(api_client, server_state):
 
 @pytest.mark.integration
 @pytest.mark.themes
-def test_req_theme_002_default_interval(api_client, server_state):
+def test_req_theme_002_default_interval(api_client):
     """REQ-THEME-002: New themes SHALL have default interval of 3600 seconds."""
-    server_state.create_theme('DefaultIntervalTest')
+    response = api_client.post('/api/themes', json={'name': 'DefaultIntervalTest'})
+    assert response.status_code == 200
 
     settings = api_client.get('/api/settings').json()
     theme_interval = settings['themes']['DefaultIntervalTest']['interval']
 
     assert theme_interval == 3600
 
+    # Cleanup
+    api_client.delete('/api/themes/DefaultIntervalTest')
+
 
 @pytest.mark.integration
 @pytest.mark.themes
-def test_req_theme_003_unique_names(api_client, server_state):
+def test_req_theme_003_unique_names(api_client):
     """REQ-THEME-003: Theme names SHALL be unique."""
-    server_state.create_theme('UniqueTest')
+    # Create first theme
+    api_client.post('/api/themes', json={'name': 'UniqueTest'})
 
     # Try to create duplicate
     response = api_client.post('/api/themes', json={'name': 'UniqueTest'})
 
     # Should fail
     assert response.status_code in [400, 409]
+
+    # Cleanup
+    api_client.delete('/api/themes/UniqueTest')
 
 
 @pytest.mark.integration
@@ -62,92 +71,85 @@ def test_req_theme_004_all_images_not_deletable(api_client):
 
 @pytest.mark.integration
 @pytest.mark.themes
-def test_req_theme_005_assign_image_to_theme(api_client, image_uploader, server_state):
+def test_req_theme_005_assign_image_to_theme(api_client, isolated_test_data):
     """REQ-THEME-005: POST /api/images/<filename>/themes SHALL assign to themes."""
-    filename = image_uploader.upload_test_image()
-    server_state.create_theme('AssignTest')
+    # Use an image from isolated data
+    image_id = isolated_test_data['images'][19]  # Use the last image (not in any theme initially)
+
+    # Create a test theme
+    api_client.post('/api/themes', json={'name': 'AssignTest'})
 
     # Assign to theme
-    response = api_client.post(f'/api/images/{filename}/themes', json={
+    response = api_client.post(f'/api/images/{image_id}/themes', json={
         'themes': ['AssignTest']
     })
     assert response.status_code == 200
 
     # Verify assignment
     settings = api_client.get('/api/settings').json()
-    assert 'AssignTest' in settings.get('image_themes', {}).get(filename, [])
+    assert 'AssignTest' in settings.get('image_themes', {}).get(image_id, [])
+
+    # Cleanup
+    api_client.delete('/api/themes/AssignTest')
 
 
 @pytest.mark.integration
 @pytest.mark.themes
-def test_req_theme_006_images_many_to_many(api_client, image_uploader, server_state):
+def test_req_theme_006_images_many_to_many(api_client, isolated_test_data):
     """REQ-THEME-006: Images can belong to multiple themes (many-to-many)."""
-    filename = image_uploader.upload_test_image()
-    server_state.create_theme('Theme1')
-    server_state.create_theme('Theme2')
+    # The first 10 images belong to both TestTheme10Images and TestTheme15Images
+    image_id = isolated_test_data['images'][0]
 
-    # Assign to both themes
-    api_client.post(f'/api/images/{filename}/themes', json={
-        'themes': ['Theme1', 'Theme2']
-    })
-
-    # Verify
     settings = api_client.get('/api/settings').json()
-    image_themes = settings.get('image_themes', {}).get(filename, [])
+    image_themes = settings.get('image_themes', {}).get(image_id, [])
 
-    assert 'Theme1' in image_themes
-    assert 'Theme2' in image_themes
+    # Should belong to multiple themes
+    assert 'TestTheme10Images' in image_themes
+    assert 'TestTheme15Images' in image_themes
+    assert 'TestTheme19ImagesVideoEnd' in image_themes
 
 
 @pytest.mark.integration
 @pytest.mark.themes
-def test_req_theme_007_active_theme_selection(api_client, server_state):
+def test_req_theme_007_active_theme_selection(api_client, isolated_test_data):
     """REQ-THEME-007: POST /api/themes/active SHALL set active theme."""
-    server_state.create_theme('ActiveTest')
+    theme_name = 'TestTheme10Images'
 
-    response = api_client.post('/api/themes/active', json={'theme': 'ActiveTest'})
+    response = api_client.post('/api/themes/active', json={'theme': theme_name})
     assert response.status_code == 200
 
     # Verify
     settings = api_client.get('/api/settings').json()
-    assert settings.get('active_theme') == 'ActiveTest'
+    assert settings.get('active_theme') == theme_name
 
 
 @pytest.mark.integration
 @pytest.mark.themes
-def test_req_theme_008_active_theme_filters(api_client, image_uploader, server_state):
+def test_req_theme_008_active_theme_filters(api_client, isolated_test_data):
     """REQ-THEME-008: Active theme SHALL filter displayed images."""
-    # Ensure day scheduling is disabled for this test (in case previous tests enabled it)
+    # Ensure day scheduling is disabled
     api_client.post('/api/day/disable')
 
-    # Upload image and assign to specific theme
-    filename = image_uploader.upload_test_image()
-    server_state.create_theme('FilterTest')
-    api_client.post(f'/api/images/{filename}/themes', json={'themes': ['FilterTest']})
-
-    # Activate the theme
-    api_client.post('/api/themes/active', json={'theme': 'FilterTest'})
+    # Activate TestTheme10Images
+    api_client.post('/api/themes/active', json={'theme': 'TestTheme10Images'})
 
     # Get filtered images
     response = api_client.get('/api/images?enabled_only=true')
     images = response.json()
 
-    # Should only contain images in FilterTest theme
+    # Should only show 10 images
+    assert len(images) == 10, f"Expected 10 images, got {len(images)}"
+
+    # All images should be from the theme
+    expected_images = isolated_test_data['themes']['TestTheme10Images']['images']
     for img in images:
-        settings = api_client.get('/api/settings').json()
-        img_themes = settings.get('image_themes', {}).get(img['name'], [])
-        # Image should either be in FilterTest or have no themes (All Images)
-        assert 'FilterTest' in img_themes or len(img_themes) == 0
+        assert img['name'] in expected_images
 
 
 @pytest.mark.integration
 @pytest.mark.themes
-def test_req_theme_009_all_images_shows_all(api_client, image_uploader, server_state):
+def test_req_theme_009_all_images_shows_all(api_client, isolated_test_data):
     """REQ-THEME-009: 'All Images' theme SHALL show all enabled images."""
-    # Upload some images
-    file1 = image_uploader.upload_test_image(color=(255, 0, 0))
-    file2 = image_uploader.upload_test_image(color=(0, 255, 0))
-
     # Activate All Images
     api_client.post('/api/themes/active', json={'theme': 'All Images'})
 
@@ -156,33 +158,41 @@ def test_req_theme_009_all_images_shows_all(api_client, image_uploader, server_s
     images = response.json()
     image_names = [img['name'] for img in images]
 
-    # Both should be present
-    assert file1 in image_names
-    assert file2 in image_names
+    # All test images should be present
+    for img_id in isolated_test_data['images']:
+        assert img_id in image_names, f"Image {img_id} should be in All Images"
 
 
 @pytest.mark.integration
 @pytest.mark.themes
-def test_req_theme_010_update_interval(api_client, server_state):
+def test_req_theme_010_update_interval(api_client, isolated_test_data):
     """REQ-THEME-010: POST /api/themes/<name>/interval SHALL update interval."""
-    server_state.create_theme('IntervalTest')
+    theme_name = 'TestTheme10Images'
+
+    # Get original interval
+    settings = api_client.get('/api/settings').json()
+    original_interval = settings['themes'][theme_name]['interval']
 
     # Update interval to 1800 seconds (30 minutes)
-    response = api_client.post('/api/themes/IntervalTest/interval', json={
+    response = api_client.post(f'/api/themes/{theme_name}/interval', json={
         'interval': 1800
     })
     assert response.status_code == 200
 
     # Verify
     settings = api_client.get('/api/settings').json()
-    assert settings['themes']['IntervalTest']['interval'] == 1800
+    assert settings['themes'][theme_name]['interval'] == 1800
+
+    # Restore original interval
+    api_client.post(f'/api/themes/{theme_name}/interval', json={'interval': original_interval})
 
 
 @pytest.mark.integration
 @pytest.mark.themes
-def test_req_theme_011_delete_theme(api_client, server_state):
+def test_req_theme_011_delete_theme(api_client):
     """REQ-THEME-011: DELETE /api/themes/<name> SHALL remove theme."""
-    server_state.create_theme('DeleteTest')
+    # Create theme for deletion
+    api_client.post('/api/themes', json={'name': 'DeleteTest'})
 
     response = api_client.delete('/api/themes/DeleteTest')
     assert response.status_code == 200
@@ -191,42 +201,37 @@ def test_req_theme_011_delete_theme(api_client, server_state):
     settings = api_client.get('/api/settings').json()
     assert 'DeleteTest' not in settings['themes']
 
-    # Don't cleanup in server_state since we deleted it
-    server_state.created_themes.remove('DeleteTest')
-
 
 @pytest.mark.integration
 @pytest.mark.themes
-def test_req_theme_012_delete_removes_assignments(api_client, image_uploader, server_state):
+def test_req_theme_012_delete_removes_assignments(api_client, isolated_test_data):
     """REQ-THEME-012: Deleting theme SHALL remove image assignments."""
-    filename = image_uploader.upload_test_image()
-    server_state.create_theme('RemoveTest')
+    # Use an image from isolated data
+    image_id = isolated_test_data['images'][19]
 
-    # Assign image to theme
-    api_client.post(f'/api/images/{filename}/themes', json={'themes': ['RemoveTest']})
+    # Create theme and assign image
+    api_client.post('/api/themes', json={'name': 'RemoveTest'})
+    api_client.post(f'/api/images/{image_id}/themes', json={'themes': ['RemoveTest']})
 
     # Delete theme
     api_client.delete('/api/themes/RemoveTest')
-    server_state.created_themes.remove('RemoveTest')
 
     # Verify image assignment removed
     settings = api_client.get('/api/settings').json()
-    image_themes = settings.get('image_themes', {}).get(filename, [])
+    image_themes = settings.get('image_themes', {}).get(image_id, [])
     assert 'RemoveTest' not in image_themes
 
 
 @pytest.mark.integration
 @pytest.mark.themes
-def test_req_theme_013_delete_switches_to_all_images(api_client, server_state):
+def test_req_theme_013_delete_switches_to_all_images(api_client):
     """REQ-THEME-013: Deleting active theme SHALL switch to 'All Images'."""
-    server_state.create_theme('ActiveDeleteTest')
-
-    # Make it active
+    # Create and activate theme
+    api_client.post('/api/themes', json={'name': 'ActiveDeleteTest'})
     api_client.post('/api/themes/active', json={'theme': 'ActiveDeleteTest'})
 
     # Delete it
     api_client.delete('/api/themes/ActiveDeleteTest')
-    server_state.created_themes.remove('ActiveDeleteTest')
 
     # Verify switched to All Images
     settings = api_client.get('/api/settings').json()
@@ -235,9 +240,11 @@ def test_req_theme_013_delete_switches_to_all_images(api_client, server_state):
 
 @pytest.mark.integration
 @pytest.mark.themes
-def test_req_theme_014_interval_sync_with_settings(api_client, server_state):
+def test_req_theme_014_interval_sync_with_settings(api_client):
     """REQ-THEME-014: Active theme's interval SHALL sync with global settings.interval."""
-    server_state.create_theme('SyncTest', interval=2400)
+    # Create theme with specific interval
+    api_client.post('/api/themes', json={'name': 'SyncTest'})
+    api_client.post('/api/themes/SyncTest/interval', json={'interval': 2400})
 
     # Activate theme
     api_client.post('/api/themes/active', json={'theme': 'SyncTest'})
@@ -245,3 +252,6 @@ def test_req_theme_014_interval_sync_with_settings(api_client, server_state):
     # Global interval should update
     settings = api_client.get('/api/settings').json()
     assert settings['interval'] == 2400
+
+    # Cleanup
+    api_client.delete('/api/themes/SyncTest')
