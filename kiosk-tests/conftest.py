@@ -901,7 +901,7 @@ def isolated_test_data(api_client):
 
         # Atmosphere 1: Points to 2 image themes
         atm_name = 'TestAtmosphereImageThemes'
-        response = api_client.post('/api/atmospheres', json={'name': atm_name, 'cadence': 300})
+        response = api_client.post('/api/atmospheres', json={'name': atm_name, 'interval': 300})
         if response.status_code == 200:
             # Assign themes
             theme_list = ['TestTheme10Images', 'TestTheme15Images']
@@ -911,7 +911,7 @@ def isolated_test_data(api_client):
 
         # Atmosphere 2: Points to all 4 themes (like "All Images")
         atm_name = 'TestAtmosphereAllThemes'
-        response = api_client.post('/api/atmospheres', json={'name': atm_name, 'cadence': 600})
+        response = api_client.post('/api/atmospheres', json={'name': atm_name, 'interval': 600})
         if response.status_code == 200:
             # Assign all themes
             theme_list = list(created_data['themes'].keys())
