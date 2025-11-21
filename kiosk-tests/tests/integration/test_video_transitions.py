@@ -406,8 +406,9 @@ def test_video_stops_on_jump_to_another_video(api_client, isolated_test_data, st
 @pytest.mark.video
 def test_video_stops_on_interval_advance(api_client, isolated_test_data, stop_all_videos):
     """Video SHALL stop when slideshow interval advances automatically."""
-    # Use TestThemeVideosOnly which has 5 videos
-    theme_name = 'TestThemeVideosOnly'
+    # Use TestTheme19ImagesVideoEnd which has images + 1 video
+    # This ensures the next item after the video is an image, not another video
+    theme_name = 'TestTheme19ImagesVideoEnd'
     videos = isolated_test_data['themes'][theme_name]['videos']
 
     if len(videos) < 1:
