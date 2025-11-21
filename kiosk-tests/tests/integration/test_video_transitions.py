@@ -363,22 +363,26 @@ def test_video_stops_on_jump_to_image(api_client, video_setup, stop_all_videos):
 
 @pytest.mark.integration
 @pytest.mark.video
-def test_video_stops_on_jump_to_another_video(api_client, video_setup, stop_all_videos):
+def test_video_stops_on_jump_to_another_video(api_client, isolated_test_data, stop_all_videos):
     """Video SHALL stop when jumping to another video."""
-    if len(video_setup['all_videos']) < 2:
+    # Use TestThemeVideosOnly which has 5 videos
+    theme_name = 'TestThemeVideosOnly'
+    videos = isolated_test_data['themes'][theme_name]['videos']
+
+    if len(videos) < 2:
         pytest.skip("Need at least 2 videos for this test")
 
-    video1 = video_setup['all_videos'][0]['name']
-    video2 = video_setup['all_videos'][1]['name']
+    video1 = videos[0]
+    video2 = videos[1]
 
-    # Assign both to theme
-    api_client.post(f'/api/images/{video2}/themes', json={'themes': [video_setup['theme']]})
-
-    # Start first video
-    api_client.post('/api/themes/active', json={'theme': video_setup['theme']})
+    # Disable day scheduling and activate theme
+    api_client.post('/api/day/disable')
+    api_client.post('/api/themes/active', json={'theme': theme_name})
     time.sleep(0.5)
     api_client.post('/api/control/send', json={'command': 'reload'})
     time.sleep(2)
+
+    # Start first video
     api_client.post('/api/control/send', json={'command': 'jump', 'image_name': video1})
     time.sleep(1)
 
@@ -400,15 +404,27 @@ def test_video_stops_on_jump_to_another_video(api_client, video_setup, stop_all_
 
 @pytest.mark.integration
 @pytest.mark.video
-@pytest.mark.skip(reason="Dynamic interval change during video playback may not be fully implemented")
-def test_video_stops_on_interval_advance(api_client, video_setup, stop_all_videos):
+@pytest.mark.skip(reason="Dynamic interval change during video playback not fully implemented - video keeps playing")
+def test_video_stops_on_interval_advance(api_client, isolated_test_data, stop_all_videos):
     """Video SHALL stop when slideshow interval advances automatically."""
-    # Start video first with long interval
-    api_client.post('/api/themes/active', json={'theme': video_setup['theme']})
+    # Use TestThemeVideosOnly which has 5 videos
+    theme_name = 'TestThemeVideosOnly'
+    videos = isolated_test_data['themes'][theme_name]['videos']
+
+    if len(videos) < 1:
+        pytest.skip("Need at least 1 video for this test")
+
+    video = videos[0]
+
+    # Disable day scheduling and activate theme
+    api_client.post('/api/day/disable')
+    api_client.post('/api/themes/active', json={'theme': theme_name})
     time.sleep(0.5)
     api_client.post('/api/control/send', json={'command': 'reload'})
     time.sleep(2)
-    api_client.post('/api/control/send', json={'command': 'jump', 'image_name': video_setup['video']})
+
+    # Start video
+    api_client.post('/api/control/send', json={'command': 'jump', 'image_name': video})
     time.sleep(1)
 
     if not verify_video_playing(timeout=30):
@@ -417,7 +433,7 @@ def test_video_stops_on_interval_advance(api_client, video_setup, stop_all_video
     assert is_mpv_running(), "mpv should be running"
 
     # NOW set short interval after video is verified playing
-    api_client.post(f'/api/themes/{video_setup["theme"]}/interval', json={'interval': 8})
+    api_client.post(f'/api/themes/{theme_name}/interval', json={'interval': 8})
 
     # Wait for interval to elapse (8 seconds + buffer)
     time.sleep(12)
@@ -428,20 +444,32 @@ def test_video_stops_on_interval_advance(api_client, video_setup, stop_all_video
 
 @pytest.mark.integration
 @pytest.mark.video
-def test_video_stops_on_day_scheduler_transition(api_client, video_setup, stop_all_videos, test_mode, isolated_test_data):
+def test_video_stops_on_day_scheduler_transition(api_client, stop_all_videos, test_mode, isolated_test_data):
     """Video SHALL stop when day scheduler triggers atmosphere change."""
+    # Use TestThemeVideosOnly which has 5 videos
+    theme_name = 'TestThemeVideosOnly'
+    videos = isolated_test_data['themes'][theme_name]['videos']
+
+    if len(videos) < 1:
+        pytest.skip("Need at least 1 video for this test")
+
+    video = videos[0]
+
     # Use TestAtmosphereAllThemes from isolated data
     day_atmosphere = 'TestAtmosphereAllThemes'
 
     # Configure time period 0 with the atmosphere
     api_client.post('/api/day/time-periods/0', json={'atmospheres': [day_atmosphere]})
 
-    # Start video
-    api_client.post('/api/themes/active', json={'theme': video_setup['theme']})
+    # Disable day scheduling and activate theme
+    api_client.post('/api/day/disable')
+    api_client.post('/api/themes/active', json={'theme': theme_name})
     time.sleep(0.5)
     api_client.post('/api/control/send', json={'command': 'reload'})
     time.sleep(2)
-    api_client.post('/api/control/send', json={'command': 'jump', 'image_name': video_setup['video']})
+
+    # Start video
+    api_client.post('/api/control/send', json={'command': 'jump', 'image_name': video})
     time.sleep(1)
 
     if not verify_video_playing(timeout=30):
