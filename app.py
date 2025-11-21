@@ -317,9 +317,24 @@ def get_settings():
 
 
 def save_settings(settings):
-    """Save settings to file and notify clients."""
-    with open(SETTINGS_FILE, 'w') as f:
-        json.dump(settings, f, indent=2)
+    """Save settings to file and notify clients.
+
+    Uses atomic write (write to temp file, then rename) to prevent
+    race conditions when settings are read during write operations.
+    """
+    import tempfile
+    # Write to temp file first, then atomically rename
+    dir_path = os.path.dirname(SETTINGS_FILE) or '.'
+    fd, tmp_path = tempfile.mkstemp(dir=dir_path, suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w') as f:
+            json.dump(settings, f, indent=2)
+        os.replace(tmp_path, SETTINGS_FILE)
+    except:
+        # Clean up temp file on error
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
     # Emit settings update to all connected clients
     socketio.emit('settings_update', settings)
 
