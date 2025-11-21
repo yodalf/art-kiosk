@@ -404,7 +404,6 @@ def test_video_stops_on_jump_to_another_video(api_client, isolated_test_data, st
 
 @pytest.mark.integration
 @pytest.mark.video
-@pytest.mark.skip(reason="Dynamic interval change during video playback not fully implemented - video keeps playing")
 def test_video_stops_on_interval_advance(api_client, isolated_test_data, stop_all_videos):
     """Video SHALL stop when slideshow interval advances automatically."""
     # Use TestThemeVideosOnly which has 5 videos

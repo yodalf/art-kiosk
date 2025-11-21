@@ -382,6 +382,9 @@
                 clearInterval(slideTimer);
             }
 
+            // Stop any playing video
+            await stopVideoIfPlaying();
+
             // Clear existing slides
             const slides = container.querySelectorAll('.slide');
             slides.forEach(slide => slide.remove());
