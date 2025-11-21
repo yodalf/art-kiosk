@@ -244,6 +244,10 @@ def test_video_auto_transition_to_next_item(isolated_test_data):
         print(f"\nStep 2: Setting test interval to {TEST_INTERVAL} seconds...")
         assert set_theme_interval(theme_name, TEST_INTERVAL), "Failed to set theme interval"
 
+        # Reload kiosk again to pick up interval change
+        requests.post(f"{BASE_URL}/api/control/send", json={'command': 'reload'}, timeout=5)
+        time.sleep(2)
+
         # Step 3: Get images list and find video position
         print("\nStep 3: Getting images list...")
         images = get_images_list()

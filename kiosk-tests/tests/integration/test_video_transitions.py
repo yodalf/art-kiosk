@@ -285,8 +285,9 @@ def test_video_stops_on_atmosphere_switch(api_client, video_setup, stop_all_vide
 
     assert is_mpv_running(), "mpv should be running"
 
-    # Switch to atmosphere
+    # Switch to atmosphere and reload kiosk to trigger change
     api_client.post('/api/atmospheres/active', json={'atmosphere': test_atmosphere})
+    api_client.post('/api/control/send', json={'command': 'reload'})
 
     # Verify stopped
     assert wait_for_mpv_stopped(timeout=10), "mpv should stop when switching to atmosphere"
