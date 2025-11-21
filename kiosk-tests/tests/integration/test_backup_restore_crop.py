@@ -204,10 +204,10 @@ def take_screenshot_hash(page, description="", save_path=None):
 
 
 @pytest.mark.integration
-def test_backup_restore_crop():
+def test_backup_restore_crop(isolated_test_data):
     """
     Test that backup and restore correctly handles image crops visually:
-    1. Create a 400x400 test image with 4 colored quadrants
+    1. Use test image from isolated_test_data
     2. Create first backup (no crop - shows all quadrants)
     3. Apply crop to bottom-right quadrant only (yellow)
     4. Create second backup (with crop)
@@ -216,7 +216,6 @@ def test_backup_restore_crop():
     7. Verify screenshots are different (proves crop is applied)
     8. Clean up
     """
-    test_image_name = None
     backup1_name = None
     backup2_name = None
 
@@ -228,15 +227,20 @@ def test_backup_restore_crop():
         try:
             # Pre-test cleanup
             print("\nPre-test cleanup...")
+
+            # Disable day scheduling and activate test theme
+            requests.post(f"{BASE_URL}/api/day/disable", timeout=5)
+            theme_name = 'TestTheme15Images'
+            requests.post(f"{BASE_URL}/api/themes/active", json={'theme': theme_name}, timeout=5)
+            requests.post(f"{BASE_URL}/api/control/send", json={'command': 'reload'}, timeout=5)
+            time.sleep(2)
             print("  Pre-test cleanup complete")
 
-            # Step 1: Download/create test image with visual features
+            # Step 1: Use crop-test image from isolated_test_data (first image is the crop-test one)
             print("\nStep 1: Creating test image with visual features...")
-            test_image_name, IMAGE_WIDTH, IMAGE_HEIGHT = download_test_image()
-            if test_image_name is None:
-                test_image_name, IMAGE_WIDTH, IMAGE_HEIGHT = create_gradient_test_image()
-            assert test_image_name is not None, "Failed to create test image"
-            assert image_exists(test_image_name), f"Image {test_image_name} not found after upload"
+            test_image_name = isolated_test_data['images'][0]  # First image is the crop-test image
+            IMAGE_WIDTH, IMAGE_HEIGHT = 400, 400  # Known size from conftest.py
+            assert image_exists(test_image_name), f"Image {test_image_name} not found"
             print(f"  Created image: {test_image_name} ({IMAGE_WIDTH}x{IMAGE_HEIGHT})")
 
             # Crop to bottom-right quarter of the image
@@ -326,13 +330,15 @@ def test_backup_restore_crop():
         finally:
             browser.close()
 
-            # Cleanup
+            # Cleanup - only delete backups, image is managed by isolated_test_data
             print("\nCleanup: Restoring original state...")
 
-            # Delete image if it exists
-            if test_image_name and image_exists(test_image_name):
-                delete_image(test_image_name)
-                print(f"  Deleted image: {test_image_name}")
+            # Clear any crop data we added
+            settings = get_settings()
+            if 'image_crops' in settings and test_image_name in settings.get('image_crops', {}):
+                del settings['image_crops'][test_image_name]
+                save_settings(settings)
+                print(f"  Cleared crop data for: {test_image_name}")
 
             # Delete backups
             if backup1_name:
