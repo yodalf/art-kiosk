@@ -937,9 +937,16 @@ def isolated_test_data(api_client):
         print("CLEANING UP ISOLATED TEST DATA")
         print("="*60)
 
-        # Stop any playing videos
-        api_client.post('/api/videos/stop-mpv')
-        time.sleep(0.5)
+        # Stop any playing videos (critical - must always run)
+        try:
+            api_client.post('/api/videos/stop-mpv')
+            time.sleep(1)
+            # Double-check mpv is stopped
+            api_client.post('/api/videos/stop-mpv')
+            time.sleep(0.5)
+            print("  ✓ Stopped any running videos")
+        except Exception as e:
+            print(f"  ⚠ Warning: Could not stop videos: {e}")
 
         # Delete atmospheres
         for atm_name in created_data['atmospheres']:
