@@ -150,6 +150,9 @@ def test_req_theme_008_active_theme_filters(api_client, isolated_test_data):
 @pytest.mark.themes
 def test_req_theme_009_all_images_shows_all(api_client, isolated_test_data):
     """REQ-THEME-009: 'All Images' theme SHALL show all enabled images."""
+    # Disable day scheduling to avoid interference
+    api_client.post('/api/day/disable')
+
     # Activate All Images
     api_client.post('/api/themes/active', json={'theme': 'All Images'})
 
