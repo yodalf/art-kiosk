@@ -226,11 +226,12 @@
 
             if (currentHour !== lastCheckHour) {
                 debugLog(`Hour boundary crossed! ${lastCheckHour}:00 -> ${currentHour}:00`, 'info');
-                debugLog(`Day scheduling active - forcing immediate image transition`, 'info');
+                debugLog(`Day scheduling active - checking for image changes`, 'info');
                 lastCheckHour = currentHour;
 
-                // Force immediate transition to next image
-                nextSlide();
+                // Check for image changes - this will detect time period changes
+                // and reload the slideshow with images for the new time period
+                await checkForImageChanges();
             }
         }
 

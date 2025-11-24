@@ -196,3 +196,95 @@ def test_no_loading_message_after_load(kiosk_page):
     # Check if it's hidden (either display:none or not visible)
     style = loading.evaluate('el => window.getComputedStyle(el).display')
     assert style == 'none', "Loading message should be hidden after images load"
+
+
+@pytest.mark.e2e
+@pytest.mark.day_scheduling
+def test_kiosk_updates_on_time_period_transition(api_client, test_mode, isolated_test_data, page):
+    """
+    Test that kiosk display updates when time period transitions during day scheduling.
+
+    This is the critical E2E test for the day scheduling bug:
+    when the time period changes, the kiosk should reload and display
+    images from the new time period's atmosphere.
+    """
+    # Use two different atmospheres from isolated test data
+    atmosphere_period_1 = 'TestAtmosphereImageThemes'  # Has 2 themes
+    atmosphere_period_2 = 'TestAtmosphereAllThemes'    # Has 4 themes
+
+    # Set mock time to period 1 (6-8 AM)
+    test_mode.set_time(1700049600)  # 7:00 AM - Period 1
+
+    # Enable day scheduling
+    api_client.post('/api/day/enable')
+
+    # Assign different atmospheres to periods 1 and 2
+    response = api_client.post('/api/day/time-periods/1', json={
+        'atmospheres': [atmosphere_period_1]
+    })
+    assert response.status_code == 200
+
+    response = api_client.post('/api/day/time-periods/2', json={
+        'atmospheres': [atmosphere_period_2]
+    })
+    assert response.status_code == 200
+
+    # Set fast check interval so kiosk detects changes quickly
+    test_mode.set_intervals(check=500)  # Check every 500ms
+
+    # Wait for settings to propagate
+    time.sleep(0.5)
+
+    # Navigate to kiosk view
+    page.set_viewport_size({"width": 2560, "height": 2880})
+    page.goto(f"{api_client.base_url}/view")
+
+    # Wait for kiosk to load and connect WebSocket
+    page.wait_for_selector('.slide.active', timeout=10000)
+    time.sleep(1)  # Allow WebSocket to connect
+
+    # Get the current image names displayed (from slide elements)
+    def get_displayed_image_names():
+        slides = page.locator('.slide')
+        count = slides.count()
+        names = []
+        for i in range(count):
+            slide = slides.nth(i)
+            # For images, get from img src
+            img = slide.locator('img')
+            if img.count() > 0:
+                src = img.first.get_attribute('src')
+                if src:
+                    # Extract filename from /images/filename
+                    name = src.split('/')[-1]
+                    names.append(name)
+        return set(names)
+
+    # Record images shown in period 1
+    period_1_images = get_displayed_image_names()
+    assert len(period_1_images) > 0, "Period 1 should show some images"
+
+    # Transition to period 2 (8-10 AM)
+    test_mode.set_time(1700055000)  # 8:30 AM - Period 2
+
+    # Wait for kiosk to detect and reload (up to 5 seconds)
+    # The kiosk checks every 500ms and should reload when it detects period change
+    time.sleep(5)
+
+    # Force a check by verifying the page is still responsive
+    page.wait_for_selector('.slide.active', timeout=5000)
+
+    # Record images shown in period 2
+    period_2_images = get_displayed_image_names()
+    assert len(period_2_images) > 0, "Period 2 should show some images"
+
+    # THE KEY ASSERTION: Images should be different between periods
+    assert period_1_images != period_2_images, (
+        f"Kiosk display should update when time period transitions!\n"
+        f"Period 1 images: {period_1_images}\n"
+        f"Period 2 images: {period_2_images}\n"
+        f"Kiosk is still showing the same images - this is the day scheduling bug!"
+    )
+
+    # Cleanup
+    api_client.post('/api/day/disable')

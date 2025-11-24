@@ -171,3 +171,81 @@ def test_time_period_atmosphere_assignment(api_client, server_state, isolated_te
 
     # Cleanup
     server_state.disable_day_scheduling()
+
+
+@pytest.mark.integration
+@pytest.mark.day_scheduling
+def test_images_change_on_time_period_transition(api_client, test_mode, isolated_test_data):
+    """
+    Test that images change when time period transitions.
+
+    This is the critical test for the day scheduling bug:
+    when the time period changes, the images returned by /api/images
+    should reflect the new time period's atmosphere.
+    """
+    # Use two different atmospheres from isolated test data
+    # TestAtmosphereImageThemes has themes with specific images
+    # TestAtmosphereAllThemes has themes with different images
+    atmosphere_period_1 = 'TestAtmosphereImageThemes'
+    atmosphere_period_2 = 'TestAtmosphereAllThemes'
+
+    # Enable test mode and set time to period 1 (6-8 AM)
+    test_mode.enable()
+    test_mode.set_time(1700049600)  # 7:00 AM - Period 1
+
+    # Enable day scheduling
+    api_client.post('/api/day/enable')
+
+    # Assign different atmospheres to periods 1 and 2
+    response = api_client.post('/api/day/time-periods/1', json={
+        'atmospheres': [atmosphere_period_1]
+    })
+    assert response.status_code == 200, f"Failed to assign atmosphere to period 1: {response.text}"
+
+    response = api_client.post('/api/day/time-periods/2', json={
+        'atmospheres': [atmosphere_period_2]
+    })
+    assert response.status_code == 200, f"Failed to assign atmosphere to period 2: {response.text}"
+
+    # Wait for settings to propagate
+    import time
+    time.sleep(0.5)
+
+    # Get images for period 1
+    response = api_client.get('/api/images', params={'enabled_only': 'true'})
+    assert response.status_code == 200
+    period_1_images = response.json()
+    period_1_names = set(img['name'] for img in period_1_images)
+
+    # Verify we got some images for period 1
+    assert len(period_1_names) > 0, "Period 1 should have some images"
+
+    # Now transition to period 2 (8-10 AM)
+    test_mode.set_time(1700055000)  # 8:30 AM - Period 2
+    time.sleep(0.5)
+
+    # Verify time period changed
+    status = test_mode.get_status()
+    assert status['current_time_period'] == '2', f"Expected period 2, got {status['current_time_period']}"
+
+    # Get images for period 2
+    response = api_client.get('/api/images', params={'enabled_only': 'true'})
+    assert response.status_code == 200
+    period_2_images = response.json()
+    period_2_names = set(img['name'] for img in period_2_images)
+
+    # Verify we got some images for period 2
+    assert len(period_2_names) > 0, "Period 2 should have some images"
+
+    # THE KEY ASSERTION: Images should be different between periods
+    # since different atmospheres are assigned to each period
+    assert period_1_names != period_2_names, (
+        f"Images should change when time period transitions!\n"
+        f"Period 1 images: {period_1_names}\n"
+        f"Period 2 images: {period_2_names}\n"
+        f"Both periods returned the same images - this is the day scheduling bug!"
+    )
+
+    # Cleanup
+    api_client.post('/api/day/disable')
+    test_mode.disable()
