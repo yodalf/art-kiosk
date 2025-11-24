@@ -70,11 +70,22 @@ def test_req_remote_003_pause_command(kiosk_page, test_mode, api_client):
 
 @pytest.mark.e2e
 @pytest.mark.remote_control
-def test_req_remote_004_play_command(kiosk_page, test_mode, api_client):
+def test_req_remote_004_play_command(api_client, isolated_test_data, test_mode, page):
     """REQ-REMOTE-004: 'play' command SHALL resume automatic advancement."""
-    test_mode.set_intervals(slideshow=1000)
+    # Set active theme with predictable images
+    api_client.post('/api/themes/active', json={'theme': 'TestTheme10Images'})
 
-    kiosk_page.wait_for_selector('.slide.active')
+    # Set viewport and navigate
+    page.set_viewport_size({"width": 2560, "height": 2880})
+    page.goto(f"{api_client.base_url}/view")
+
+    # Wait for initial load and WebSocket connection
+    page.wait_for_selector('.slide.active', timeout=10000)
+    time.sleep(0.5)
+
+    # Set fast interval AFTER page connects
+    test_mode.set_intervals(slideshow=1500, check=500)
+    time.sleep(0.3)
 
     # Pause first
     api_client.post('/api/control/send', json={'command': 'pause'})
@@ -84,13 +95,13 @@ def test_req_remote_004_play_command(kiosk_page, test_mode, api_client):
     api_client.post('/api/control/send', json={'command': 'play'})
     time.sleep(0.5)
 
-    initial_index = kiosk_page.locator('.slide.active').get_attribute('data-index')
+    initial_index = page.locator('.slide.active').get_attribute('data-index')
 
-    # Wait for transition
-    time.sleep(2)
+    # Wait for transition (1.5s interval + buffer)
+    time.sleep(2.5)
 
     # Should have advanced
-    new_index = kiosk_page.locator('.slide.active').get_attribute('data-index')
+    new_index = page.locator('.slide.active').get_attribute('data-index')
     assert new_index != initial_index
 
 
@@ -199,23 +210,35 @@ def test_req_remote_009_navigation_preserves_pause(kiosk_page, test_mode, api_cl
 
 @pytest.mark.e2e
 @pytest.mark.remote_control
-def test_req_remote_010_reload_always_resumes(kiosk_page, test_mode, api_client):
+def test_req_remote_010_reload_always_resumes(api_client, isolated_test_data, test_mode, page):
     """REQ-REMOTE-010: 'reload' command SHALL always resume playback."""
-    test_mode.set_intervals(slideshow=1000)
-    kiosk_page.wait_for_selector('.slide.active')
+    # Set active theme with predictable images
+    api_client.post('/api/themes/active', json={'theme': 'TestTheme10Images'})
+
+    # Set viewport and navigate
+    page.set_viewport_size({"width": 2560, "height": 2880})
+    page.goto(f"{api_client.base_url}/view")
+
+    # Wait for initial load and WebSocket connection
+    page.wait_for_selector('.slide.active', timeout=10000)
+    time.sleep(0.5)
+
+    # Set fast interval AFTER page connects
+    test_mode.set_intervals(slideshow=1500, check=500)
+    time.sleep(0.3)
 
     # Pause first
     api_client.post('/api/control/send', json={'command': 'pause'})
     time.sleep(0.5)
 
-    # Reload
+    # Reload (should resume playback)
     api_client.post('/api/control/send', json={'command': 'reload'})
     time.sleep(0.5)
 
-    initial_index = kiosk_page.locator('.slide.active').get_attribute('data-index')
+    initial_index = page.locator('.slide.active').get_attribute('data-index')
 
-    # Wait - should auto-advance (playback resumed)
-    time.sleep(2)
+    # Wait - should auto-advance (playback resumed, 1.5s interval + buffer)
+    time.sleep(2.5)
 
-    new_index = kiosk_page.locator('.slide.active').get_attribute('data-index')
+    new_index = page.locator('.slide.active').get_attribute('data-index')
     assert new_index != initial_index

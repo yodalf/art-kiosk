@@ -77,19 +77,30 @@ def test_req_slide_005_randomized_order(api_client, kiosk_page):
 
 
 @pytest.mark.e2e
-def test_req_slide_006_configurable_interval(test_mode, kiosk_page):
+def test_req_slide_006_configurable_interval(api_client, isolated_test_data, test_mode, page):
     """REQ-SLIDE-006: Slideshow interval SHALL be configurable."""
-    # Set fast interval
-    test_mode.set_intervals(slideshow=1000)
+    # Set active theme with predictable images
+    api_client.post('/api/themes/active', json={'theme': 'TestTheme10Images'})
 
-    kiosk_page.wait_for_selector('.slide.active')
-    initial = kiosk_page.locator('.slide.active').get_attribute('data-index')
+    # Set viewport and navigate
+    page.set_viewport_size({"width": 2560, "height": 2880})
+    page.goto(f"{api_client.base_url}/view")
 
-    # Wait just over interval
-    time.sleep(1.5)
+    # Wait for initial load and WebSocket connection
+    page.wait_for_selector('.slide.active', timeout=10000)
+    time.sleep(0.5)
+
+    # Set fast interval AFTER page connects
+    test_mode.set_intervals(slideshow=1500, check=500)
+    time.sleep(0.3)
+
+    initial = page.locator('.slide.active').get_attribute('data-index')
+
+    # Wait just over interval (1.5s + buffer)
+    time.sleep(2.0)
 
     # Should have advanced
-    current = kiosk_page.locator('.slide.active').get_attribute('data-index')
+    current = page.locator('.slide.active').get_attribute('data-index')
     assert current != initial
 
 
@@ -148,11 +159,22 @@ def test_req_slide_011_handle_no_images(kiosk_page, api_client):
 
 
 @pytest.mark.e2e
-def test_req_slide_012_maintain_aspect_ratio(kiosk_page):
+def test_req_slide_012_maintain_aspect_ratio(api_client, isolated_test_data, page):
     """REQ-SLIDE-012: Images SHALL maintain aspect ratio (no distortion in cover mode)."""
-    kiosk_page.wait_for_selector('.slide.active img')
+    # Set active theme with predictable images
+    api_client.post('/api/themes/active', json={'theme': 'TestTheme10Images'})
 
-    img = kiosk_page.locator('.slide.active img').first
+    # Set viewport and navigate
+    page.set_viewport_size({"width": 2560, "height": 2880})
+    page.goto(f"{api_client.base_url}/view")
+
+    # Wait for slide to be active
+    page.wait_for_selector('.slide.active img', timeout=10000)
+
+    img = page.locator('.slide.active img').first
+
+    # Wait for image to actually load (naturalWidth > 0)
+    page.wait_for_function("el => el.naturalWidth > 0", arg=img.element_handle(), timeout=10000)
 
     # Get natural and displayed dimensions
     dimensions = img.evaluate("""el => ({

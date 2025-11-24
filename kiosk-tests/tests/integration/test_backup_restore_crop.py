@@ -6,7 +6,7 @@ import time
 import hashlib
 from PIL import Image
 import io
-from playwright.sync_api import sync_playwright
+# Playwright page fixture is provided by pytest-playwright
 
 # Load device configuration
 def load_device_config():
@@ -204,7 +204,7 @@ def take_screenshot_hash(page, description="", save_path=None):
 
 
 @pytest.mark.integration
-def test_backup_restore_crop(isolated_test_data):
+def test_backup_restore_crop(isolated_test_data, page):
     """
     Test that backup and restore correctly handles image crops visually:
     1. Use test image from isolated_test_data
@@ -219,137 +219,136 @@ def test_backup_restore_crop(isolated_test_data):
     backup1_name = None
     backup2_name = None
 
-    with sync_playwright() as p:
-        # Launch browser
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page(viewport={'width': 1920, 'height': 1080})
+    # Set viewport
+    page.set_viewport_size({'width': 1920, 'height': 1080})
 
-        try:
-            # Pre-test cleanup
-            print("\nPre-test cleanup...")
+    test_image_name = None
 
-            # Disable day scheduling and activate test theme
-            requests.post(f"{BASE_URL}/api/day/disable", timeout=5)
-            theme_name = 'TestTheme15Images'
-            requests.post(f"{BASE_URL}/api/themes/active", json={'theme': theme_name}, timeout=5)
-            requests.post(f"{BASE_URL}/api/control/send", json={'command': 'reload'}, timeout=5)
-            time.sleep(2)
-            print("  Pre-test cleanup complete")
+    try:
+        # Pre-test cleanup
+        print("\nPre-test cleanup...")
 
-            # Step 1: Use crop-test image from isolated_test_data (first image is the crop-test one)
-            print("\nStep 1: Creating test image with visual features...")
-            test_image_name = isolated_test_data['images'][0]  # First image is the crop-test image
-            IMAGE_WIDTH, IMAGE_HEIGHT = 400, 400  # Known size from conftest.py
-            assert image_exists(test_image_name), f"Image {test_image_name} not found"
-            print(f"  Created image: {test_image_name} ({IMAGE_WIDTH}x{IMAGE_HEIGHT})")
+        # Disable day scheduling and activate test theme
+        requests.post(f"{BASE_URL}/api/day/disable", timeout=5)
+        theme_name = 'TestTheme15Images'
+        requests.post(f"{BASE_URL}/api/themes/active", json={'theme': theme_name}, timeout=5)
+        requests.post(f"{BASE_URL}/api/control/send", json={'command': 'reload'}, timeout=5)
+        time.sleep(2)
+        print("  Pre-test cleanup complete")
 
-            # Crop to bottom-right quarter of the image
-            CROP_X = IMAGE_WIDTH // 2
-            CROP_Y = IMAGE_HEIGHT // 2
-            CROP_WIDTH = IMAGE_WIDTH // 2
-            CROP_HEIGHT = IMAGE_HEIGHT // 2
-            print(f"  Will crop to: x={CROP_X}, y={CROP_Y}, w={CROP_WIDTH}, h={CROP_HEIGHT}")
+        # Step 1: Use crop-test image from isolated_test_data (first image is the crop-test one)
+        print("\nStep 1: Creating test image with visual features...")
+        test_image_name = isolated_test_data['images'][0]  # First image is the crop-test image
+        IMAGE_WIDTH, IMAGE_HEIGHT = 400, 400  # Known size from conftest.py
+        assert image_exists(test_image_name), f"Image {test_image_name} not found"
+        print(f"  Created image: {test_image_name} ({IMAGE_WIDTH}x{IMAGE_HEIGHT})")
 
-            # Step 2: Create first backup (no crop)
-            print("\nStep 2: Creating first backup (no crop)...")
-            backup1_name = create_backup()
-            assert backup1_name is not None, "Failed to create first backup"
-            print(f"  Created backup: {backup1_name}")
+        # Crop to bottom-right quarter of the image
+        CROP_X = IMAGE_WIDTH // 2
+        CROP_Y = IMAGE_HEIGHT // 2
+        CROP_WIDTH = IMAGE_WIDTH // 2
+        CROP_HEIGHT = IMAGE_HEIGHT // 2
+        print(f"  Will crop to: x={CROP_X}, y={CROP_Y}, w={CROP_WIDTH}, h={CROP_HEIGHT}")
 
-            # Step 3: Apply crop to bottom-right quarter
-            print(f"\nStep 3: Applying crop to bottom-right quarter ({CROP_X},{CROP_Y},{CROP_WIDTH},{CROP_HEIGHT})...")
-            assert set_crop(test_image_name, CROP_X, CROP_Y, CROP_WIDTH, CROP_HEIGHT, IMAGE_WIDTH, IMAGE_HEIGHT), "Failed to set crop"
-            crop_data = get_crop(test_image_name)
-            assert crop_data is not None, "Crop data not found after setting"
-            print(f"  Applied crop: x={CROP_X}, y={CROP_Y}, w={CROP_WIDTH}, h={CROP_HEIGHT}")
-            print("  This should show only the bottom-right quarter of the image")
+        # Step 2: Create first backup (no crop)
+        print("\nStep 2: Creating first backup (no crop)...")
+        backup1_name = create_backup()
+        assert backup1_name is not None, "Failed to create first backup"
+        print(f"  Created backup: {backup1_name}")
 
-            # Step 4: Create second backup (with crop)
-            print("\nStep 4: Creating second backup (with crop)...")
-            backup2_name = create_backup()
-            assert backup2_name is not None, "Failed to create second backup"
-            print(f"  Created backup: {backup2_name}")
+        # Step 3: Apply crop to bottom-right quarter
+        print(f"\nStep 3: Applying crop to bottom-right quarter ({CROP_X},{CROP_Y},{CROP_WIDTH},{CROP_HEIGHT})...")
+        assert set_crop(test_image_name, CROP_X, CROP_Y, CROP_WIDTH, CROP_HEIGHT, IMAGE_WIDTH, IMAGE_HEIGHT), "Failed to set crop"
+        crop_data = get_crop(test_image_name)
+        assert crop_data is not None, "Crop data not found after setting"
+        print(f"  Applied crop: x={CROP_X}, y={CROP_Y}, w={CROP_WIDTH}, h={CROP_HEIGHT}")
+        print("  This should show only the bottom-right quarter of the image")
 
-            # Step 5: Restore first backup (no crop) and take screenshot
-            print("\nStep 5: Restoring first backup (no crop)...")
-            assert restore_backup(backup1_name), "Failed to restore first backup"
-            time.sleep(3)  # Wait for restore and kiosk reload
-            print(f"  Restored from: {backup1_name}")
+        # Step 4: Create second backup (with crop)
+        print("\nStep 4: Creating second backup (with crop)...")
+        backup2_name = create_backup()
+        assert backup2_name is not None, "Failed to create second backup"
+        print(f"  Created backup: {backup2_name}")
 
-            # Verify server-side: crop should NOT exist after restoring first backup
-            server_crop = get_crop(test_image_name)
-            if server_crop:
-                print(f"  WARNING: Server still has crop data after restore: {server_crop}")
-            else:
-                print("  Server verified: no crop data in settings")
+        # Step 5: Restore first backup (no crop) and take screenshot
+        print("\nStep 5: Restoring first backup (no crop)...")
+        assert restore_backup(backup1_name), "Failed to restore first backup"
+        time.sleep(3)  # Wait for restore and kiosk reload
+        print(f"  Restored from: {backup1_name}")
 
-            # Navigate to kiosk view and jump to the image
-            page.goto(f"{BASE_URL}/view")
-            time.sleep(2)  # Wait for page load
+        # Verify server-side: crop should NOT exist after restoring first backup
+        server_crop = get_crop(test_image_name)
+        if server_crop:
+            print(f"  WARNING: Server still has crop data after restore: {server_crop}")
+        else:
+            print("  Server verified: no crop data in settings")
 
-            # Jump to the test image
-            jump_to_image(test_image_name)
-            time.sleep(2)  # Wait for image display
+        # Navigate to kiosk view and jump to the image
+        page.goto(f"{BASE_URL}/view")
+        time.sleep(2)  # Wait for page load
 
-            print("\nStep 6: Taking screenshot of uncropped image...")
-            hash1, screenshot1 = take_screenshot_hash(page, "uncropped - full image", "/tmp/crop_test_uncropped.png")
+        # Jump to the test image
+        jump_to_image(test_image_name)
+        time.sleep(2)  # Wait for image display
 
-            # Step 7: Restore second backup (with crop) and take screenshot
-            print("\nStep 7: Restoring second backup (with crop)...")
-            assert restore_backup(backup2_name), "Failed to restore second backup"
-            time.sleep(3)  # Wait for restore and kiosk reload
-            print(f"  Restored from: {backup2_name}")
+        print("\nStep 6: Taking screenshot of uncropped image...")
+        hash1, screenshot1 = take_screenshot_hash(page, "uncropped - full image", "/tmp/crop_test_uncropped.png")
 
-            # Reload the page and jump to image again
-            page.reload()
-            time.sleep(2)
+        # Step 7: Restore second backup (with crop) and take screenshot
+        print("\nStep 7: Restoring second backup (with crop)...")
+        assert restore_backup(backup2_name), "Failed to restore second backup"
+        time.sleep(3)  # Wait for restore and kiosk reload
+        print(f"  Restored from: {backup2_name}")
 
-            jump_to_image(test_image_name)
-            time.sleep(2)
+        # Reload the page and jump to image again
+        page.reload()
+        time.sleep(2)
 
-            print("\nStep 8: Taking screenshot of cropped image...")
-            hash2, screenshot2 = take_screenshot_hash(page, "cropped - bottom-right only", "/tmp/crop_test_cropped.png")
+        jump_to_image(test_image_name)
+        time.sleep(2)
 
-            # Step 9: Verify screenshots are different
-            print("\nStep 9: Comparing screenshots...")
-            print(f"  Uncropped hash: {hash1}")
-            print(f"  Cropped hash:   {hash2}")
+        print("\nStep 8: Taking screenshot of cropped image...")
+        hash2, screenshot2 = take_screenshot_hash(page, "cropped - bottom-right only", "/tmp/crop_test_cropped.png")
 
-            assert hash1 != hash2, f"Screenshots are identical! Crop was not visually applied. Hash: {hash1}"
-            print("  ✓ Screenshots differ - crop was visually applied!")
+        # Step 9: Verify screenshots are different
+        print("\nStep 9: Comparing screenshots...")
+        print(f"  Uncropped hash: {hash1}")
+        print(f"  Cropped hash:   {hash2}")
 
-            # Verify crop data is present
-            crop_data = get_crop(test_image_name)
-            assert crop_data is not None, "Crop data not found after restore"
-            assert crop_data['x'] == CROP_X, f"Crop X mismatch"
-            assert crop_data['y'] == CROP_Y, f"Crop Y mismatch"
-            print("  ✓ Crop data verified in settings")
+        assert hash1 != hash2, f"Screenshots are identical! Crop was not visually applied. Hash: {hash1}"
+        print("  ✓ Screenshots differ - crop was visually applied!")
 
-            print("\n✓ Backup and restore crop test PASSED!")
+        # Verify crop data is present
+        crop_data = get_crop(test_image_name)
+        assert crop_data is not None, "Crop data not found after restore"
+        assert crop_data['x'] == CROP_X, f"Crop X mismatch"
+        assert crop_data['y'] == CROP_Y, f"Crop Y mismatch"
+        print("  ✓ Crop data verified in settings")
 
-        finally:
-            browser.close()
+        print("\n✓ Backup and restore crop test PASSED!")
 
-            # Cleanup - only delete backups, image is managed by isolated_test_data
-            print("\nCleanup: Restoring original state...")
+    finally:
+        # Cleanup - only delete backups, image is managed by isolated_test_data
+        print("\nCleanup: Restoring original state...")
 
-            # Clear any crop data we added
+        # Clear any crop data we added
+        if test_image_name:
             settings = get_settings()
             if 'image_crops' in settings and test_image_name in settings.get('image_crops', {}):
                 del settings['image_crops'][test_image_name]
                 save_settings(settings)
                 print(f"  Cleared crop data for: {test_image_name}")
 
-            # Delete backups
-            if backup1_name:
-                delete_backup(backup1_name)
-                print(f"  Deleted backup: {backup1_name}")
+        # Delete backups
+        if backup1_name:
+            delete_backup(backup1_name)
+            print(f"  Deleted backup: {backup1_name}")
 
-            if backup2_name:
-                delete_backup(backup2_name)
-                print(f"  Deleted backup: {backup2_name}")
+        if backup2_name:
+            delete_backup(backup2_name)
+            print(f"  Deleted backup: {backup2_name}")
 
-            print("  Cleanup complete")
+        print("  Cleanup complete")
 
 
 if __name__ == "__main__":

@@ -102,6 +102,7 @@
     <script>
         // Initialize Socket.IO connection
         const socket = io();
+        window.socket = socket;  // Expose for testing
 
         let images = [];
         let currentIndex = 0;
@@ -311,8 +312,8 @@
                     previousTimePeriod = newTimePeriod;
                 }
 
-                // Check if interval changed
-                if (newInterval !== interval) {
+                // Check if interval changed (but don't override test mode interval)
+                if (newInterval !== interval && !testMode.forceInterval) {
                     debugLog(`Interval changed! ${interval / 1000}s -> ${newInterval / 1000}s`);
                     interval = newInterval;
                     needsReload = true;
@@ -1112,6 +1113,11 @@
                     await loadImages(0, imageName);
                 }
                 return;
+            }
+
+            // Handle object commands with just a command string (e.g., {'command': 'next'})
+            if (typeof command === 'object' && command.command) {
+                command = command.command;  // Extract string command from object
             }
 
             // Handle string commands

@@ -25,12 +25,21 @@ def test_req_ws_001_connection_established(kiosk_page):
 
 @pytest.mark.e2e
 @pytest.mark.websocket
-def test_req_ws_002_settings_update_event(kiosk_page, api_client):
+def test_req_ws_002_settings_update_event(api_client, isolated_test_data, page):
     """REQ-WS-002: Settings changes SHALL emit 'settings_update' event."""
-    kiosk_page.wait_for_selector('.slide.active')
+    # Set active theme with predictable images
+    api_client.post('/api/themes/active', json={'theme': 'TestTheme10Images'})
+
+    # Set viewport and navigate
+    page.set_viewport_size({"width": 2560, "height": 2880})
+    page.goto(f"{api_client.base_url}/view")
+
+    # Wait for initial load and WebSocket connection
+    page.wait_for_selector('.slide.active', timeout=10000)
+    time.sleep(0.5)
 
     # Monitor WebSocket messages
-    kiosk_page.evaluate("""
+    page.evaluate("""
         window.__settings_updates = 0;
         if (window.socket) {
             window.socket.on('settings_update', function() {
@@ -39,12 +48,12 @@ def test_req_ws_002_settings_update_event(kiosk_page, api_client):
         }
     """)
 
-    # Change a setting
-    api_client.post('/api/themes/active', json={'theme': 'All Images'})
+    # Change a setting (switch to a different theme)
+    api_client.post('/api/themes/active', json={'theme': 'TestTheme15Images'})
     time.sleep(1)
 
     # Check if event was received
-    updates = kiosk_page.evaluate("window.__settings_updates || 0")
+    updates = page.evaluate("window.__settings_updates || 0")
     assert updates > 0
 
 
