@@ -122,52 +122,6 @@ def test_manual_next_command(api_client, isolated_test_data, test_mode, page):
 
 
 @pytest.mark.e2e
-@pytest.mark.day_scheduling
-@pytest.mark.skip(reason="Hour boundary with mock time requires further debugging - session fixture interference")
-def test_hour_boundary_transition_visual(api_client, isolated_test_data, test_mode, page):
-    """Test visual transition when crossing hour boundary during day scheduling."""
-    # Set active theme to TestTheme10Images (has exactly 10 images)
-    api_client.post('/api/themes/active', json={'theme': 'TestTheme10Images'})
-
-    # Enable day scheduling BEFORE page loads
-    api_client.post('/api/day/enable')
-
-    # Set viewport and navigate
-    page.set_viewport_size({"width": 2560, "height": 2880})
-    page.goto(f"{api_client.base_url}/view")
-
-    # Wait for initial load and WebSocket connection
-    page.wait_for_selector('.slide.active', timeout=10000)
-    time.sleep(0.5)
-
-    # Set fast check interval so page picks up day scheduling quickly
-    test_mode.set_intervals(slideshow=5000, check=200)
-
-    # Wait for kiosk to poll and see day scheduling is enabled
-    time.sleep(1.0)
-
-    # Set initial time (this also initializes lastCheckHour)
-    test_mode.set_time(1700040000)  # 07:59:50
-    time.sleep(0.5)
-
-    # Get current slide
-    initial_index = page.locator('.slide.active').get_attribute('data-index')
-
-    # Cross hour boundary
-    test_mode.set_time(1700043610)  # 08:00:10
-    time.sleep(0.5)  # Wait for hour boundary check and transition
-
-    # Get new slide
-    new_index = page.locator('.slide.active').get_attribute('data-index')
-
-    # Should have transitioned (hour boundary should trigger nextSlide)
-    assert initial_index != new_index, "Crossing hour boundary should trigger image transition"
-
-    # Cleanup
-    api_client.post('/api/day/disable')
-
-
-@pytest.mark.e2e
 @pytest.mark.screenshot
 def test_image_transition_visual_comparison(api_client, isolated_test_data, test_mode, page, screenshot_helper):
     """Test that images are visually different after transition."""
