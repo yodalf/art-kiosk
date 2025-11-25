@@ -350,7 +350,7 @@ When Day Scheduling is enabled:
 - The system displays images from the current time period's atmospheres
 - If a time period has multiple atmospheres, all their themes are combined
 - If a time period has no atmospheres, it defaults to "All Images" atmosphere
-- **Hour boundary transitions**: Images automatically transition when crossing into a new hour (e.g., 8:00 AM), overriding cadence settings
+- **Hour boundary transitions**: When crossing into a new time period (e.g., 8:00 AM), the system reloads images for the new time period's atmosphere(s), ensuring the kiosk always displays the correct content
 - The cadence controls transitions between hour boundaries
 - "Current Images" heading displays the actual atmosphere(s) from the current time period
 
@@ -683,7 +683,7 @@ The system automatically updates all references (enabled state, theme assignment
 
 ## Testing
 
-The project includes a comprehensive test suite with 54 automated tests covering all functionality.
+The project includes a comprehensive test suite with 119 automated tests covering all functionality.
 
 ### Running Tests
 
@@ -707,9 +707,10 @@ pytest -v
 
 ### Test Coverage
 
-**Total:** 54 tests with 100% pass rate
+**Total:** 119 tests with 100% pass rate
 - **Unit Tests (14):** API endpoints, cleanup safety
-- **Integration Tests (40):** Image management, themes, atmospheres, day scheduling
+- **Integration Tests (55):** Image management, themes, atmospheres, day scheduling, video transitions
+- **E2E Tests (50):** Kiosk display, WebSocket communication, browser automation
 
 See `TEST.md` for detailed test report and requirements traceability.
 

@@ -221,8 +221,8 @@ This document defines testable requirements for the Art Kiosk system. Requiremen
 **REQ-DAY-008**: System SHALL check for hour boundary crossings every 60 seconds
 - **Test**: Mock time, verify checkHourBoundary() called every 60s when day scheduling enabled
 
-**REQ-DAY-009**: Crossing hour boundary SHALL force immediate image transition
-- **Test**: Mock time change from 7:59 to 8:00, verify nextSlide() called immediately
+**REQ-DAY-009**: Crossing hour boundary SHALL reload images for new time period
+- **Test**: Mock time change from 7:59 to 8:00, verify checkForImageChanges() called to reload images for the new time period's atmosphere(s)
 
 **REQ-DAY-010**: Hour transitions SHALL override atmosphere/theme cadence
 - **Test**: Cadence=3600s, hour boundary crossed at 8:00, verify transition occurs regardless

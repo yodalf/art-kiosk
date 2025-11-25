@@ -86,6 +86,22 @@ On timer fire:
 - **Atmosphere active**: Combine all themes in atmosphere
 - **Day Scheduling**: Use current time period's atmospheres
 
+### Day Scheduling Time Period Transitions
+
+When day scheduling is enabled, the kiosk monitors for time period changes:
+
+```
+Every 60 seconds (checkHourBoundary):
+  if currentHour != lastCheckHour:
+    lastCheckHour = currentHour
+    await checkForImageChanges()  // Reloads images for new time period
+```
+
+This ensures that when crossing a time period boundary (e.g., 8:00 AM), the kiosk:
+1. Detects the hour change
+2. Calls checkForImageChanges() which fetches the new image list
+3. Reloads the slideshow with images from the new time period's atmosphere(s)
+
 ## API Architecture
 
 ### RESTful Endpoints
