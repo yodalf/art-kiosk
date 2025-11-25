@@ -1,689 +1,486 @@
 # Kiosk Image Display System
 
-A web-based kiosk system for displaying images in slideshow mode, optimized for Raspberry Pi with a 2560x2880 portrait monitor.
+A web-based digital art display system for Raspberry Pi, optimized for a 2560x2880 portrait monitor. Display images and videos in a beautiful slideshow with remote control from any device on your network.
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Web Interfaces](#web-interfaces)
+- [Core Concepts](#core-concepts)
+- [Configuration Guide](#configuration-guide)
+- [Remote Control](#remote-control)
+- [API Reference](#api-reference)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Documentation](#documentation)
+
+---
+
+## Quick Start
+
+```bash
+# 1. Copy to Raspberry Pi
+scp -r kiosk_images pi@raspberrypi.local:~/
+
+# 2. SSH into Pi and set up
+ssh pi@raspberrypi.local
+cd ~/kiosk_images
+sudo apt install python3-venv python3-full -y
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Install auto-start services
+sudo ./install-autostart.sh
+
+# 4. Access from any device on your network
+# Management: http://raspberrypi.local/
+# Display:    http://raspberrypi.local/view
+```
+
+---
 
 ## Features
 
-- **Single-Page App** - Unified navigation across all sections without opening new tabs
-- Web-based image upload and management
-- **Dark theme interface** - Professional black background across all pages
-- **Day Scheduling** - Automatically switch atmospheres throughout the day based on time periods (12-hour repeating pattern with 6 configurable 2-hour slots)
-- **Atmospheres** - Hierarchical organization layer above themes with configurable cadence (slideshow interval); atmosphere cadence always takes precedence over theme cadence
-- **Themes** - Organize images into multiple themes with per-theme cadence; images can belong to multiple themes
-- **"All Images" atmosphere and theme** - Permanent defaults that show all enabled images regardless of assignments (cannot be deleted)
-- **Randomized ordering** - Images display in random order that changes with each theme/atmosphere switch
-- **Image cropping** - Crop images to select specific regions that fill the entire kiosk display
-- **Video support** - Play YouTube videos mixed with images in the slideshow with automatic transitions
-- **Backup and restore** - Create backups of all images, settings, and configurations; restore to any previous state
-- **Enable/disable individual images** - Control which images appear in the slideshow with checkboxes
-- **Auto-preview uploads** - Newly uploaded images automatically display on the kiosk for immediate review
-- **Remote control** - Control the kiosk from any device on your network
-- **Click-to-jump** - Click any image thumbnail to immediately display it on the kiosk
-- **Smooth dissolve transitions** - Optional fade effect between images
-- Automatic slideshow with configurable cadence (intervals)
-- Real-time image scaling optimized for 2560x2880 portrait displays
-- Firefox fullscreen/kiosk mode support
-- Hidden mouse cursor for clean display
-- Responsive image scaling with aspect ratio preservation
-- Drag-and-drop upload interface
-- RESTful API for image management
+### Display Features
+| Feature | Description |
+|---------|-------------|
+| **Portrait Display** | Optimized for 2560x2880 portrait monitors |
+| **Smooth Transitions** | 0.8s dissolve fade between images |
+| **Image Cropping** | Select specific regions to display |
+| **Video Support** | Play YouTube videos in the slideshow |
+| **Smart Reload** | Detects changes without interrupting playback |
+| **Hidden Cursor** | Clean display without mouse pointer |
+
+### Organization Features
+| Feature | Description |
+|---------|-------------|
+| **Themes** | Organize images into categories |
+| **Atmospheres** | Group themes together for moods |
+| **Day Scheduling** | Auto-switch atmospheres by time of day |
+| **Randomization** | Images shuffle with each theme switch |
+
+### Management Features
+| Feature | Description |
+|---------|-------------|
+| **Web Interface** | Manage everything from your phone/tablet |
+| **Remote Control** | Next/prev/pause without touching the kiosk |
+| **Click-to-Jump** | Tap any thumbnail to display it |
+| **Auto-Preview** | New uploads instantly show on display |
+| **Backup/Restore** | Save and restore complete configurations |
+| **Debug Console** | Real-time logs for troubleshooting |
+
+### Integration Features
+| Feature | Description |
+|---------|-------------|
+| **Museum Search** | Find art from major museum collections |
+| **YouTube Videos** | Add videos by URL |
+| **WebSocket** | Real-time communication |
+| **REST API** | Full programmatic control |
+
+---
 
 ## Requirements
 
-- Raspberry Pi running Raspberry Pi OS (X11 mode recommended)
-- Python 3.7 or higher
+### Hardware
+- Raspberry Pi 4 (recommended) or compatible
+- Monitor: 2560x2880 portrait orientation
+- Network connection (WiFi or Ethernet)
+
+### Software
+- Raspberry Pi OS (X11 mode - not Wayland)
+- Python 3.7+
 - Firefox browser
-- unclutter (for hiding mouse cursor in X11 mode)
-- curl (for server readiness checks)
-- Monitor: 2560x2880 (portrait orientation)
+
+### System Packages
+```bash
+# Required
+sudo apt install python3-venv python3-full firefox-esr unclutter curl -y
+
+# For video support
+sudo apt install mpv -y
+pip install yt-dlp
+```
 
 ### Python Dependencies
-- Flask 3.0.0
-- Werkzeug 3.0.1
-- flask-socketio 5.3.6
-- python-socketio 5.11.1
-- requests 2.31.0
+| Package | Version | Purpose |
+|---------|---------|---------|
+| Flask | 3.0.0 | Web framework |
+| flask-socketio | 5.3.6 | Real-time WebSocket |
+| Werkzeug | 3.0.1 | WSGI utilities |
+| requests | 2.31.0 | HTTP client |
+| Pillow | >=10.0.0 | Image processing |
 
-### System Dependencies (for video support)
-- mpv (video player)
-- yt-dlp (YouTube video download)
-- xdotool (window management)
+> **Important**: This system requires X11. If using Raspberry Pi OS with Wayland:
+> ```bash
+> sudo raspi-config
+> # Navigate to: Advanced Options > Wayland > Select "X11"
+> sudo reboot
+> ```
 
-**Important**: This system is designed for X11. If using Raspberry Pi OS with Wayland (newer versions), switch to X11 mode:
-```bash
-sudo raspi-config
-# Navigate to: Advanced Options > Wayland > Select "X11"
-# Then reboot
-```
+---
 
 ## Installation
 
-### 1. Copy files to your Raspberry Pi
+### Step 1: Copy Files to Raspberry Pi
 
 ```bash
-# On your computer, copy files to the Pi
+# From your computer
 scp -r kiosk_images pi@<raspberry-pi-ip>:~/
 ```
 
-### 2. Set up Python virtual environment
-
-On your Raspberry Pi:
+### Step 2: Set Up Python Environment
 
 ```bash
+# On the Raspberry Pi
 cd ~/kiosk_images
 
-# Install python3-venv if not already installed
+# Install system dependencies
 sudo apt install python3-venv python3-full -y
 
-# Create virtual environment
+# Create and activate virtual environment
 python3 -m venv venv
-
-# Activate virtual environment
 source venv/bin/activate
 
-# Install dependencies
+# Install Python dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Make scripts executable
+### Step 3: Install Auto-Start Services (Recommended)
 
 ```bash
-chmod +x app.py start-kiosk.sh
-```
-
-## Usage
-
-### Starting the Server
-
-Run the Flask server:
-
-```bash
-cd ~/kiosk_images
-source venv/bin/activate  # Activate virtual environment
-python app.py
-```
-
-Or use the start script (which handles the venv automatically):
-
-```bash
-./start-kiosk.sh
-```
-
-The server will start on `http://0.0.0.0:80` (accessible from any device on your network).
-
-### Accessing the Interfaces
-
-**Single-Page App**: All management interfaces are accessible through a unified navigation menu:
-
-- **Management Interface**: `http://<raspberry-pi-ip>/` (default page)
-  - Manage atmospheres and themes
-  - Enable/disable images
-  - Crop images
-  - Remote control the kiosk display
-  - View current images (shows cropped thumbnails in randomized order)
-  - Debug console with real-time logs
-
-- **Upload**: Navigate via menu or `http://<raspberry-pi-ip>/upload`
-  - Drag-and-drop file upload
-  - Newly uploaded images automatically display on kiosk for preview
-
-- **Search Art**: Navigate via menu or `http://<raspberry-pi-ip>/search`
-  - Search museum collections for high-resolution portrait paintings
-  - Download images to extra images folder
-
-- **Extra Images**: Navigate via menu or `http://<raspberry-pi-ip>/extra-images`
-  - Review downloaded art search results
-  - Import images to main storage
-  - Bulk operations
-
-- **Debug**: Navigate via menu or `http://<raspberry-pi-ip>/debug`
-  - Real-time debug console
-  - View kiosk display logs
-  - Copy logs to clipboard
-
-- **Kiosk Display**: `http://<raspberry-pi-ip>/view`
-  - Main slideshow display
-  - Optimized for fullscreen viewing
-  - Only shows enabled images in random order
-
-**Navigation**: All pages include a unified navigation menu at the top for seamless switching between sections without opening new tabs.
-
-### Firefox Kiosk Mode
-
-To run Firefox in fullscreen kiosk mode on your Raspberry Pi:
-
-#### Option 1: Command Line
-
-```bash
-firefox --kiosk http://localhost/view
-```
-
-#### Option 2: Using a Startup Script
-
-Create a startup script at `/home/pi/start-kiosk.sh`:
-
-```bash
-#!/bin/bash
-
-# Wait for the server to start
-sleep 5
-
-# Disable screen blanking
-xset s off
-xset -dpms
-xset s noblank
-
-# Start Firefox in kiosk mode
-firefox --kiosk http://localhost/view
-```
-
-Make it executable:
-
-```bash
-chmod +x /home/pi/start-kiosk.sh
-```
-
-#### Option 3: Auto-start on Boot (Recommended)
-
-Use the automated installation script to set up both the Flask server and Firefox to start automatically at boot:
-
-```bash
-cd ~/kiosk_images
 sudo ./install-autostart.sh
 ```
 
-This installs two systemd services:
-- **kiosk-display.service** - Flask server (starts first)
-  - Automatically kills any process using port 80 before starting
-  - Binds to port 80 using Linux capabilities (no root required)
-  - Ensures clean port cleanup on service stop/restart
-- **kiosk-firefox.service** - Firefox in kiosk mode (starts after server is ready)
-  - Uses **start-firefox-kiosk.sh** for automatic Firefox profile management
-  - Automatically cleans up old Firefox processes and profiles to prevent corruption
-  - Creates fresh Firefox profile on each start with kiosk-optimized settings
-  - Waits for server to respond before launching Firefox
-  - Disables screen blanking and hides cursor
-  - **Multi-stage cleanup on stop**: Graceful termination → wait → force kill to ensure all Firefox instances are destroyed
+This creates two systemd services:
 
-**Manual Installation** (if you prefer to install manually):
+| Service | Purpose |
+|---------|---------|
+| **kiosk-display.service** | Flask server on port 80 |
+| **kiosk-firefox.service** | Firefox in kiosk mode |
 
-1. Copy both service files:
+### Step 4: Verify Installation
 
 ```bash
-cd ~/kiosk_images
-sudo cp kiosk-display.service /etc/systemd/system/
-sudo cp kiosk-firefox.service /etc/systemd/system/
-sudo systemctl daemon-reload
-```
-
-2. Enable and start services:
-
-```bash
-sudo systemctl enable kiosk-display.service
-sudo systemctl enable kiosk-firefox.service
-sudo systemctl start kiosk-display.service
-sudo systemctl start kiosk-firefox.service
-```
-
-3. Check status:
-
-```bash
+# Check services are running
 sudo systemctl status kiosk-display.service
 sudo systemctl status kiosk-firefox.service
+
+# View logs if needed
+sudo journalctl -u kiosk-display -f
 ```
 
-**Useful Commands:**
+### Manual Start (Development)
 
 ```bash
-# View logs
-sudo journalctl -u kiosk-display -f
-sudo journalctl -u kiosk-firefox -f
+# Start server manually
+cd ~/kiosk_images
+source venv/bin/activate
+python app.py
 
-# Restart services
-sudo systemctl restart kiosk-display.service
-sudo systemctl restart kiosk-firefox.service
-
-# Stop services
-sudo systemctl stop kiosk-firefox.service
-sudo systemctl stop kiosk-display.service
-
-# Disable autostart
-sudo systemctl disable kiosk-firefox.service
-sudo systemctl disable kiosk-display.service
+# In another terminal, start Firefox
+firefox --kiosk http://localhost/view
 ```
 
-## Configuration
+---
 
-### Slideshow Settings
+## Web Interfaces
 
-Configure settings through the management interface at `/`, or edit `settings.json` directly:
+Access from any device on your network:
 
-```json
-{
-  "interval": 3600,
-  "check_interval": 2,
-  "enabled_images": {},
-  "dissolve_enabled": true,
-  "themes": {
-    "All Images": {"name": "All Images", "created": 1234567890, "interval": 3600},
-    "Nature": {"name": "Nature", "created": 1234567891, "interval": 3600},
-    "Urban": {"name": "Urban", "created": 1234567892, "interval": 1800}
-  },
-  "image_themes": {
-    "photo1.jpg": ["Nature"],
-    "photo2.jpg": ["Nature", "Urban"],
-    "photo3.jpg": ["Urban"]
-  },
-  "active_theme": "All Images",
-  "atmospheres": {
-    "All Images": {"name": "All Images", "created": 1234567890, "interval": 3600},
-    "Evening": {"name": "Evening", "created": 1234567893, "interval": 1800},
-    "Morning": {"name": "Morning", "created": 1234567894, "interval": 3600}
-  },
-  "atmosphere_themes": {
-    "All Images": [],
-    "Evening": ["Nature", "Urban"],
-    "Morning": ["Nature"]
-  },
-  "active_atmosphere": null,
-  "day_scheduling_enabled": false,
-  "day_times": {
-    "1": {"start_hour": 6, "atmospheres": ["Morning"]},
-    "2": {"start_hour": 8, "atmospheres": []},
-    "3": {"start_hour": 10, "atmospheres": []},
-    "4": {"start_hour": 12, "atmospheres": ["Evening"]},
-    "5": {"start_hour": 14, "atmospheres": []},
-    "6": {"start_hour": 16, "atmospheres": []}
-  },
-  "shuffle_id": 0.123456789,
-  "image_crops": {
-    "photo1.jpg": {
-      "x": 0,
-      "y": 0,
-      "width": 1690,
-      "height": 1885,
-      "imageWidth": 1690,
-      "imageHeight": 3000
-    }
-  }
-}
+| Interface | URL | Purpose |
+|-----------|-----|---------|
+| **Management** | `http://<pi-ip>/` | Main control panel |
+| **Kiosk Display** | `http://<pi-ip>/view` | Slideshow display |
+| **Upload** | `http://<pi-ip>/upload` | Image upload |
+| **Search Art** | `http://<pi-ip>/search` | Museum search |
+| **Extra Images** | `http://<pi-ip>/extra-images` | Staging area |
+| **Debug** | `http://<pi-ip>/debug` | Log viewer |
+| **Backup** | `http://<pi-ip>/backup` | Backup management |
+| **Remote** | `http://<pi-ip>/remote` | Simple remote |
+
+### Management Interface (/)
+
+The main control panel provides:
+
+- **Image Management** - Enable/disable, crop, assign themes
+- **Theme Configuration** - Create and manage themes
+- **Atmosphere Setup** - Group themes into atmospheres
+- **Day Scheduling** - Configure automatic time-based switching
+- **Remote Control** - Next, prev, pause, play buttons
+- **Current Images** - View active slideshow order
+- **Debug Console** - Real-time log messages
+
+### Kiosk Display (/view)
+
+The slideshow display supports:
+
+| Key | Action |
+|-----|--------|
+| `Space` / `→` | Next image |
+| `←` | Previous image |
+| `F` | Toggle fill/fit mode |
+| `R` | Reload display |
+
+---
+
+## Core Concepts
+
+### Organization Hierarchy
+
+```
+Day Schedule
+    └── Time Period (1-12)
+            └── Atmosphere(s)
+                    └── Theme(s)
+                            └── Image(s)
 ```
 
-- **interval** (I): Current slideshow cadence in seconds (dynamically determined based on active atmosphere/theme)
-- **check_interval** (C): Time in seconds between checks for changes (default: 2)
-- **dissolve_enabled**: Smooth dissolve transition between images (always true)
-- **themes**: Dictionary of defined themes, each with its own cadence (interval) in seconds
-  - **"All Images"**: Permanent default theme (cannot be deleted), shows all enabled images
-- **image_themes**: Mapping of image names to their theme lists
-- **active_theme**: Currently active theme (defaults to "All Images")
-- **atmospheres**: Dictionary of defined atmospheres, each with its own cadence (interval)
-  - **"All Images"**: Permanent default atmosphere (cannot be deleted), shows all enabled images
-- **atmosphere_themes**: Mapping of atmosphere names to theme lists (empty list for "All Images")
-- **active_atmosphere**: Currently active atmosphere (null if none active)
-- **day_scheduling_enabled**: Whether Day scheduling is active (overrides manual atmosphere selection)
-- **day_times**: 6 time periods (2 hours each, repeating every 12 hours) with atmosphere assignments
-  - Times 1-6 are source times; times 7-12 mirror them automatically
-  - Empty atmospheres list defaults to "All Images" atmosphere
-- **shuffle_id**: Random seed for image ordering (regenerates on theme/atmosphere change)
-- **image_crops**: Mapping of image names to crop regions (x, y, width, height in original image coordinates)
+### Images
 
-### Day Scheduling
-
-Automatically rotate atmospheres throughout the day based on time periods:
-
-1. **Enable Day Scheduling** - Toggle the "Day Scheduling" switch in the management interface
-2. **Configure Time Periods** - 6 configurable 2-hour time slots that repeat every 12 hours:
-   - Time 1: 6 AM - 8 AM (mirrors at 6 PM - 8 PM)
-   - Time 2: 8 AM - 10 AM (mirrors at 8 PM - 10 PM)
-   - Time 3: 10 AM - 12 PM (mirrors at 10 PM - 12 AM)
-   - Time 4: 12 PM - 2 PM (mirrors at 12 AM - 2 AM)
-   - Time 5: 2 PM - 4 PM (mirrors at 2 AM - 4 AM)
-   - Time 6: 4 PM - 6 PM (mirrors at 4 AM - 6 AM)
-3. **Assign Atmospheres** - Drag atmospheres to time slots or use the dropdown
-4. **Automatic Switching** - The system automatically switches to the current time period's atmospheres
-5. **Cadence Priority** - Atmosphere cadence (interval) always takes precedence over theme cadence
-6. **Green Border Highlighting** - The current time period is highlighted with a green border
-7. **Dynamic Time Labels** - Time period labels automatically update to show AM (6am-6pm) or PM (6pm-6am) cycle based on current hour
-
-When Day Scheduling is enabled:
-- Manual atmosphere selection is disabled
-- The system displays images from the current time period's atmospheres
-- If a time period has multiple atmospheres, all their themes are combined
-- If a time period has no atmospheres, it defaults to "All Images" atmosphere
-- **Hour boundary transitions**: When crossing into a new time period (e.g., 8:00 AM), the system reloads images for the new time period's atmosphere(s), ensuring the kiosk always displays the correct content
-- The cadence controls transitions between hour boundaries
-- "Current Images" heading displays the actual atmosphere(s) from the current time period
-
-### Atmospheres
-
-Atmospheres provide a hierarchical organization layer above themes (Atmospheres → Themes → Images):
-
-1. **Default atmosphere** - "All Images" is a permanent atmosphere that shows all enabled images (cannot be deleted)
-2. **Create atmospheres** - Click "New Atmosphere", enter name, press Enter
-3. **Assign themes** - Click the "Themes" button on an atmosphere badge to select which themes belong to it
-4. **Set cadence** - Click the cadence display to edit the slideshow interval for that atmosphere
-5. **Activate atmosphere** - Click the atmosphere name to activate it and display all images from all its themes (disabled when Day Scheduling is active)
-6. **Mutual exclusivity** - Activating an atmosphere deselects any active theme, and vice versa
-7. **Random ordering** - Each atmosphere displays images in a random order that changes every time you switch
-
-When an atmosphere is active:
-- All images from all themes in that atmosphere are shown
-- The atmosphere's cadence (interval) is used for the slideshow
-- Atmosphere cadence always takes precedence over theme cadence
-- Images display in randomized order
+- **UUID Filenames**: All images get unique names (e.g., `ab4ab3c1-5c16.jpg`)
+- **Enable/Disable**: Control which images appear in slideshow
+- **Cropping**: Select specific regions to display
+- **Multiple Themes**: Images can belong to many themes
 
 ### Themes
 
-Organize your images into themes for different occasions or categories:
+Organize images into categories:
 
-1. **Default theme** - "All Images" is a permanent theme that shows all enabled images (cannot be deleted)
-2. **Create themes** - Enter a theme name and click "New Theme" (default interval: 60 minutes)
-3. **Set theme interval** - Each theme has its own slideshow interval. Click to edit it
-4. **Assign images** - Use the dropdown on each image card to add it to themes
-5. **Multiple themes** - Images can belong to multiple themes
-6. **Remove from theme** - Click the "✕" on a theme tag to remove the image from that theme
-7. **Select active theme** - Click a theme name to activate it
-8. **Random ordering** - Each theme displays images in a random order that changes every time you switch
+```
+Theme: "Nature"
+├── forest.jpg
+├── mountains.jpg
+└── ocean.jpg
 
-When a theme is active:
-- **"All Images" theme**: Shows all enabled images regardless of theme assignments
-- **Other themes**: Only enabled images belonging to that theme will appear in the slideshow
-- The slideshow uses the active theme's interval setting
-- Images display in randomized order
+Theme: "Portraits"
+├── portrait1.jpg
+└── portrait2.jpg
+```
 
-### Image Randomization
+- **"All Images"** theme always exists (cannot be deleted)
+- Each theme has its own slideshow interval
+- Images can belong to multiple themes
+- Switching themes reshuffles the display order
 
-Images are displayed in random order, with the following behavior:
+### Atmospheres
 
-- **Order changes** - Switching to a different theme or atmosphere generates a new random order
-- **Order persists** - The same theme/atmosphere always shows the same random order (within a session)
-- **Kiosk syncs automatically** - The kiosk display matches the order shown in Current Images
-- **All images included** - Every enabled image appears exactly once (no duplicates, no missing images)
+Group multiple themes together for moods:
+
+```
+Atmosphere: "Morning"
+├── Theme: "Nature"
+└── Theme: "Calm"
+
+Atmosphere: "Evening"
+├── Theme: "Portraits"
+└── Theme: "Dark Art"
+```
+
+- **"All Images"** atmosphere always exists
+- Atmosphere interval overrides theme intervals
+- Combines all images from all included themes
+- Perfect for day scheduling
+
+### Day Scheduling
+
+Automatically switch atmospheres throughout the day:
+
+```
+Time Periods (2-hour blocks, 12-hour mirroring):
+
+Period 1:  6 AM -  8 AM  ←→  Period 7:  6 PM -  8 PM
+Period 2:  8 AM - 10 AM  ←→  Period 8:  8 PM - 10 PM
+Period 3: 10 AM - 12 PM  ←→  Period 9: 10 PM - 12 AM
+Period 4: 12 PM -  2 PM  ←→  Period 10: 12 AM -  2 AM
+Period 5:  2 PM -  4 PM  ←→  Period 11:  2 AM -  4 AM
+Period 6:  4 PM -  6 PM  ←→  Period 12:  4 AM -  6 AM
+```
+
+- Configure 6 periods; the other 6 mirror automatically
+- Assign different atmospheres to each period
+- System automatically switches when time period changes
+- Green border highlights current period in UI
+
+### Interval Precedence
+
+The slideshow interval is determined by priority:
+
+1. **Day Scheduling** → First atmosphere's interval
+2. **Active Atmosphere** → Atmosphere's interval
+3. **Active Theme** → Theme's interval
+4. **Default** → Global interval setting
+
+---
+
+## Configuration Guide
 
 ### Image Cropping
 
-Crop images to display specific regions on the kiosk:
-
-1. **Open crop editor** - Click the "Crop" button on any image card (available in Manage and Extra Images pages)
-2. **Select region** - Use the interactive cropper to select the desired area
-   - Drag corners to resize the crop region
-   - Drag inside the box to move it
-   - **Aspect ratio lock** - Toggle checkbox to lock crop to display aspect ratio (2560/2880 = 0.889)
-     - Locked (default): Maintains display proportions, eliminates distortion
-     - Unlocked: Free-form cropping, allows non-uniform scaling
-3. **Clear crop** - Click "Clear Crop" to reset to default display aspect ratio (does not save)
-4. **Save crop** - Click "Save Crop" to apply and persist the crop
-5. **Instant refresh** - The kiosk display immediately updates to show the new crop
-6. **Preview** - The management interface shows cropped thumbnails matching what appears on the kiosk
+1. Click **Crop** on any image card
+2. Drag corners to resize selection
+3. Toggle **Aspect Lock** for display ratio (2560/2880)
+4. Click **Save Crop** to apply
 
 Crop behavior:
-- **Default crop**: When opening the crop tool for an image without existing crop data, it initializes with the display aspect ratio (2560/2880)
-- **Non-uniform scaling**: Crops with unlocked aspect ratios use independent X/Y scaling to fill the viewport exactly
-- **No black bars**: The crop zone is scaled to fill the entire screen with no black bars
-- **Extra Images**: When cropping from the Extra Images page, the kiosk stays on that extra image and immediately shows the updated crop
-- **Regular Images**: Changes apply automatically within 2 seconds via the smart reload system
-- Crops are stored per-image and persist across restarts
+- Locked aspect ratio maintains display proportions
+- Unlocked allows free-form selection
+- Cropped region fills entire screen (no black bars)
+- Changes apply within 2 seconds
 
 ### Video Support
 
-Add YouTube videos to your slideshow mixed with images:
+1. Enter YouTube URL in "Add Video" section
+2. Click **Add Video**
+3. Thumbnails generate automatically on first play
+4. Videos appear in slideshow with images
+5. Auto-transition after interval expires
 
-1. **Add videos** - Enter a YouTube URL in the "Add Video" section and click "Add Video"
-2. **Thumbnails** - Thumbnails are automatically generated when videos first play
-3. **Play/Stop** - Click Play on a video card to start playback, Stop to end it
-4. **Mixed slideshow** - Videos appear in the randomized slideshow with images
-5. **Auto-transition** - Videos automatically transition to the next item after the interval expires
-6. **Theme assignment** - Videos can be assigned to themes like images
-
-Video behavior:
-- **Fullscreen playback** - Videos play in fullscreen using mpv
-- **Auto-transition** - Server-side timer ensures videos transition after the interval
-- **Continue to next item** - After video ends, slideshow continues to the next item in the list (not first)
-- **Manual control** - Stop videos manually from the management interface
+Video controls:
+- Play/Stop from management interface
+- Assign to themes like images
+- mpv handles fullscreen playback
 
 ### Backup and Restore
 
-Create complete backups of your kiosk configuration:
-
-1. **Navigate to Backup** - Go to the Backup page from the navigation menu
-2. **Create backup** - Click "Create Backup" to save current state
-3. **View backups** - All backups are listed with creation date and size
-4. **Restore** - Click "Restore" on any backup to restore that state
-5. **Delete** - Remove old backups you no longer need
-
 Backups include:
-- All images and their enabled states
-- All videos and video thumbnails
+- All images and videos
 - Theme and atmosphere configurations
 - Day scheduling settings
-- Image crops and other settings
+- Image crops and enabled states
 - Complete settings.json
 
-### Auto-Preview on Upload
+```bash
+# Backups stored in
+~/kiosk_images/backups/
+```
 
-When you upload a new image via the upload page:
+### Smart Reload System
 
-1. The image is automatically assigned to the currently active theme (if not "All Images")
-2. A "jump" command is sent to the kiosk display
-3. The kiosk switches to the newly uploaded image within 500ms
-4. This allows immediate review of uploads
+The kiosk checks for changes every 2 seconds:
 
-### Smart Reload Algorithm
-
-The kiosk uses an intelligent reload system:
-
-1. Every **C seconds** (check_interval = 2), the kiosk checks:
-   - The list of enabled images (vector **V**)
-   - The slideshow interval setting
-   - Image crop data
-   - The shuffle_id (detects theme/atmosphere changes)
-2. It compares the current vector **V** with the previous vector **VP**
-3. It compares the current interval with the previous interval
-4. It compares the current crop data with the previous crop data
-5. It compares the current shuffle_id with the previous shuffle_id
-6. If anything changed, the slideshow reloads with the new settings
-7. If nothing changed, the slideshow continues uninterrupted
+1. Fetches current enabled images
+2. Compares with previous list
+3. Checks interval, crops, shuffle_id
+4. Only reloads if something changed
 
 This means:
-- No unnecessary reloads when nothing changes
-- Smooth playback continues as long as settings are stable
-- Automatic updates when you enable/disable images in the management interface
-- Automatic updates when you change the slideshow interval
-- Automatic updates when you crop or modify image crops
-- Automatic updates when you switch themes or atmospheres (with new random order)
+- Smooth playback when nothing changes
+- Automatic updates when you modify settings
+- No manual refresh needed
 - Changes apply within 2 seconds
 
-### Image Scaling
+---
 
-The kiosk display supports two scaling modes:
+## Remote Control
 
-1. **Contain Mode** (default): Images fit within the viewport while maintaining aspect ratio
-2. **Cover Mode**: Images fill the entire screen, potentially cropping edges
+### Web-Based Controls
 
-Toggle between modes by pressing `F` while viewing the kiosk display.
+Available from the management interface:
 
-## Keyboard Controls (Kiosk Display)
+| Button | Action |
+|--------|--------|
+| **◀ Prev** | Previous image (instant) |
+| **▶ Next** | Next image (instant) |
+| **⏸ Pause** | Pause slideshow |
+| **▶ Play** | Resume slideshow |
+| **↻ Reload** | Refresh display |
 
-- `Space` or `Right Arrow`: Next image
-- `Left Arrow`: Previous image
-- `F`: Toggle between contain/cover scaling modes
-- `R`: Reload page and refresh image list
+### Click-to-Jump
 
-## Remote Control (Web-Based)
+Click any thumbnail in "Current Images" to immediately display it on the kiosk.
 
-Since the kiosk is a remote display without a keyboard, you can control it from any device on your network via the management interface at `/`.
+### WebSocket Communication
 
-**Available Controls:**
-- **Previous** - Go to previous image (instant transition)
-- **Next** - Go to next image (instant transition)
-- **Pause** - Pause the slideshow
-- **Play** - Resume the slideshow
-- **Reload** - Refresh the kiosk display
-- **Click on any image** - Jump directly to that image in the slideshow (instant transition)
+Commands execute instantly via WebSocket:
+- 0ms latency for manual controls
+- Real-time settings synchronization
+- Live debug log streaming
 
-**Real-Time Communication**: The system uses WebSockets for instant communication between the management interface and kiosk display. Commands execute immediately with 0ms latency. Automatic slideshow transitions still use smooth dissolve effects, while manual controls (next/prev/jump) use instant transitions.
+---
 
-## Debug Console
+## API Reference
 
-Monitor your kiosk display in real-time with the built-in debug console:
+### Images
 
-1. **Open Debug Console** - Navigate to the **Debug** page from the navigation menu
-2. **Real-time logs** - Messages stream live from the kiosk display via WebSocket
-3. **Copy logs** - Click **📋 Clip** to copy all debug messages to clipboard (works over HTTP)
-4. **Clear logs** - Click **Clear Console** to remove accumulated messages
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/images` | List all images |
+| GET | `/api/images?enabled_only=true` | List enabled (filtered) |
+| POST | `/api/images` | Upload image |
+| DELETE | `/api/images/<name>` | Delete image |
+| POST | `/api/images/<name>/toggle` | Toggle enabled |
+| POST | `/api/images/<name>/themes` | Update themes |
 
-The debug console shows:
-- Image change events
-- Settings updates
-- Slideshow state changes
-- Crop calculations
-- Error messages
-- WebSocket connection status
+### Themes
 
-## API Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/themes` | List all themes |
+| POST | `/api/themes` | Create theme |
+| DELETE | `/api/themes/<name>` | Delete theme |
+| POST | `/api/themes/active` | Set active theme |
+| POST | `/api/themes/<name>/interval` | Update interval |
 
-**Images:**
-- `GET /api/images` - List all images (use `?enabled_only=true` to filter)
-- `POST /api/images` - Upload a new image
-- `POST /api/images/<filename>/toggle` - Toggle enabled state of an image
-- `DELETE /api/images/<filename>` - Delete an image
-- `POST /api/images/<filename>/themes` - Update image themes
-- `POST /api/images/rename-all-to-uuid` - Rename all images to UUID-based names for uniqueness
+### Atmospheres
 
-**Settings:**
-- `GET /api/settings` - Get current settings
-- `POST /api/settings` - Update settings
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/atmospheres` | List all atmospheres |
+| POST | `/api/atmospheres` | Create atmosphere |
+| DELETE | `/api/atmospheres/<name>` | Delete atmosphere |
+| POST | `/api/atmospheres/active` | Set active |
+| POST | `/api/atmospheres/<name>/themes` | Assign themes |
+| POST | `/api/atmospheres/<name>/interval` | Update interval |
 
-**Remote Control:**
-- `POST /api/control/send` - Send command to kiosk (commands: next, prev, pause, play, reload, jump)
-  - For jump command, include `image_name` parameter: `{"command": "jump", "image_name": "photo.jpg"}`
-- `GET /api/control/poll` - Poll for commands (legacy, replaced by WebSockets)
+### Day Scheduling
 
-**WebSocket Events:**
-- `connect` - Client connected to server
-- `disconnect` - Client disconnected from server
-- `send_command` - Send remote command (emitted by client)
-- `remote_command` - Receive remote command (broadcasted to all clients)
-- `log_debug` - Send debug message from kiosk (emitted by client)
-- `debug_message` - Receive debug message (broadcasted to all clients)
-- `settings_update` - Settings changed (broadcasted to all clients)
-- `image_list_changed` - Image list changed (broadcasted to all clients)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/day/status` | Get status |
+| POST | `/api/day/enable` | Enable scheduling |
+| POST | `/api/day/disable` | Disable scheduling |
+| POST | `/api/day/times/<id>/atmospheres` | Set period atmospheres |
 
-**Themes:**
-- `GET /api/themes` - List all themes and active theme
-- `POST /api/themes` - Create a new theme (`{"name": "Theme Name"}`)
-- `DELETE /api/themes/<theme_name>` - Delete a theme
-- `POST /api/themes/active` - Set active theme (`{"theme_name": "Theme Name"}`)
-- `POST /api/themes/<theme_name>/interval` - Update theme interval (seconds)
+### Remote Control
 
-**Atmospheres:**
-- `GET /api/atmospheres` - List all atmospheres
-- `POST /api/atmospheres` - Create a new atmosphere (`{"name": "Atmosphere Name"}`)
-- `DELETE /api/atmospheres/<atmosphere_name>` - Delete an atmosphere (cannot delete "All Images")
-- `POST /api/atmospheres/active` - Set active atmosphere (`{"atmosphere_name": "Atmosphere Name"}` or null)
-- `POST /api/atmospheres/<atmosphere_name>/interval` - Update atmosphere cadence in seconds
-- `POST /api/atmospheres/<atmosphere_name>/themes` - Update themes in atmosphere (`{"themes": ["Theme1", "Theme2"]}`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/control/send` | Send command |
+| GET | `/api/control/poll` | Poll for commands |
 
-**Day Scheduling:**
-- `GET /api/day/status` - Get Day scheduling status and current time period
-- `POST /api/day/toggle` - Enable/disable Day scheduling (`{"enabled": true}`)
-- `POST /api/day/times/<time_id>/atmospheres` - Update atmospheres for a time period (`{"atmospheres": ["Atmosphere1", "Atmosphere2"]}`)
+Commands: `next`, `prev`, `pause`, `play`, `reload`, `jump`
 
-**Videos:**
-- `GET /api/videos` - List all videos
-- `POST /api/videos` - Add a new video (`{"url": "https://youtube.com/..."}`)
-- `DELETE /api/videos/<video_id>` - Delete a video
-- `POST /api/videos/<video_id>/toggle` - Toggle video enabled state
-- `POST /api/videos/<video_id>/themes` - Update video themes
-- `POST /api/videos/execute-mpv` - Start video playback
-- `POST /api/videos/stop-mpv` - Stop video playback
+### Videos
 
-**Backup and Restore:**
-- `GET /api/backups` - List all backups
-- `POST /api/backup` - Create a new backup
-- `POST /api/backup/restore/<backup_name>` - Restore from a backup
-- `DELETE /api/backup/<backup_name>` - Delete a backup
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/videos` | List videos |
+| POST | `/api/videos` | Add video URL |
+| DELETE | `/api/videos/<id>` | Delete video |
+| POST | `/api/videos/<id>/toggle` | Toggle enabled |
+| POST | `/api/videos/execute-mpv` | Start playback |
+| POST | `/api/videos/stop-mpv` | Stop playback |
 
-## Convenience Scripts
+### WebSocket Events
 
-- **start-kiosk.sh** - Start the kiosk (cleans up previous instances, starts server, launches Firefox)
-- **stop-kiosk.sh** - Stop all kiosk processes
+| Event | Direction | Purpose |
+|-------|-----------|---------|
+| `remote_command` | Server → Client | Execute command |
+| `settings_update` | Server → Client | Settings changed |
+| `image_list_changed` | Server → Client | Images modified |
+| `debug_message` | Server → Client | Log entry |
+| `send_command` | Client → Server | Send command |
+| `log_debug` | Client → Server | Submit log |
 
-Usage:
-```bash
-./start-kiosk.sh   # Start everything
-./stop-kiosk.sh    # Stop everything
-```
-
-## File Structure
-
-```
-kiosk_images/
-├── app.py                     # Flask server
-├── requirements.txt           # Python dependencies
-├── settings.json              # Configuration (auto-generated)
-├── images/                    # Uploaded images (auto-generated)
-├── venv/                      # Python virtual environment
-├── start-kiosk.sh             # Start script (cleans up + starts)
-├── start-firefox-kiosk.sh     # Firefox startup with profile management
-├── stop-kiosk.sh              # Stop script
-├── kiosk-display.service      # Systemd service file for Flask
-├── kiosk-firefox.service      # Systemd service file for Firefox
-├── install-autostart.sh       # Systemd installer
-├── README.md                  # This file
-├── ARCHITECTURE.md            # Architecture documentation
-├── QUICKSTART.md              # Quick start guide
-├── REQUIREMENTS.md            # Requirements specification
-├── TEST.md                    # Test report
-├── TEST_MODE.md               # Test mode documentation
-├── CLAUDE.md                  # Claude Code guidance
-├── kiosk-tests/               # Test suite
-│   ├── conftest.py            # Test fixtures
-│   ├── pytest.ini             # Test configuration
-│   ├── requirements.txt       # Test dependencies
-│   ├── device.txt             # Device credentials (gitignored)
-│   └── tests/
-│       ├── unit/              # Unit tests
-│       ├── integration/       # Integration tests
-│       └── e2e/               # End-to-end tests
-└── templates/
-    ├── kiosk.html             # Main kiosk display
-    ├── manage.html            # Management interface
-    ├── upload.html            # Upload interface
-    ├── search.html            # Art search interface
-    ├── extra-images.html      # Extra images management
-    ├── debug.html             # Debug console
-    ├── backup.html            # Backup and restore interface
-    └── loading.html           # Loading screen for video transitions
-```
-
-## Supported Image Formats
-
-- PNG
-- JPG/JPEG
-- GIF
-- WebP
-- BMP
-
-## Image Naming
-
-All images are automatically assigned UUID-based filenames to ensure uniqueness and prevent naming conflicts. This happens automatically for:
-- **Web uploads** - Images uploaded via the upload page
-- **Art search downloads** - Images downloaded from museum APIs
-- **Extra image imports** - Images imported from the extra images folder
-- **Bulk operations** - All import and upload operations
-
-Benefits:
-- Prevents issues with special characters or spaces in filenames
-- Guarantees unique names across all images (e.g., `ab4ab3c1-5c16-48ed-86ab-cd769182ea97.jpg`)
-- Eliminates naming conflicts when importing from external sources
-- Preserves file extensions (e.g., `.jpg`, `.png`, `.webp`)
-
-The system automatically updates all references (enabled state, theme assignments, crop data) to track images by their UUID filenames.
+---
 
 ## Testing
 
-The project includes a comprehensive test suite with 119 automated tests covering all functionality.
+The project includes 119 automated tests.
 
 ### Running Tests
 
@@ -696,119 +493,188 @@ pip install -r requirements.txt
 # Run all tests
 pytest
 
-# Run specific test categories
-pytest tests/unit/           # Unit tests only
-pytest tests/integration/    # Integration tests only
-pytest tests/e2e/            # End-to-end tests only
+# Run by category
+pytest tests/unit/           # 14 unit tests
+pytest tests/integration/    # 55 integration tests
+pytest tests/e2e/            # 50 end-to-end tests
 
-# Run with verbose output
+# Verbose output
 pytest -v
 ```
 
 ### Test Coverage
 
-**Total:** 119 tests with 100% pass rate
-- **Unit Tests (14):** API endpoints, cleanup safety
-- **Integration Tests (55):** Image management, themes, atmospheres, day scheduling, video transitions
-- **E2E Tests (50):** Kiosk display, WebSocket communication, browser automation
-
-See `TEST.md` for detailed test report and requirements traceability.
-
-### Test Infrastructure
-
-The test suite includes several important features:
-
-- **Session-scoped fixtures**: Day scheduling state is saved once at the start of the test session and restored once at the end, preventing race conditions
-- **Automatic cleanup**: All test resources (images, themes, atmospheres) are automatically cleaned up after each test
-- **State isolation**: Tests run independently without interfering with each other or leaving the server in a modified state
-- **Test mode API**: Allows deterministic testing of time-dependent features with mock time control
+| Category | Count | Coverage |
+|----------|-------|----------|
+| Unit | 14 | API endpoints, cleanup safety |
+| Integration | 55 | Themes, atmospheres, day scheduling, videos |
+| E2E | 50 | Browser automation, WebSocket, display |
+| **Total** | **119** | **100% pass rate** |
 
 ### Test Configuration
 
-Tests connect to the Raspberry Pi device specified in `kiosk-tests/device.txt`:
+Tests connect to the device specified in `kiosk-tests/device.txt`:
+
 ```
 hostname=raspberrypi.local
 username=<your-username>
 password=<your-password>
 ```
 
-**Note:** The `device.txt` file is gitignored and should never be committed to version control.
+> **Note**: `device.txt` is gitignored and should never be committed.
+
+---
 
 ## Troubleshooting
 
-### Images not displaying
+### Images Not Displaying
 
-1. Check that images are uploaded via the management interface
-2. Verify images are enabled (checkbox is checked)
-3. Verify the Flask server is running
-4. Check browser console for errors (F12)
+1. Verify images are enabled (checkbox checked)
+2. Check Flask server is running: `sudo systemctl status kiosk-display`
+3. Open browser console (F12) for errors
+4. Check API response: `curl http://localhost/api/images?enabled_only=true`
 
-### Scaling issues
+### Server Not Accessible
 
-- Press `F` to toggle between contain and cover modes
-- Images are automatically scaled to fit 2560x2880 resolution
-- Aspect ratio is preserved in contain mode, may be altered in cover mode
+1. Check service status: `sudo systemctl status kiosk-display`
+2. Verify port 80 is open: `sudo ss -tlnp | grep :80`
+3. Check firewall settings
+4. Try `http://localhost` on the Pi itself
 
-### Server not accessible
+### Firefox Not Starting
 
-1. Check that the Flask server is running: `sudo systemctl status kiosk-display`
-2. Verify firewall settings allow port 80
-3. Use `http://localhost` on the Pi itself, or `http://<pi-ip>` from other devices
-
-### Auto-start not working
-
-1. Check systemd service status: `sudo systemctl status kiosk-display`
-2. View logs: `sudo journalctl -u kiosk-display -f`
-3. View Firefox logs: `sudo journalctl -u kiosk-firefox -f`
-4. Verify X11 mode (not Wayland): `echo $WAYLAND_DISPLAY` should be empty when logged in locally
-5. Check that start-firefox-kiosk.sh is executable: `ls -la ~/kiosk_images/start-firefox-kiosk.sh`
-
-### Firefox not displaying or profile errors
-
-1. **Automatic fix**: The service now automatically cleans Firefox profiles on each start
-2. **Manual cleanup** (if needed):
+1. Check service: `sudo systemctl status kiosk-firefox`
+2. View logs: `sudo journalctl -u kiosk-firefox -f`
+3. Manual cleanup:
    ```bash
    sudo systemctl stop kiosk-firefox
    rm -rf ~/.mozilla/firefox
    sudo systemctl start kiosk-firefox
    ```
-3. Check Firefox logs: `sudo journalctl -u kiosk-firefox -f`
-4. Verify X11 is running: `ps aux | grep -E 'X|xinit'`
-5. Test manually: `DISPLAY=:0 firefox --kiosk http://localhost/view`
+4. Verify X11: `echo $WAYLAND_DISPLAY` should be empty
 
-### Wayland compatibility issues
+### Auto-Start Not Working
 
-If you see errors like "Failed connect to PipeWire" or Firefox doesn't display:
-
-1. **Switch to X11 mode** (recommended):
+1. Check both services:
+   ```bash
+   sudo systemctl status kiosk-display.service
+   sudo systemctl status kiosk-firefox.service
+   ```
+2. Verify X11 mode (not Wayland):
    ```bash
    sudo raspi-config
-   # Navigate to: Advanced Options > Wayland > Select "X11"
-   sudo reboot
+   # Advanced Options > Wayland > X11
+   ```
+3. Check script permissions:
+   ```bash
+   ls -la ~/kiosk_images/start-firefox-kiosk.sh
+   chmod +x ~/kiosk_images/start-firefox-kiosk.sh
    ```
 
-2. **Or modify for Wayland**: Edit `kiosk-firefox.service` to use Wayland environment variables (see ARCHITECTURE.md for details)
+### Day Scheduling Not Switching
 
-### Themes/Atmospheres not filtering
+1. Verify day scheduling is enabled in UI
+2. Check current time period: `curl http://localhost/api/day/status`
+3. Verify atmospheres are assigned to time periods
+4. Wait up to 60 seconds for hour boundary detection
 
-1. Verify the theme or atmosphere is activated (badge shows as active)
-2. Check images have themes assigned
-3. Look at API response: `/api/images?enabled_only=true`
-4. Check settings.json for correct theme/atmosphere mappings
+### Theme/Atmosphere Not Filtering
+
+1. Check theme/atmosphere is activated (highlighted in UI)
+2. Verify images have themes assigned
+3. Check API: `curl http://localhost/api/images?enabled_only=true`
+4. Review `settings.json` for correct mappings
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [README.md](README.md) | This file - user guide |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Technical architecture |
+| [REQUIREMENTS.md](REQUIREMENTS.md) | Feature requirements |
+| [TEST.md](TEST.md) | Test documentation |
+| [TEST_MODE.md](TEST_MODE.md) | Test mode API |
+| [QUICKSTART.md](QUICKSTART.md) | Quick start guide |
+| [CLAUDE.md](CLAUDE.md) | Developer instructions |
+
+---
+
+## File Structure
+
+```
+kiosk_images/
+├── app.py                      # Flask backend
+├── painting_searcher.py        # Museum API client
+├── requirements.txt            # Python dependencies
+│
+├── templates/                  # HTML templates
+│   ├── kiosk.html             # Slideshow display
+│   ├── manage.html            # Management interface
+│   ├── upload.html            # Image upload
+│   ├── search.html            # Art search
+│   ├── extra-images.html      # Extra images
+│   ├── debug.html             # Debug console
+│   ├── backup.html            # Backup management
+│   ├── remote.html            # Simple remote
+│   └── loading.html           # Video loading
+│
+├── images/                    # Image storage (gitignored)
+├── EXTRA_IMAGES/              # Staging folder
+├── thumbnails/                # Video thumbnails
+├── backups/                   # Backup archives
+├── settings.json              # Configuration (gitignored)
+│
+├── kiosk-display.service      # Flask systemd service
+├── kiosk-firefox.service      # Firefox systemd service
+├── kiosk.target               # Composite service
+├── install-autostart.sh       # Service installer
+├── start-kiosk.sh             # Development start
+├── start-firefox-kiosk.sh     # Firefox launcher
+├── stop-kiosk.sh              # Stop script
+│
+├── kiosk-tests/               # Test suite
+│   ├── tests/
+│   │   ├── unit/
+│   │   ├── integration/
+│   │   └── e2e/
+│   └── conftest.py
+│
+└── venv/                      # Python environment (gitignored)
+```
+
+---
 
 ## Performance Tips
 
-- Use optimized image formats (WebP for smaller file sizes)
-- Pre-resize large images before uploading for better performance
-- Set appropriate slideshow intervals (longer for slower Pi models)
-- The page automatically checks for changes every 2 seconds
+- Use **WebP** format for smaller file sizes
+- Pre-resize large images before uploading
+- Set longer intervals on slower Pi models
+- The system checks for changes every 2 seconds automatically
+
+---
 
 ## Security Considerations
 
-- This server is designed for local network use
-- No authentication is included by default
-- Do not expose directly to the internet without adding authentication
-- Consider using a reverse proxy (nginx) for production deployments
+- **Local Network Only** - No authentication included
+- **Do Not Expose to Internet** without adding authentication
+- **Port 80 Binding** - Uses Linux capabilities (no root needed)
+- **File Validation** - 50MB max, allowed extensions only
+- Consider using nginx reverse proxy for production
+
+---
+
+## Supported Formats
+
+### Images
+- PNG, JPG/JPEG, GIF, WebP, BMP
+
+### Videos
+- YouTube URLs (via yt-dlp)
+- Played with mpv in fullscreen
+
+---
 
 ## License
 
