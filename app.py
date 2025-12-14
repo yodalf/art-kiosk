@@ -2615,12 +2615,14 @@ def execute_mpv():
             ffplay_env['DISPLAY'] = ':0'
 
             # Build ffplay command
+            # -sync video: sync to video frames (prevents frame drops on Pi5)
             # -fs: fullscreen
             # -an: no audio
             # -loop 0: loop forever
             # -vf: video filter for crop and scale
             ffplay_cmd = [
                 'ffplay',
+                '-sync', 'video',
                 '-fs',
                 '-an',
                 '-loop', '0',
