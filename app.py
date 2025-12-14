@@ -38,6 +38,126 @@ def is_thumbnail_mostly_black(image_path, threshold=30):
         return False
 
 
+def get_best_30fps_format(url):
+    """Get the best available 30fps (or lower) format for a YouTube video.
+
+    Returns the format ID string (e.g., '94' for 480p30) or None if no suitable format found.
+    Prefers higher resolution 30fps formats over lower ones.
+
+    For HLS live streams, typical formats are:
+    - 91: 144p15
+    - 92: 240p30
+    - 93: 360p30
+    - 94: 480p30
+    - 300: 720p60
+    - 301: 1080p60
+    """
+    try:
+        # Run yt-dlp to get available formats
+        result = subprocess.run(
+            ['yt-dlp', '-F', url],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode != 0:
+            print(f"[FORMAT] yt-dlp -F failed: {result.stderr}", flush=True)
+            return None
+
+        # Parse output to find 30fps or lower formats
+        # Format lines look like: "94  mp4 854x480     30 | 1569k m3u8  | avc1.4D401F mp4a.40.2"
+        best_format = None
+        best_height = 0
+
+        for line in result.stdout.split('\n'):
+            # Skip header lines and empty lines
+            if not line or line.startswith('ID') or line.startswith('--') or line.startswith('['):
+                continue
+
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+
+            format_id = parts[0]
+
+            # Look for resolution (like "854x480") and fps
+            for i, part in enumerate(parts):
+                if 'x' in part and part.replace('x', '').replace('.', '').isdigit() == False:
+                    # Check if it looks like resolution
+                    try:
+                        if 'x' in part:
+                            width, height = part.split('x')
+                            height = int(height)
+                            # Next part should be fps
+                            if i + 1 < len(parts):
+                                fps_str = parts[i + 1]
+                                try:
+                                    fps = int(fps_str)
+                                    # Only consider 30fps or lower
+                                    if fps <= 30 and height > best_height:
+                                        best_height = height
+                                        best_format = format_id
+                                        print(f"[FORMAT] Found candidate: {format_id} ({height}p{fps})", flush=True)
+                                except ValueError:
+                                    pass
+                            break
+                    except (ValueError, IndexError):
+                        pass
+
+        if best_format:
+            print(f"[FORMAT] Best 30fps format: {best_format} ({best_height}p)", flush=True)
+        else:
+            print(f"[FORMAT] No 30fps format found, will use fallback", flush=True)
+
+        return best_format
+
+    except subprocess.TimeoutExpired:
+        print(f"[FORMAT] yt-dlp timed out", flush=True)
+        return None
+    except Exception as e:
+        print(f"[FORMAT] Error getting formats: {e}", flush=True)
+        return None
+
+
+def get_video_stream_url(url, format_id=None):
+    """Get the direct stream URL for a video using yt-dlp.
+
+    Args:
+        url: The YouTube or video URL
+        format_id: Optional format ID to use (e.g., '94')
+
+    Returns the direct stream URL or None on failure.
+    """
+    try:
+        cmd = ['yt-dlp', '-g']
+        if format_id:
+            cmd.extend(['-f', format_id])
+        cmd.append(url)
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode == 0:
+            stream_url = result.stdout.strip()
+            print(f"[STREAM] Got stream URL (format={format_id})", flush=True)
+            return stream_url
+        else:
+            print(f"[STREAM] yt-dlp -g failed: {result.stderr}", flush=True)
+            return None
+
+    except subprocess.TimeoutExpired:
+        print(f"[STREAM] yt-dlp timed out", flush=True)
+        return None
+    except Exception as e:
+        print(f"[STREAM] Error getting stream URL: {e}", flush=True)
+        return None
+
+
 socketio = SocketIO(app, cors_allowed_origins="*")
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'images'
@@ -56,32 +176,50 @@ def generate_video_thumbnail(video_id, url):
     """Generate thumbnail for a video by playing it and capturing a screenshot after 20 seconds.
 
     This runs in a background thread to avoid blocking the API response.
+    Uses ffplay with the best 30fps format for consistent playback.
     """
     thumbnail_path = THUMBNAILS_FOLDER / f"{video_id}.jpg"
 
     try:
         print(f"[THUMBNAIL] Starting thumbnail generation for video {video_id}", flush=True)
 
-        # Start mpv in background with minimal settings for thumbnail capture
-        mpv_cmd = [
-            'mpv',
-            '--vo=x11',
-            '--fullscreen',
-            '--no-audio',
-            '--ytdl-format=bestvideo[height<=720]+bestaudio/best',
-            '--hwdec=auto',
-            url
+        # Get best 30fps format and stream URL
+        format_id = get_best_30fps_format(url)
+        if format_id:
+            print(f"[THUMBNAIL] Using format: {format_id}", flush=True)
+        else:
+            print(f"[THUMBNAIL] No 30fps format found, using default", flush=True)
+
+        stream_url = get_video_stream_url(url, format_id)
+        if not stream_url:
+            print(f"[THUMBNAIL] Could not get stream URL, using direct URL", flush=True)
+            stream_url = url
+
+        # Start ffplay in background with settings for thumbnail capture
+        ffplay_env = os.environ.copy()
+        ffplay_env['DISPLAY'] = ':0'
+        ffplay_cmd = [
+            'ffplay',
+            '-fs',
+            '-an',
+            '-vf', 'crop=ih*2560/2880:ih,scale=2560:2880:flags=fast_bilinear',
+            '-i', stream_url
         ]
 
-        mpv_process = subprocess.Popen(mpv_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print(f"[THUMBNAIL] mpv started with PID {mpv_process.pid}", flush=True)
+        ffplay_process = subprocess.Popen(
+            ffplay_cmd,
+            env=ffplay_env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        print(f"[THUMBNAIL] ffplay started with PID {ffplay_process.pid}", flush=True)
 
         # Wait 20 seconds for video to start and show content
         time.sleep(20)
 
-        # Check if mpv is still running
-        if mpv_process.poll() is not None:
-            print(f"[THUMBNAIL] mpv exited early, cannot capture screenshot", flush=True)
+        # Check if ffplay is still running
+        if ffplay_process.poll() is not None:
+            print(f"[THUMBNAIL] ffplay exited early, cannot capture screenshot", flush=True)
             return
 
         # Capture screenshot using scrot
@@ -94,17 +232,17 @@ def generate_video_thumbnail(video_id, url):
             import_result = subprocess.run(['import', '-window', 'root', temp_screenshot], capture_output=True, text=True)
             if import_result.returncode != 0:
                 print(f"[THUMBNAIL] import also failed: {import_result.stderr}", flush=True)
-                mpv_process.terminate()
+                ffplay_process.terminate()
                 return
 
         print(f"[THUMBNAIL] Screenshot captured to {temp_screenshot}", flush=True)
 
-        # Stop mpv
-        mpv_process.terminate()
+        # Stop ffplay
+        ffplay_process.terminate()
         try:
-            mpv_process.wait(timeout=5)
+            ffplay_process.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            mpv_process.kill()
+            ffplay_process.kill()
 
         # Convert to JPEG and resize for thumbnail
         try:
@@ -2427,10 +2565,15 @@ def execute_mpv():
     if not url:
         return jsonify({'error': 'URL is required'}), 400
 
-    print("About to create thread for launch_mpv_async...", flush=True)
+    print("About to create thread for launch_ffplay_async...", flush=True)
 
-    def launch_mpv_async():
-        """Launch mpv in background thread to avoid blocking the response."""
+    def launch_ffplay_async():
+        """Launch ffplay in background thread to avoid blocking the response.
+
+        Uses ffplay instead of mpv for better real-time playback on Raspberry Pi.
+        Automatically selects the best 30fps format available to reduce CPU load.
+        Uses crop filter to center-crop video for portrait display (2560x2880).
+        """
         try:
             import time
             import sys
@@ -2441,50 +2584,74 @@ def execute_mpv():
                 socketio.emit('show_loading')
             time.sleep(0.5)
 
-            # STEP 2: Kill existing mpv
-            print("Killing any existing mpv...", flush=True)
+            # STEP 2: Kill existing video players (mpv and ffplay)
+            print("Killing any existing video players...", flush=True)
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
+            subprocess.run(['pkill', '-9', 'ffplay'], check=False)
             time.sleep(0.3)
 
-            # STEP 3: Launch mpv with working configuration for Raspberry Pi 5
-            # Uses x11 video output for compatibility, limits format to reduce CPU load
-            # Disables audio to reduce CPU usage further
-            print(f"Launching mpv with video: {url}", flush=True)
-            mpv_env = os.environ.copy()
-            mpv_env['DISPLAY'] = ':0'
-            mpv_proc = subprocess.Popen([
-                'mpv',
-                '--vo=x11',
-                '--fullscreen',
-                '--loop-file=inf',
-                '--no-audio',
-                '--ytdl-format=bestvideo[height<=720]+bestaudio/best',
-                '--hwdec=auto',
-                '--cache=auto',
-                '--panscan=1.0',  # Crop video to fill screen (portrait mode)
-                url
-            ], env=mpv_env)
-
-            print(f"MPV STARTED WITH PID: {mpv_proc.pid}", flush=True)
-            print(f"Started mpv with video: {url}", flush=True)
-
-            # Check if mpv is still running after a brief moment
-            time.sleep(0.5)
-            poll_result = mpv_proc.poll()
-            if poll_result is not None:
-                print(f"WARNING: MPV exited immediately with code: {poll_result}", flush=True)
+            # STEP 3: Get best 30fps format and stream URL
+            print(f"Getting best 30fps format for: {url}", flush=True)
+            format_id = get_best_30fps_format(url)
+            if format_id:
+                print(f"Using format: {format_id}", flush=True)
             else:
-                print(f"MPV process still running (PID: {mpv_proc.pid})", flush=True)
+                print("No 30fps format found, using default", flush=True)
 
-            # STEP 4: Wait for mpv window to appear and bring it to front using xdotool
-            print("Waiting for mpv window to appear...", flush=True)
+            stream_url = get_video_stream_url(url, format_id)
+            if not stream_url:
+                print("ERROR: Could not get stream URL, trying direct URL", flush=True)
+                stream_url = url
+
+            # STEP 4: Launch ffplay with crop filter for portrait display
+            # The display is 2560x2880 (portrait). We crop the center strip of the video
+            # to fill the screen without stretching.
+            # crop=ih*2560/2880:ih crops to aspect ratio 0.889 (portrait)
+            # scale=2560:2880 scales to fullscreen
+            print(f"Launching ffplay with video stream...", flush=True)
+            ffplay_env = os.environ.copy()
+            ffplay_env['DISPLAY'] = ':0'
+
+            # Build ffplay command
+            # -fs: fullscreen
+            # -an: no audio
+            # -loop 0: loop forever
+            # -vf: video filter for crop and scale
+            ffplay_cmd = [
+                'ffplay',
+                '-fs',
+                '-an',
+                '-loop', '0',
+                '-vf', 'crop=ih*2560/2880:ih,scale=2560:2880:flags=fast_bilinear',
+                '-i', stream_url
+            ]
+
+            ffplay_proc = subprocess.Popen(
+                ffplay_cmd,
+                env=ffplay_env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+            print(f"FFPLAY STARTED WITH PID: {ffplay_proc.pid}", flush=True)
+
+            # Check if ffplay is still running after a brief moment
+            time.sleep(0.5)
+            poll_result = ffplay_proc.poll()
+            if poll_result is not None:
+                print(f"WARNING: FFPLAY exited immediately with code: {poll_result}", flush=True)
+            else:
+                print(f"FFPLAY process still running (PID: {ffplay_proc.pid})", flush=True)
+
+            # STEP 5: Wait for ffplay window to appear and bring it to front using xdotool
+            print("Waiting for ffplay window to appear...", flush=True)
             time.sleep(2)
 
-            # Use xdotool to find and focus the mpv window
-            print("Bringing mpv window to front with xdotool...", flush=True)
-            subprocess.run(['xdotool', 'search', '--class', 'mpv', 'windowactivate'], check=False)
+            # Use xdotool to find and focus the ffplay window
+            print("Bringing ffplay window to front with xdotool...", flush=True)
+            subprocess.run(['xdotool', 'search', '--class', 'ffplay', 'windowactivate'], check=False)
             time.sleep(0.5)
-            print("MPV window should now be in front", flush=True)
+            print("FFPLAY window should now be in front", flush=True)
 
             # Emit event to notify UI that video is playing
             with app.app_context():
@@ -2533,13 +2700,13 @@ def execute_mpv():
                             break
 
         except Exception as e:
-            print(f"Error launching mpv: {e}", flush=True)
+            print(f"Error launching ffplay: {e}", flush=True)
             import traceback
             traceback.print_exc()
 
-    # Start mpv in background thread
+    # Start ffplay in background thread
     print("Creating thread...", flush=True)
-    thread = threading.Thread(target=launch_mpv_async, daemon=True)
+    thread = threading.Thread(target=launch_ffplay_async, daemon=True)
     print(f"Thread created: {thread}", flush=True)
     print("Starting thread...", flush=True)
     thread.start()
@@ -2551,7 +2718,7 @@ def execute_mpv():
 
 @app.route('/api/videos/stop-mpv', methods=['POST'])
 def stop_mpv():
-    """Stop mpv video playback and restore Firefox kiosk display."""
+    """Stop video playback (mpv or ffplay) and restore Firefox kiosk display."""
     import subprocess
     import threading
 
@@ -2564,13 +2731,13 @@ def stop_mpv():
     data = request.get_json(silent=True) or {}
     jump_to_image = data.get('jump_to')
 
-    def stop_mpv_async(target_image):
-        """Stop mpv and restore Firefox in background thread."""
+    def stop_video_async(target_image):
+        """Stop video player (mpv or ffplay) and restore Firefox in background thread."""
         try:
             import time
 
-            # STEP 1: Kill mpv process
-            print("Killing mpv...")
+            # STEP 1: Kill video player processes (both mpv and ffplay)
+            print("Killing video players (mpv and ffplay)...")
             global mpv_process, current_video_id
             if mpv_process is not None:
                 try:
@@ -2587,8 +2754,9 @@ def stop_mpv():
             settings['current_video_id'] = None
             save_settings(settings)
 
-            # Also kill any lingering mpv processes
+            # Kill any lingering video player processes (both mpv and ffplay)
             subprocess.run(['pkill', '-9', 'mpv'], check=False)
+            subprocess.run(['pkill', '-9', 'ffplay'], check=False)
             time.sleep(0.3)
 
             # STEP 2: Navigate Firefox to kiosk view with target image
@@ -2612,12 +2780,12 @@ def stop_mpv():
 
             print("Kiosk view restored")
         except Exception as e:
-            print(f"Error stopping mpv: {e}")
+            print(f"Error stopping video player: {e}")
             import traceback
             traceback.print_exc()
 
     # Start stop process in background thread
-    thread = threading.Thread(target=stop_mpv_async, args=(jump_to_image,), daemon=True)
+    thread = threading.Thread(target=stop_video_async, args=(jump_to_image,), daemon=True)
     thread.start()
 
     # Return immediately
