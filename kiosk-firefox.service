@@ -20,6 +20,8 @@ ExecStartPre=/bin/sleep 5
 ExecStartPre=-/usr/bin/xset s off
 ExecStartPre=-/usr/bin/xset -dpms
 ExecStartPre=-/usr/bin/xset s noblank
+# Set display to 30Hz for smooth video playback
+ExecStartPre=-/usr/bin/xrandr --output HDMI-1 --mode 2560x2880 --rate 29.99
 # Wait for server to respond before launching Firefox
 ExecStartPre=/bin/bash -c 'until curl -s http://localhost/view > /dev/null; do sleep 1; done'
 ExecStart=/home/realo/kiosk_images/start-firefox-kiosk.sh
