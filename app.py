@@ -2614,25 +2614,23 @@ def execute_mpv():
             ffplay_env = os.environ.copy()
             ffplay_env['DISPLAY'] = ':0'
 
-            # Build ffplay command
-            # -sync video: sync to video frames (prevents frame drops on Pi5)
+            # Build ffplay command using setsid for proper detachment
             # -fs: fullscreen
             # -an: no audio
             # -loop 0: loop forever
             # -vf: video filter for crop and scale
-            ffplay_cmd = [
-                'ffplay',
-                '-sync', 'video',
-                '-fs',
-                '-an',
-                '-loop', '0',
-                '-vf', 'crop=ih*2560/2880:ih,scale=2560:2880:flags=fast_bilinear',
-                '-i', stream_url
-            ]
+            # Note: -sync video removed as it causes half-speed playback when launched from Flask
+            ffplay_cmd = (
+                f"setsid ffplay -fs -an -loop 0 "
+                f"-vf 'crop=ih*2560/2880:ih,scale=2560:2880:flags=fast_bilinear' "
+                f"-i '{stream_url}'"
+            )
 
             ffplay_proc = subprocess.Popen(
                 ffplay_cmd,
+                shell=True,
                 env=ffplay_env,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
