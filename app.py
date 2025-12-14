@@ -52,6 +52,8 @@ def get_best_30fps_format(url):
     - 300: 720p60
     - 301: 1080p60
     """
+    import re
+
     try:
         # Run yt-dlp to get available formats
         result = subprocess.run(
@@ -81,27 +83,27 @@ def get_best_30fps_format(url):
 
             format_id = parts[0]
 
-            # Look for resolution (like "854x480") and fps
+            # Look for resolution pattern (WIDTHxHEIGHT) followed by FPS
+            # Example: "854x480     30"
             for i, part in enumerate(parts):
-                if 'x' in part and part.replace('x', '').replace('.', '').isdigit() == False:
-                    # Check if it looks like resolution
+                # Check if this part matches resolution pattern (e.g., "854x480")
+                resolution_match = re.match(r'^(\d+)x(\d+)$', part)
+                if resolution_match:
                     try:
-                        if 'x' in part:
-                            width, height = part.split('x')
-                            height = int(height)
-                            # Next part should be fps
-                            if i + 1 < len(parts):
-                                fps_str = parts[i + 1]
-                                try:
-                                    fps = int(fps_str)
-                                    # Only consider 30fps or lower
-                                    if fps <= 30 and height > best_height:
-                                        best_height = height
-                                        best_format = format_id
-                                        print(f"[FORMAT] Found candidate: {format_id} ({height}p{fps})", flush=True)
-                                except ValueError:
-                                    pass
-                            break
+                        height = int(resolution_match.group(2))
+                        # Next part should be fps
+                        if i + 1 < len(parts):
+                            fps_str = parts[i + 1]
+                            try:
+                                fps = int(fps_str)
+                                # Only consider 30fps or lower
+                                if fps <= 30 and height > best_height:
+                                    best_height = height
+                                    best_format = format_id
+                                    print(f"[FORMAT] Found candidate: {format_id} ({height}p{fps})", flush=True)
+                            except ValueError:
+                                pass
+                        break
                     except (ValueError, IndexError):
                         pass
 
