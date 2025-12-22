@@ -994,7 +994,9 @@
         // Load and display images
         async function loadImages() {
             try {
-                const response = await fetch('/api/images?enabled_only=true');
+                // When viewing "All Images" theme, show all images including disabled ones
+                const url = activeTheme === 'All Images' ? '/api/images' : '/api/images?enabled_only=true';
+                const response = await fetch(url);
                 const images = await response.json();
 
                 // Load crop settings
@@ -1026,7 +1028,8 @@
                 }
 
                 if (images.length === 0) {
-                    grid.innerHTML = '<p style="color: #999;">No enabled images in current selection</p>';
+                    const emptyMsg = activeTheme === 'All Images' ? 'No images uploaded yet' : 'No enabled images in current selection';
+                    grid.innerHTML = `<p style="color: #999;">${emptyMsg}</p>`;
                     return;
                 }
 
