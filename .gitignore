@@ -39,3 +39,4 @@ kiosk-tests/__pycache__/
 kiosk-tests/.pytest_cache/
 kiosk-tests/screenshots/*.png
 kiosk-tests/screenshots/*.jpg
+docs/*.pdf
