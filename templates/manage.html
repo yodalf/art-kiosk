@@ -2652,8 +2652,8 @@
                     .then(data => {
                         // Build URL with current image parameter if available
                         let url = '/view';
-                        if (data.image_name) {
-                            url += '?image=' + encodeURIComponent(data.image_name);
+                        if (data.current_image) {
+                            url += '?image=' + encodeURIComponent(data.current_image);
                         }
                         // Navigate to the kiosk view (not blocked by pop-up blockers)
                         window.location.href = url;
