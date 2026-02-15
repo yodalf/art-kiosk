@@ -872,11 +872,11 @@
                 } else if (activeTheme && activeTheme !== 'All Images') {
                     heading.textContent = `Current Images - Theme: ${activeTheme}`;
                 } else {
-                    heading.textContent = activeTheme === 'All Images' ? 'Current Images - All Images' : 'Current Images';
+                    heading.textContent = activeTheme === 'All Images' ? 'Current Images - All Images' : activeTheme === 'All un-themed' ? 'Current Images - All un-themed' : 'Current Images';
                 }
 
                 if (images.length === 0) {
-                    const emptyMsg = activeTheme === 'All Images' ? 'No images uploaded yet' : 'No enabled images in current selection';
+                    const emptyMsg = activeTheme === 'All Images' ? 'No images uploaded yet' : activeTheme === 'All un-themed' ? 'All images have been assigned to themes' : 'No enabled images in current selection';
                     grid.innerHTML = `<p style="color: #999;">${emptyMsg}</p>`;
                     return;
                 }
@@ -1051,6 +1051,7 @@
                 themeSubmenu.className = 'submenu';
 
                 for (const themeName in availableThemes) {
+                    if (themeName === 'All un-themed') continue;
                     if (!(image.themes || []).includes(themeName)) {
                         const themeOption = document.createElement('div');
                         themeOption.className = 'submenu-item';
@@ -1244,6 +1245,7 @@
                 themeSubmenu.className = 'submenu';
 
                 for (const themeName in availableThemes) {
+                    if (themeName === 'All un-themed') continue;
                     if (!(video.themes || []).includes(themeName)) {
                         const themeOption = document.createElement('div');
                         themeOption.className = 'submenu-item';
@@ -1929,7 +1931,7 @@
                 themesList.innerHTML = '';
 
                 // Separate permanent themes from user-created themes
-                const permanentThemes = ['All Images', 'Extras'];
+                const permanentThemes = ['All Images', 'Extras', 'All un-themed'];
                 const userThemes = Object.keys(availableThemes).filter(name => !permanentThemes.includes(name));
 
                 // Create permanent themes row

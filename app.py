@@ -393,6 +393,9 @@ def get_settings():
             settings['themes'].setdefault('Extras', {
                 'name': 'Extras', 'created': time.time(), 'interval': 3600
             })
+            settings['themes'].setdefault('All un-themed', {
+                'name': 'All un-themed', 'created': time.time(), 'interval': 3600
+            })
             settings['atmospheres'].setdefault('All Images', {
                 'name': 'All Images', 'created': time.time(), 'interval': 3600
             })
@@ -561,6 +564,8 @@ def list_images():
                 allowed_themes = None
             else:
                 allowed_themes = set(atm_themes)
+        elif active_theme and active_theme == 'All un-themed':
+            allowed_themes = {'All un-themed'}
         elif active_theme and active_theme != 'All Images':
             # If only a theme is active (no atmosphere), use that theme
             allowed_themes = {active_theme}
@@ -583,8 +588,12 @@ def list_images():
             # Apply theme/atmosphere filtering
             if allowed_themes is not None:
                 image_theme_list = set(image_themes.get(file.name, []))
-                # Image must belong to at least one of the allowed themes
-                if not image_theme_list.intersection(allowed_themes):
+                is_unthemed = len(image_theme_list) == 0
+                if 'All un-themed' in allowed_themes and is_unthemed:
+                    pass  # Un-themed item matches
+                elif image_theme_list.intersection(allowed_themes):
+                    pass  # Normal theme match
+                else:
                     continue
 
             # Get themes for this image
@@ -611,8 +620,12 @@ def list_images():
         # Apply theme/atmosphere filtering
         if allowed_themes is not None:
             video_theme_list = set(video_themes.get(video_id, []))
-            # Video must belong to at least one of the allowed themes
-            if not video_theme_list.intersection(allowed_themes):
+            is_unthemed = len(video_theme_list) == 0
+            if 'All un-themed' in allowed_themes and is_unthemed:
+                pass  # Un-themed video matches
+            elif video_theme_list.intersection(allowed_themes):
+                pass  # Normal theme match
+            else:
                 continue
 
         # Get themes for this video
@@ -661,10 +674,10 @@ def upload_image():
     filepath = app.config['UPLOAD_FOLDER'] / filename
     file.save(filepath)
 
-    # Assign the new image to the active theme (if not "All Images")
+    # Assign the new image to the active theme (if not "All Images" or "All un-themed")
     settings = get_settings()
     active_theme = settings.get('active_theme')
-    if active_theme and active_theme != 'All Images':
+    if active_theme and active_theme not in ('All Images', 'All un-themed'):
         image_themes = settings.get('image_themes', {})
         image_themes[filename] = [active_theme]
         settings['image_themes'] = image_themes
@@ -902,6 +915,8 @@ def reshuffle_images():
         if enabled_only:
             if active_atmosphere:
                 allowed_themes = set(atmosphere_themes.get(active_atmosphere, []))
+            elif active_theme and active_theme == 'All un-themed':
+                allowed_themes = {'All un-themed'}
             elif active_theme and active_theme != 'All Images':
                 allowed_themes = {active_theme}
 
@@ -920,7 +935,12 @@ def reshuffle_images():
                     # Check theme filtering
                     if allowed_themes is not None:
                         img_themes = set(image_themes.get(filename, []))
-                        if not img_themes.intersection(allowed_themes):
+                        is_unthemed = len(img_themes) == 0
+                        if 'All un-themed' in allowed_themes and is_unthemed:
+                            pass  # Un-themed item matches
+                        elif img_themes.intersection(allowed_themes):
+                            pass  # Normal theme match
+                        else:
                             continue
 
                     images.append({'name': filename})
@@ -1045,7 +1065,7 @@ def create_theme():
 def delete_theme(theme_name):
     """Delete a theme."""
     # Prevent deletion of "All Images" and "Extras" themes
-    if theme_name in ['All Images', 'Extras']:
+    if theme_name in ['All Images', 'Extras', 'All un-themed']:
         return jsonify({'error': f'Cannot delete the "{theme_name}" theme'}), 400
 
     settings = get_settings()
@@ -1984,9 +2004,9 @@ def add_video():
     enabled_videos[video_id] = True
     settings['enabled_videos'] = enabled_videos
 
-    # Assign the new video to the active theme (if not "All Images")
+    # Assign the new video to the active theme (if not "All Images" or "All un-themed")
     active_theme = settings.get('active_theme')
-    if active_theme and active_theme != 'All Images':
+    if active_theme and active_theme not in ('All Images', 'All un-themed'):
         video_themes = settings.get('video_themes', {})
         video_themes[video_id] = [active_theme]
         settings['video_themes'] = video_themes
