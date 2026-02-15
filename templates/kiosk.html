@@ -909,9 +909,7 @@
                         await loadImages(0);  // Start from first image (index 0)
 
                         // Restart slideshow if not paused
-                        if (!isPaused) {
-                            startSlideshow();
-                        }
+                        restartIfNotPaused();
                         return;
                     } else {
                         debugLog(`Reshuffle returned success=false`, 'error');
@@ -939,8 +937,11 @@
             if (slideTimer) {
                 clearInterval(slideTimer);
             }
-
             slideTimer = setInterval(nextSlide, interval);
+        }
+
+        function restartIfNotPaused() {
+            if (!isPaused) { startSlideshow(); }
         }
 
         // Toggle between cover (default, fills screen) and contain (shows full image)
@@ -948,11 +949,7 @@
             fillMode = !fillMode;
             const slides = document.querySelectorAll('.slide');
             slides.forEach(slide => {
-                if (fillMode) {
-                    slide.classList.add('contain-mode');
-                } else {
-                    slide.classList.remove('contain-mode');
-                }
+                slide.classList.toggle('contain-mode', fillMode);
             });
 
             // Also update extra image overlay if present
@@ -968,17 +965,11 @@
                 case 'ArrowRight':
                 case ' ':
                     nextSlide(true); // Instant transition for keyboard control
-                    // Only restart timer if not paused
-                    if (!isPaused) {
-                        startSlideshow();
-                    }
+                    restartIfNotPaused();
                     break;
                 case 'ArrowLeft':
                     prevSlide(true); // Instant transition for keyboard control
-                    // Only restart timer if not paused
-                    if (!isPaused) {
-                        startSlideshow();
-                    }
+                    restartIfNotPaused();
                     break;
                 case 'f':
                 case 'F':
@@ -1104,10 +1095,7 @@
                 if (imageIndex !== -1) {
                     // Image found in current array, jump to it (instant transition)
                     showSlide(imageIndex, true);
-                    // Restart slideshow if not paused
-                    if (!isPaused) {
-                        startSlideshow();
-                    }
+                    restartIfNotPaused();
                 } else {
                     // Image not found (likely newly uploaded), reload with this image
                     await debugLog(`Image ${imageName} not in current list, reloading...`, 'info');
@@ -1124,18 +1112,12 @@
             // Handle string commands
             switch(command) {
                 case 'next':
-                    nextSlide(true); // Instant transition for remote control
-                    // Only restart slideshow if not paused
-                    if (!isPaused) {
-                        startSlideshow();
-                    }
+                    nextSlide(true);
+                    restartIfNotPaused();
                     break;
                 case 'prev':
-                    prevSlide(true); // Instant transition for remote control
-                    // Only restart slideshow if not paused
-                    if (!isPaused) {
-                        startSlideshow();
-                    }
+                    prevSlide(true);
+                    restartIfNotPaused();
                     break;
                 case 'pause':
                     if (slideTimer) {

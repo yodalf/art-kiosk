@@ -974,14 +974,8 @@
 
         // Update LED indicators
         function updateLEDs() {
-            // Update play/pause LEDs
-            if (isPlaying) {
-                document.getElementById('led-play').classList.add('active');
-                document.getElementById('led-pause').classList.remove('active');
-            } else {
-                document.getElementById('led-play').classList.remove('active');
-                document.getElementById('led-pause').classList.add('active');
-            }
+            document.getElementById('led-play').classList.toggle('active', isPlaying);
+            document.getElementById('led-pause').classList.toggle('active', !isPlaying);
         }
 
         // Flash LED briefly for action buttons
@@ -2776,7 +2770,7 @@
         }
 
         // Update LED indicators based on current kiosk image or video
-        async function updateLEDs() {
+        async function updateImageLEDs() {
             try {
                 const response = await fetch('/api/kiosk/current-image');
                 if (!response.ok) {
@@ -2820,7 +2814,7 @@
         }
 
         // Poll for current image every 1 second
-        setInterval(updateLEDs, 1000);
+        setInterval(updateImageLEDs, 1000);
 
         // Track shuffle_id to detect when kiosk reshuffles
         let previousShuffleId = null;
@@ -3124,7 +3118,7 @@
             await loadThemes();
             await loadImages();
             await restorePlaybackStatus(); // Restore video playback state
-            updateLEDs(); // Initialize LED indicators after images are loaded
+            updateImageLEDs(); // Initialize LED indicators after images are loaded
 
             // Initialize shuffle_id tracking
             const response = await fetch('/api/settings');
