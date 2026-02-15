@@ -641,6 +641,29 @@
             background: #616161;
         }
 
+        .card-buttons {
+            display: flex;
+            gap: 8px;
+            padding: 10px;
+            justify-content: center;
+        }
+
+        .card-btn {
+            flex: 1;
+            padding: 8px 16px;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .card-btn.import { background: #4CAF50; }
+        .card-btn.import:hover { background: #45a049; }
+        .card-btn.delete { background: #f44336; }
+        .card-btn.delete:hover { background: #d32f2f; }
+
         .crop-image-button {
             background: #2196F3;
             color: white;
@@ -916,48 +939,21 @@
 
             // No checkbox for extra images - they're managed separately from main images
 
-            // Action buttons container
+            // Action buttons
             const buttonsContainer = document.createElement('div');
-            buttonsContainer.style.display = 'flex';
-            buttonsContainer.style.gap = '8px';
-            buttonsContainer.style.padding = '10px';
-            buttonsContainer.style.justifyContent = 'center';
+            buttonsContainer.className = 'card-buttons';
 
-            // Import button
             const importButton = document.createElement('button');
             importButton.textContent = 'Import';
-            importButton.style.flex = '1';
-            importButton.style.padding = '8px 16px';
-            importButton.style.background = '#4CAF50';
-            importButton.style.color = 'white';
-            importButton.style.border = 'none';
-            importButton.style.borderRadius = '4px';
-            importButton.style.cursor = 'pointer';
-            importButton.style.fontSize = '14px';
-            importButton.style.fontWeight = '500';
+            importButton.className = 'card-btn import';
             importButton.title = 'Import to main images';
-            importButton.onclick = (e) => {
-                e.stopPropagation();
-                importSingleImage(image.name);
-            };
+            importButton.onclick = (e) => { e.stopPropagation(); importSingleImage(image.name); };
 
-            // Delete button
             const deleteButton = document.createElement('button');
             deleteButton.textContent = 'Delete';
-            deleteButton.style.flex = '1';
-            deleteButton.style.padding = '8px 16px';
-            deleteButton.style.background = '#f44336';
-            deleteButton.style.color = 'white';
-            deleteButton.style.border = 'none';
-            deleteButton.style.borderRadius = '4px';
-            deleteButton.style.cursor = 'pointer';
-            deleteButton.style.fontSize = '14px';
-            deleteButton.style.fontWeight = '500';
+            deleteButton.className = 'card-btn delete';
             deleteButton.title = 'Delete this image';
-            deleteButton.onclick = (e) => {
-                e.stopPropagation();
-                deleteImage(image.name);
-            };
+            deleteButton.onclick = (e) => { e.stopPropagation(); deleteImage(image.name); };
 
             buttonsContainer.appendChild(importButton);
             buttonsContainer.appendChild(deleteButton);
