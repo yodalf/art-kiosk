@@ -6,13 +6,19 @@ A simple Flask server for managing and displaying images in kiosk mode.
 
 import os
 import json
+import re
+import shutil
+import tarfile
+import tempfile
 import time
+import traceback
 import random
 import requests
 import hashlib
 import uuid
 import subprocess
 import threading
+from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
@@ -52,8 +58,6 @@ def get_best_30fps_format(url):
     - 300: 720p60
     - 301: 1080p60
     """
-    import re
-
     try:
         # Run yt-dlp to get available formats
         result = subprocess.run(
@@ -379,77 +383,20 @@ def get_settings():
     if SETTINGS_FILE.exists():
         with open(SETTINGS_FILE, 'r') as f:
             settings = json.load(f)
-            # Ensure check_interval is set to 2 if not present
-            if 'check_interval' not in settings:
-                settings['check_interval'] = 2
-            # Ensure enabled_images exists
-            if 'enabled_images' not in settings:
-                settings['enabled_images'] = {}
-            # Ensure dissolve_enabled exists
-            if 'dissolve_enabled' not in settings:
-                settings['dissolve_enabled'] = True
-            # Ensure themes exist
-            if 'themes' not in settings:
-                settings['themes'] = {}
-            # Ensure "All Images" theme always exists
-            if 'All Images' not in settings['themes']:
-                settings['themes']['All Images'] = {
-                    'name': 'All Images',
-                    'created': time.time(),
-                    'interval': 3600
-                }
-            # Ensure "Extras" theme always exists
-            if 'Extras' not in settings['themes']:
-                settings['themes']['Extras'] = {
-                    'name': 'Extras',
-                    'created': time.time(),
-                    'interval': 3600
-                }
-            if 'image_themes' not in settings:
-                settings['image_themes'] = {}
-            if 'active_theme' not in settings:
-                settings['active_theme'] = 'All Images'
-            if 'atmospheres' not in settings:
-                settings['atmospheres'] = {}
-            # Ensure "All Images" atmosphere always exists
-            if 'All Images' not in settings['atmospheres']:
-                settings['atmospheres']['All Images'] = {
-                    'name': 'All Images',
-                    'created': time.time(),
-                    'interval': 3600
-                }
-            if 'atmosphere_themes' not in settings:
-                settings['atmosphere_themes'] = {}
-            # Ensure "All Images" atmosphere has empty themes list (shows all)
-            if 'All Images' not in settings['atmosphere_themes']:
-                settings['atmosphere_themes']['All Images'] = []
-            if 'active_atmosphere' not in settings:
-                settings['active_atmosphere'] = None
-            if 'shuffle_id' not in settings:
-                settings['shuffle_id'] = random.random()
-            if 'image_crops' not in settings:
-                settings['image_crops'] = {}
-            if 'video_themes' not in settings:
-                settings['video_themes'] = {}
-            if 'enabled_videos' not in settings:
-                settings['enabled_videos'] = {}
-            if 'day_scheduling_enabled' not in settings:
-                settings['day_scheduling_enabled'] = False
-            if 'day_times' not in settings:
-                settings['day_times'] = {
-                    '1': {'start_hour': 6, 'atmospheres': []},
-                    '2': {'start_hour': 8, 'atmospheres': []},
-                    '3': {'start_hour': 10, 'atmospheres': []},
-                    '4': {'start_hour': 12, 'atmospheres': []},
-                    '5': {'start_hour': 14, 'atmospheres': []},
-                    '6': {'start_hour': 16, 'atmospheres': []},
-                    '7': {'start_hour': 18, 'atmospheres': []},
-                    '8': {'start_hour': 20, 'atmospheres': []},
-                    '9': {'start_hour': 22, 'atmospheres': []},
-                    '10': {'start_hour': 0, 'atmospheres': []},
-                    '11': {'start_hour': 2, 'atmospheres': []},
-                    '12': {'start_hour': 4, 'atmospheres': []}
-                }
+            # Apply defaults for any missing keys
+            for key, value in defaults.items():
+                settings.setdefault(key, value)
+            # Ensure required built-in entries always exist
+            settings['themes'].setdefault('All Images', {
+                'name': 'All Images', 'created': time.time(), 'interval': 3600
+            })
+            settings['themes'].setdefault('Extras', {
+                'name': 'Extras', 'created': time.time(), 'interval': 3600
+            })
+            settings['atmospheres'].setdefault('All Images', {
+                'name': 'All Images', 'created': time.time(), 'interval': 3600
+            })
+            settings['atmosphere_themes'].setdefault('All Images', [])
             return settings
 
     return defaults
@@ -498,39 +445,14 @@ def get_current_time_period():
     """Get the current time period (1-12) based on current hour.
     12 independent 2-hour periods covering a full 24-hour day.
     """
-    from datetime import datetime
-
     # Use mock time if in test mode
     if test_mode['enabled'] and test_mode['mock_time'] is not None:
         current_hour = datetime.fromtimestamp(test_mode['mock_time']).hour
     else:
         current_hour = datetime.now().hour
 
-    # Map hours to time periods (2-hour blocks)
-    if 6 <= current_hour < 8:
-        return '1'
-    elif 8 <= current_hour < 10:
-        return '2'
-    elif 10 <= current_hour < 12:
-        return '3'
-    elif 12 <= current_hour < 14:
-        return '4'
-    elif 14 <= current_hour < 16:
-        return '5'
-    elif 16 <= current_hour < 18:
-        return '6'
-    elif 18 <= current_hour < 20:
-        return '7'
-    elif 20 <= current_hour < 22:
-        return '8'
-    elif 22 <= current_hour < 24:
-        return '9'
-    elif 0 <= current_hour < 2:
-        return '10'
-    elif 2 <= current_hour < 4:
-        return '11'
-    else:  # 4 <= current_hour < 6
-        return '12'
+    # Map hours to time periods: 6-7->1, 8-9->2, ..., 4-5->12
+    return str(((current_hour - 6) % 24) // 2 + 1)
 
 
 def get_active_atmospheres_for_time(time_period, settings):
@@ -785,12 +707,8 @@ def delete_image(filename):
 
         # Clean up settings for this image
         settings = get_settings()
-        if 'enabled_images' in settings and filename in settings['enabled_images']:
-            del settings['enabled_images'][filename]
-        if 'image_themes' in settings and filename in settings['image_themes']:
-            del settings['image_themes'][filename]
-        if 'image_crops' in settings and filename in settings['image_crops']:
-            del settings['image_crops'][filename]
+        for key in ('enabled_images', 'image_themes', 'image_crops'):
+            settings.get(key, {}).pop(filename, None)
         save_settings(settings)
 
         # Notify clients that image list changed
@@ -800,7 +718,6 @@ def delete_image(filename):
         return jsonify({'success': True})
     except Exception as e:
         print(f"Error deleting image {filename}: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -908,11 +825,7 @@ def send_command():
 
         # If a video is playing and we're jumping to a different item, stop it
         if current_video_id and image_name != current_video_id:
-            cancel_video_transition_timer()
-            subprocess.run(['pkill', '-9', 'mpv'], check=False)
-            current_video_id = None
-            # Emit show_kiosk so loading page navigates to the target
-            socketio.emit('show_kiosk', {'start_image': image_name})
+            stop_playing_video({'start_image': image_name})
 
         # Also emit via WebSocket for clients that don't poll
         socketio.emit('remote_command', {'command': 'jump', 'image_name': image_name})
@@ -923,14 +836,8 @@ def send_command():
 
         # If a video is playing, stop it and emit WebSocket event for loading page
         if current_video_id and command in ['next', 'prev', 'reload']:
-            # Stop the video
             print(f"[STOP VIDEO] Command '{command}' received while video '{current_video_id}' is playing - stopping mpv", flush=True)
-            cancel_video_transition_timer()
-            result = subprocess.run(['pkill', '-9', 'mpv'], check=False)
-            print(f"[STOP VIDEO] pkill result: {result.returncode}", flush=True)
-            current_video_id = None
-            # Emit show_kiosk so loading page navigates back
-            socketio.emit('show_kiosk', {})
+            stop_playing_video()
 
         # Also emit via WebSocket for clients
         socketio.emit('remote_command', {'command': command})
@@ -1060,7 +967,6 @@ def reshuffle_images():
 
     except Exception as e:
         print(f"[RESHUFFLE] ERROR: {type(e).__name__}: {str(e)}")
-        import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -1223,11 +1129,7 @@ def set_active_theme():
         return jsonify({'error': 'Theme not found'}), 404
 
     # Stop any playing video when switching themes
-    if current_video_id:
-        cancel_video_transition_timer()
-        subprocess.run(['pkill', '-9', 'mpv'], check=False)
-        current_video_id = None
-        socketio.emit('show_kiosk', {})
+    stop_playing_video()
 
     # Update interval to theme's interval
     theme_interval = themes[theme_name].get('interval', 3600)
@@ -1392,11 +1294,7 @@ def set_active_atmosphere():
     atmospheres = settings.get('atmospheres', {})
 
     # Stop any playing video when switching atmospheres
-    if current_video_id:
-        cancel_video_transition_timer()
-        subprocess.run(['pkill', '-9', 'mpv'], check=False)
-        current_video_id = None
-        socketio.emit('show_kiosk', {})
+    stop_playing_video()
 
     # Allow setting to None to clear active atmosphere
     if atmosphere_name is None:
@@ -1678,7 +1576,6 @@ def import_single_extra_image(filename):
         return jsonify({'success': True, 'imported_filename': dest.name})
     except Exception as e:
         print(f"Error importing image: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -1716,7 +1613,6 @@ def import_all_extra_images():
         return jsonify({'success': True, 'imported_count': imported})
     except Exception as e:
         print(f"Error importing images: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -1833,7 +1729,6 @@ def handle_art_search(data):
 
     except Exception as e:
         print(f"Art search error: {e}")
-        import traceback
         traceback.print_exc()
         emit('search_error', {
             'success': False,
@@ -1883,7 +1778,6 @@ def api_download_art():
 
     except Exception as e:
         print(f"Download error: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({
             'success': False,
@@ -2043,7 +1937,6 @@ def rename_all_to_uuid():
         })
     except Exception as e:
         print(f"Error renaming images: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -2379,11 +2272,19 @@ def cancel_video_transition_timer():
         video_transition_timer = None
 
 
+def stop_playing_video(show_kiosk_data=None):
+    """Stop any currently playing video: cancel timer, kill mpv, clear state, notify clients."""
+    global current_video_id
+    if not current_video_id:
+        return
+    cancel_video_transition_timer()
+    subprocess.run(['pkill', '-9', 'mpv'], check=False)
+    current_video_id = None
+    socketio.emit('show_kiosk', show_kiosk_data or {})
+
+
 def start_video_transition_timer():
     """Start a timer to auto-transition after the video interval expires."""
-    import threading
-    import subprocess
-
     global video_transition_timer
 
     # Cancel any existing timer
@@ -3015,44 +2916,43 @@ def cleanup_old_backups(is_testing=False):
             elif filename.startswith(REGULAR_BACKUP_PREFIX):
                 regular_backups.append((filepath, mtime))
 
-    # Sort by modification time, oldest first
-    regular_backups.sort(key=lambda x: x[1])
-    testing_backups.sort(key=lambda x: x[1])
+    def _trim_backups(backups, max_count):
+        backups.sort(key=lambda x: x[1])
+        while len(backups) > max_count:
+            oldest = backups.pop(0)
+            try:
+                os.remove(oldest[0])
+                print(f"Removed old backup: {oldest[0]}")
+            except Exception as e:
+                print(f"Error removing old backup {oldest[0]}: {e}")
 
-    # Remove oldest regular backups if we have more than MAX_BACKUPS
-    while len(regular_backups) > MAX_BACKUPS:
-        oldest = regular_backups.pop(0)
-        try:
-            os.remove(oldest[0])
-            print(f"Removed old regular backup: {oldest[0]}")
-        except Exception as e:
-            print(f"Error removing old backup {oldest[0]}: {e}")
-
-    # Remove oldest testing backups if we have more than MAX_TESTING_BACKUPS
-    while len(testing_backups) > MAX_TESTING_BACKUPS:
-        oldest = testing_backups.pop(0)
-        try:
-            os.remove(oldest[0])
-            print(f"Removed old testing backup: {oldest[0]}")
-        except Exception as e:
-            print(f"Error removing old backup {oldest[0]}: {e}")
+    _trim_backups(regular_backups, MAX_BACKUPS)
+    _trim_backups(testing_backups, MAX_TESTING_BACKUPS)
 
 
 @app.route('/api/backup/restore/<backup_name>', methods=['POST'])
 def restore_backup(backup_name):
     """Restore from a backup file."""
-    import tarfile
-    import shutil
-
     backup_path = os.path.join(BACKUP_DIR, backup_name)
 
     if not os.path.exists(backup_path):
         return jsonify({'success': False, 'error': 'Backup not found'}), 404
 
+    def _restore_directory(src_dir, dst_dir):
+        """Clear dst_dir and copy all files from src_dir into it."""
+        if not os.path.exists(src_dir):
+            return
+        dst_dir = str(dst_dir)
+        if os.path.exists(dst_dir):
+            for f in os.listdir(dst_dir):
+                os.remove(os.path.join(dst_dir, f))
+        else:
+            os.makedirs(dst_dir, exist_ok=True)
+        for filename in os.listdir(src_dir):
+            shutil.copy2(os.path.join(src_dir, filename), os.path.join(dst_dir, filename))
+
     try:
         with tarfile.open(backup_path, 'r:gz') as tar:
-            # Extract to a temporary directory first
-            import tempfile
             with tempfile.TemporaryDirectory() as tmpdir:
                 tar.extractall(tmpdir)
 
@@ -3061,55 +2961,10 @@ def restore_backup(backup_name):
                 if os.path.exists(settings_src):
                     shutil.copy2(settings_src, SETTINGS_FILE)
 
-                # Restore images
-                images_src = os.path.join(tmpdir, 'images')
-                upload_folder = str(app.config['UPLOAD_FOLDER'])
-                if os.path.exists(images_src):
-                    # Clear existing images
-                    if os.path.exists(upload_folder):
-                        for f in os.listdir(upload_folder):
-                            os.remove(os.path.join(upload_folder, f))
-                    else:
-                        os.makedirs(upload_folder, exist_ok=True)
-
-                    # Copy restored images
-                    for filename in os.listdir(images_src):
-                        src = os.path.join(images_src, filename)
-                        dst = os.path.join(upload_folder, filename)
-                        shutil.copy2(src, dst)
-
-                # Restore extra-images
-                extra_src = os.path.join(tmpdir, 'EXTRA_IMAGES')
-                extra_dst = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'EXTRA_IMAGES')
-                if os.path.exists(extra_src):
-                    # Clear existing extra images
-                    if os.path.exists(extra_dst):
-                        for f in os.listdir(extra_dst):
-                            os.remove(os.path.join(extra_dst, f))
-                    else:
-                        os.makedirs(extra_dst, exist_ok=True)
-
-                    # Copy restored extra images
-                    for filename in os.listdir(extra_src):
-                        src = os.path.join(extra_src, filename)
-                        dst = os.path.join(extra_dst, filename)
-                        shutil.copy2(src, dst)
-
-                # Restore thumbnails (video thumbnails)
-                thumbnails_src = os.path.join(tmpdir, 'thumbnails')
-                if os.path.exists(thumbnails_src):
-                    # Clear existing thumbnails
-                    if THUMBNAILS_FOLDER.exists():
-                        for f in os.listdir(THUMBNAILS_FOLDER):
-                            os.remove(THUMBNAILS_FOLDER / f)
-                    else:
-                        THUMBNAILS_FOLDER.mkdir(exist_ok=True)
-
-                    # Copy restored thumbnails
-                    for filename in os.listdir(thumbnails_src):
-                        src = os.path.join(thumbnails_src, filename)
-                        dst = THUMBNAILS_FOLDER / filename
-                        shutil.copy2(src, dst)
+                _restore_directory(os.path.join(tmpdir, 'images'), app.config['UPLOAD_FOLDER'])
+                _restore_directory(os.path.join(tmpdir, 'EXTRA_IMAGES'),
+                                   os.path.join(os.path.dirname(os.path.abspath(__file__)), 'EXTRA_IMAGES'))
+                _restore_directory(os.path.join(tmpdir, 'thumbnails'), THUMBNAILS_FOLDER)
 
         # Emit multiple events to ensure kiosk picks up the restored settings/images
         socketio.emit('remote_command', {'command': 'reload'})

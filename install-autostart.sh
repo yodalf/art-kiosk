@@ -24,23 +24,23 @@ echo "Kiosk directory: $SCRIPT_DIR"
 # Stop services if they're running
 echo ""
 echo "Stopping existing services (if any)..."
-systemctl stop kiosk.target 2>/dev/null || true
-systemctl stop kiosk-firefox.service 2>/dev/null || true
-systemctl stop kiosk-display.service 2>/dev/null || true
+for svc in kiosk.target kiosk-firefox.service kiosk-display.service; do
+    systemctl stop "$svc" 2>/dev/null || true
+done
 
 # Copy service files
 echo ""
 echo "Installing service files..."
-cp "$SCRIPT_DIR/kiosk.target" /etc/systemd/system/
-cp "$SCRIPT_DIR/kiosk-display.service" /etc/systemd/system/
-cp "$SCRIPT_DIR/kiosk-firefox.service" /etc/systemd/system/
+for unit in kiosk.target kiosk-display.service kiosk-firefox.service; do
+    cp "$SCRIPT_DIR/$unit" /etc/systemd/system/
+done
 
-# Update WorkingDirectory and User in service files to actual values
-sed -i "s|/home/realo/kiosk_images|$SCRIPT_DIR|g" /etc/systemd/system/kiosk-display.service
-sed -i "s|/home/realo/kiosk_images|$SCRIPT_DIR|g" /etc/systemd/system/kiosk-firefox.service
+# Update paths, user, and username in service files
+for svc in kiosk-display.service kiosk-firefox.service; do
+    sed -i "s|/home/realo/kiosk_images|$SCRIPT_DIR|g" "/etc/systemd/system/$svc"
+    sed -i "s|User=realo|User=$REAL_USER|g" "/etc/systemd/system/$svc"
+done
 sed -i "s|/home/realo|$REAL_HOME|g" /etc/systemd/system/kiosk-firefox.service
-sed -i "s|User=realo|User=$REAL_USER|g" /etc/systemd/system/kiosk-display.service
-sed -i "s|User=realo|User=$REAL_USER|g" /etc/systemd/system/kiosk-firefox.service
 sed -i "s|-u realo|-u $REAL_USER|g" /etc/systemd/system/kiosk-firefox.service
 
 # Make startup scripts executable
@@ -61,9 +61,9 @@ setcap 'cap_net_bind_service=+ep' "$PYTHON_BIN"
 # Enable target and services
 echo ""
 echo "Enabling kiosk.target and services..."
-systemctl enable kiosk.target
-systemctl enable kiosk-display.service
-systemctl enable kiosk-firefox.service
+for svc in kiosk.target kiosk-display.service kiosk-firefox.service; do
+    systemctl enable "$svc"
+done
 
 # Start kiosk.target (starts both services)
 echo ""
@@ -74,11 +74,10 @@ systemctl start kiosk.target
 echo ""
 echo "Service Status:"
 echo "==============="
-systemctl status kiosk.target --no-pager -l || true
-echo ""
-systemctl status kiosk-display.service --no-pager -l || true
-echo ""
-systemctl status kiosk-firefox.service --no-pager -l || true
+for svc in kiosk.target kiosk-display.service kiosk-firefox.service; do
+    systemctl status "$svc" --no-pager -l || true
+    echo ""
+done
 
 echo ""
 echo "============================================"

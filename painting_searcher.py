@@ -1380,36 +1380,26 @@ class PaintingSearcher:
         # Get sources from configuration
         sources = self.sources_config.get('sources', {})
 
-        # List enabled sources
-        enabled_sources = []
-        for source_id, config in sources.items():
-            if config.get('enabled', False):
-                enabled_sources.append(config.get('name', source_id))
-
-        sources_display = ', '.join(enabled_sources) if enabled_sources else 'None'
-        print(f"Sources: VERIFIED ONLY ({sources_display})")
+        enabled_sources = [config.get('name', sid) for sid, config in sources.items()
+                           if config.get('enabled', False)]
+        print(f"Sources: VERIFIED ONLY ({', '.join(enabled_sources) or 'None'})")
         print(f"{'='*60}")
 
         verified_results = []
 
-        # Search built-in sources if enabled in config
-        if sources.get('cleveland', {}).get('enabled', True):
-            verified_results.extend(self.search_cleveland_museum(query, limit_per_source))
+        # Map source config keys to their search methods and default enabled state
+        source_handlers = [
+            ('cleveland',     self.search_cleveland_museum,  True),
+            ('rijksmuseum',   self.search_rijksmuseum,       True),
+            ('wikimedia',     self.search_wikimedia_commons,  True),
+            ('europeana',     self.search_europeana,          True),
+            ('harvard',       self.search_harvard,            False),
+            ('google_images', self.search_google_images,      False),
+        ]
 
-        if sources.get('rijksmuseum', {}).get('enabled', True):
-            verified_results.extend(self.search_rijksmuseum(query, limit_per_source))
-
-        if sources.get('wikimedia', {}).get('enabled', True):
-            verified_results.extend(self.search_wikimedia_commons(query, limit_per_source))
-
-        if sources.get('europeana', {}).get('enabled', True):
-            verified_results.extend(self.search_europeana(query, limit_per_source))
-
-        if sources.get('harvard', {}).get('enabled', False):
-            verified_results.extend(self.search_harvard(query, limit_per_source))
-
-        if sources.get('google_images', {}).get('enabled', False):
-            verified_results.extend(self.search_google_images(query, limit_per_source))
+        for source_key, handler, default_enabled in source_handlers:
+            if sources.get(source_key, {}).get('enabled', default_enabled):
+                verified_results.extend(handler(query, limit_per_source))
 
         # Randomize results for diversity
         random.shuffle(verified_results)

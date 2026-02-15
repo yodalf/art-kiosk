@@ -14,11 +14,11 @@ pkill unclutter 2>/dev/null
 # Kill any existing Flask server processes for this kiosk
 pkill -f "python.*app.py" 2>/dev/null
 
-# Kill any process using port 5000
+# Kill any process using port 80
 if command -v fuser &> /dev/null; then
-    fuser -k 5000/tcp 2>/dev/null
+    sudo fuser -k 80/tcp 2>/dev/null
 elif command -v lsof &> /dev/null; then
-    lsof -ti:5000 | xargs kill -9 2>/dev/null
+    sudo lsof -ti:80 | xargs kill -9 2>/dev/null
 fi
 
 echo "Kiosk stopped."
