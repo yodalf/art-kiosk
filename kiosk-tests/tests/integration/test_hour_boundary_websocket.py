@@ -83,8 +83,8 @@ def test_multiple_hour_boundaries(api_client, server_state):
         (8, 30, '2'),   # 8:30 AM -> Period 2
         (10, 30, '3'),  # 10:30 AM -> Period 3
         (14, 30, '5'),  # 2:30 PM -> Period 5
-        (20, 30, '8'),  # 8:30 PM -> Period 8 (mirrors 2)
-        (2, 30, '11'),  # 2:30 AM -> Period 11 (mirrors 5)
+        (20, 30, '8'),  # 8:30 PM -> Period 8
+        (2, 30, '11'),  # 2:30 AM -> Period 11
     ]
     
     for hour, minute, expected_period in test_times:

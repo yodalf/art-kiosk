@@ -291,17 +291,17 @@ Atmosphere: "Evening"
 Automatically switch atmospheres throughout the day:
 
 ```
-Time Periods (2-hour blocks, 12-hour mirroring):
+Time Periods (12 independent 2-hour blocks):
 
-Period 1:  6 AM -  8 AM  ←→  Period 7:  6 PM -  8 PM
-Period 2:  8 AM - 10 AM  ←→  Period 8:  8 PM - 10 PM
-Period 3: 10 AM - 12 PM  ←→  Period 9: 10 PM - 12 AM
-Period 4: 12 PM -  2 PM  ←→  Period 10: 12 AM -  2 AM
-Period 5:  2 PM -  4 PM  ←→  Period 11:  2 AM -  4 AM
-Period 6:  4 PM -  6 PM  ←→  Period 12:  4 AM -  6 AM
+Period 1:  6 AM -  8 AM     Period 7:  6 PM -  8 PM
+Period 2:  8 AM - 10 AM     Period 8:  8 PM - 10 PM
+Period 3: 10 AM - 12 PM     Period 9: 10 PM - 12 AM
+Period 4: 12 PM -  2 PM     Period 10: 12 AM -  2 AM
+Period 5:  2 PM -  4 PM     Period 11:  2 AM -  4 AM
+Period 6:  4 PM -  6 PM     Period 12:  4 AM -  6 AM
 ```
 
-- Configure 6 periods; the other 6 mirror automatically
+- All 12 periods are independently configurable
 - Assign different atmospheres to each period
 - System automatically switches when time period changes
 - Green border highlights current period in UI

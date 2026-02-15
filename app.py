@@ -355,20 +355,19 @@ def get_settings():
         'active_atmosphere': None,  # No atmosphere active by default
         'day_scheduling_enabled': False,  # Enable/disable Day scheduling
         'day_times': {
-            # 6 time periods of 2 hours each, repeating every 12 hours
-            # Times 4-6 mirror times 1-3 automatically
+            # 12 independent 2-hour time periods covering a full 24-hour day
             '1': {'start_hour': 6, 'atmospheres': []},   # 6:00 AM - 8:00 AM
             '2': {'start_hour': 8, 'atmospheres': []},   # 8:00 AM - 10:00 AM
             '3': {'start_hour': 10, 'atmospheres': []},  # 10:00 AM - 12:00 PM
-            '4': {'start_hour': 12, 'atmospheres': []},  # 12:00 PM - 2:00 PM (mirrors 1)
-            '5': {'start_hour': 14, 'atmospheres': []},  # 2:00 PM - 4:00 PM (mirrors 2)
-            '6': {'start_hour': 16, 'atmospheres': []},  # 4:00 PM - 6:00 PM (mirrors 3)
-            '7': {'start_hour': 18, 'atmospheres': []},  # 6:00 PM - 8:00 PM (mirrors 1)
-            '8': {'start_hour': 20, 'atmospheres': []},  # 8:00 PM - 10:00 PM (mirrors 2)
-            '9': {'start_hour': 22, 'atmospheres': []},  # 10:00 PM - 12:00 AM (mirrors 3)
-            '10': {'start_hour': 0, 'atmospheres': []},  # 12:00 AM - 2:00 AM (mirrors 1)
-            '11': {'start_hour': 2, 'atmospheres': []},  # 2:00 AM - 4:00 AM (mirrors 2)
-            '12': {'start_hour': 4, 'atmospheres': []}   # 4:00 AM - 6:00 AM (mirrors 3)
+            '4': {'start_hour': 12, 'atmospheres': []},  # 12:00 PM - 2:00 PM
+            '5': {'start_hour': 14, 'atmospheres': []},  # 2:00 PM - 4:00 PM
+            '6': {'start_hour': 16, 'atmospheres': []},  # 4:00 PM - 6:00 PM
+            '7': {'start_hour': 18, 'atmospheres': []},  # 6:00 PM - 8:00 PM
+            '8': {'start_hour': 20, 'atmospheres': []},  # 8:00 PM - 10:00 PM
+            '9': {'start_hour': 22, 'atmospheres': []},  # 10:00 PM - 12:00 AM
+            '10': {'start_hour': 0, 'atmospheres': []},  # 12:00 AM - 2:00 AM
+            '11': {'start_hour': 2, 'atmospheres': []},  # 2:00 AM - 4:00 AM
+            '12': {'start_hour': 4, 'atmospheres': []}   # 4:00 AM - 6:00 AM
         },
         'shuffle_id': random.random(),  # Random ID for consistent shuffling
         'image_crops': {},  # Image name -> crop data
@@ -497,8 +496,7 @@ def set_image_enabled(filename, enabled):
 
 def get_current_time_period():
     """Get the current time period (1-12) based on current hour.
-    6 periods of 2 hours each, repeating every 12 hours.
-    Times 4-6 mirror 1-3, times 7-9 mirror 1-3, times 10-12 mirror 1-3.
+    12 independent 2-hour periods covering a full 24-hour day.
     """
     from datetime import datetime
 
@@ -536,24 +534,13 @@ def get_current_time_period():
 
 
 def get_active_atmospheres_for_time(time_period, settings):
-    """Get atmospheres for a time period, handling mirroring.
-    Times 7-12 mirror times 1-6 (12-hour repeat pattern).
+    """Get atmospheres for a time period.
+    Each of the 12 periods is independently configured.
     If no atmospheres are assigned, returns ['All Images'].
     """
     day_times = settings.get('day_times', {})
 
-    # Handle mirroring - times 7-12 mirror times 1-6
-    mirror_map = {
-        '7': '1',   # 6 PM mirrors 6 AM
-        '8': '2',   # 8 PM mirrors 8 AM
-        '9': '3',   # 10 PM mirrors 10 AM
-        '10': '4',  # 12 AM mirrors 12 PM
-        '11': '5',  # 2 AM mirrors 2 PM
-        '12': '6'   # 4 AM mirrors 4 PM
-    }
-
-    source_time = mirror_map.get(time_period, time_period)
-    atmospheres = day_times.get(source_time, {}).get('atmospheres', [])
+    atmospheres = day_times.get(time_period, {}).get('atmospheres', [])
 
     # If no atmospheres assigned, default to "All Images"
     if not atmospheres:
@@ -1554,46 +1541,8 @@ def update_time_atmospheres(time_id):
         if time_id not in day_times:
             return jsonify({'error': 'Time period not found'}), 404
 
-        # Update atmospheres for this time
+        # Update atmospheres for this time period
         day_times[time_id]['atmospheres'] = atmospheres
-
-        # Handle mirroring: update all mirrored times
-        # Times 1-6 are the source, times 7-12 mirror them
-        mirror_groups = {
-            '1': ['7'],   # 6 AM mirrors at 6 PM
-            '2': ['8'],   # 8 AM mirrors at 8 PM
-            '3': ['9'],   # 10 AM mirrors at 10 PM
-            '4': ['10'],  # 12 PM mirrors at 12 AM
-            '5': ['11'],  # 2 PM mirrors at 2 AM
-            '6': ['12']   # 4 PM mirrors at 4 AM
-        }
-
-        mirrored_ids = []
-
-        # If updating a source time (1-6), update its mirror
-        if time_id in mirror_groups:
-            for mirror_id in mirror_groups[time_id]:
-                if mirror_id in day_times:  # Only update if mirror exists
-                    day_times[mirror_id]['atmospheres'] = atmospheres
-                    mirrored_ids.append(mirror_id)
-        # If updating a mirror time (7-12), update the source
-        else:
-            # Find which source this mirrors
-            source_map = {
-                '7': '1', '8': '2', '9': '3',
-                '10': '4', '11': '5', '12': '6'
-            }
-            source_id = source_map.get(time_id)
-            if source_id:
-                # Update source
-                if source_id in day_times:  # Only update if source exists
-                    day_times[source_id]['atmospheres'] = atmospheres
-                    mirrored_ids.append(source_id)
-                # Update the mirror (if not self)
-                for mirror_id in mirror_groups[source_id]:
-                    if mirror_id != time_id and mirror_id in day_times:  # Only update if mirror exists
-                        day_times[mirror_id]['atmospheres'] = atmospheres
-                        mirrored_ids.append(mirror_id)
 
         settings['day_times'] = day_times
 
@@ -1605,8 +1554,7 @@ def update_time_atmospheres(time_id):
         return jsonify({
             'success': True,
             'time_id': time_id,
-            'atmospheres': atmospheres,
-            'mirrored_ids': mirrored_ids
+            'atmospheres': atmospheres
         })
     except Exception as e:
         import traceback

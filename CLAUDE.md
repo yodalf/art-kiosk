@@ -59,7 +59,7 @@ Art Kiosk is a web-based image and video display system for Raspberry Pi with a 
 - Flask backend with Flask-SocketIO (port 80) for image/video management
 - 9 HTML frontend templates for display, management, upload, search, backup, debug, remote control
 - Theme and atmosphere organization system with many-to-many image assignments
-- Day scheduling with 12 two-hour periods (6 configurable + 6 auto-mirrored)
+- Day scheduling with 12 independent two-hour periods covering a full 24-hour day
 - Image cropping with non-uniform scaling for full-screen coverage
 - Video playback via mpv with YouTube integration (yt-dlp)
 - Hybrid communication: WebSocket primary, polling fallback
@@ -230,7 +230,7 @@ Images/Videos
 
 **Day Scheduling (kiosk.html)**
 - Every 60 seconds: check if hour boundary crossed
-- 12 two-hour periods with automatic mirroring (periods 7-12 mirror 1-6)
+- 12 independent two-hour periods covering a full 24-hour day
 - On boundary crossing: triggers `checkForImageChanges()` which reloads for new atmosphere
 - Empty period defaults to "All Images" atmosphere
 
@@ -292,7 +292,7 @@ Images/Videos
   "active_atmosphere": null,           // null = use theme instead
 
   "day_scheduling_enabled": false,
-  "day_times": {                       // 12 two-hour periods (7-12 mirror 1-6)
+  "day_times": {                       // 12 independent two-hour periods
     "1": {"start_hour": 6, "atmospheres": ["Morning"]},
     "2": {"start_hour": 8, "atmospheres": []},
     "7": {"start_hour": 18, "atmospheres": []}
@@ -561,9 +561,9 @@ kiosk_images/
 
 **When modifying day scheduling:**
 - Period calculation is in both app.py and kiosk.html
-- Periods 7-12 mirror 1-6 automatically
+- All 12 periods are independently configurable (no mirroring)
 - Hour boundary check runs every 60 seconds in kiosk.html
-- UI shows AM cycle (6am-6pm) and PM cycle (6pm-6am) labels
+- UI shows all 12 periods with fixed labels
 - Green border highlights current period
 
 **When debugging:**

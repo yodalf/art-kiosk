@@ -180,21 +180,27 @@ Testable requirements for the Art Kiosk system, organized by functional area wit
 
 | ID | Requirement | Test |
 |----|-------------|------|
-| REQ-DAY-004 | System SHALL support 12 time periods (6 × 2-hour + 6 mirrors) | Verify current_time_period |
+| REQ-DAY-004 | System SHALL support 12 independent 2-hour time periods | Verify current_time_period |
 | REQ-DAY-005 | POST atmospheres SHALL assign to time period | Assign, verify day_times |
-| REQ-DAY-006 | Changes SHALL mirror to corresponding period | Update Time 1, verify Time 7 |
+| REQ-DAY-006 | Each period SHALL be independently configurable | Update Time 1, verify Time 7 unchanged |
 | REQ-DAY-007 | Changing atmospheres SHALL regenerate shuffle_id | Update, verify changed |
 
 **Time Period Definitions:**
 
-| Period | Hours | Mirrors |
-|--------|-------|---------|
-| 1 | 6 AM - 8 AM | 7 (6 PM - 8 PM) |
-| 2 | 8 AM - 10 AM | 8 (8 PM - 10 PM) |
-| 3 | 10 AM - 12 PM | 9 (10 PM - 12 AM) |
-| 4 | 12 PM - 2 PM | 10 (12 AM - 2 AM) |
-| 5 | 2 PM - 4 PM | 11 (2 AM - 4 AM) |
-| 6 | 4 PM - 6 PM | 12 (4 AM - 6 AM) |
+| Period | Hours |
+|--------|-------|
+| 1 | 6 AM - 8 AM |
+| 2 | 8 AM - 10 AM |
+| 3 | 10 AM - 12 PM |
+| 4 | 12 PM - 2 PM |
+| 5 | 2 PM - 4 PM |
+| 6 | 4 PM - 6 PM |
+| 7 | 6 PM - 8 PM |
+| 8 | 8 PM - 10 PM |
+| 9 | 10 PM - 12 AM |
+| 10 | 12 AM - 2 AM |
+| 11 | 2 AM - 4 AM |
+| 12 | 4 AM - 6 AM |
 
 ### 4.3 Hour Boundary Transitions
 

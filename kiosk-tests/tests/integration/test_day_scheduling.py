@@ -46,14 +46,9 @@ def test_hour_boundary_detection(test_mode, api_client):
 def test_time_period_calculation(api_client):
     """Test that time periods are calculated correctly for different hours."""
     # Test various hours and their expected time periods (2-hour blocks)
-    # Periods 1-6: 6 AM - 6 PM (AM hours)
-    # Periods 7-12: 6 PM - 6 AM (PM hours, mirroring AM)
-    # Period 1: 6-8 AM, Period 7: 6-8 PM (mirror)
-    # Period 2: 8-10 AM, Period 8: 8-10 PM (mirror)
-    # Period 3: 10-12 PM, Period 9: 10 PM-12 AM (mirror)
-    # Period 4: 12-2 PM, Period 10: 12-2 AM (mirror)
-    # Period 5: 2-4 PM, Period 11: 2-4 AM (mirror)
-    # Period 6: 4-6 PM, Period 12: 4-6 AM (mirror)
+    # 12 independent 2-hour periods covering 24 hours
+    # Periods 1-6: 6 AM - 6 PM
+    # Periods 7-12: 6 PM - 6 AM
 
     test_cases = [
         (1700046000, '1'),  # Period 1: 6-8 AM
@@ -68,12 +63,12 @@ def test_time_period_calculation(api_client):
         (1700080200, '5'),  # Period 5: 3:30 PM
         (1700082000, '6'),  # Period 6: 4-6 PM
         (1700087400, '6'),  # Period 6: 5:30 PM
-        (1700089200, '7'),  # Period 7: 6-8 PM (mirrors Period 1)
-        (1700096400, '8'),  # Period 8: 8-10 PM (mirrors Period 2)
-        (1700103600, '9'),  # Period 9: 10 PM-12 AM (mirrors Period 3)
-        (1700024400, '10'),  # Period 10: 12-2 AM (mirrors Period 4)
-        (1700031600, '11'),  # Period 11: 2-4 AM (mirrors Period 5)
-        (1700038800, '12'),  # Period 12: 4-6 AM (mirrors Period 6)
+        (1700089200, '7'),  # Period 7: 6-8 PM
+        (1700096400, '8'),  # Period 8: 8-10 PM
+        (1700103600, '9'),  # Period 9: 10 PM-12 AM
+        (1700024400, '10'),  # Period 10: 12-2 AM
+        (1700031600, '11'),  # Period 11: 2-4 AM
+        (1700038800, '12'),  # Period 12: 4-6 AM
     ]
 
     # Enable test mode
