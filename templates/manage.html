@@ -35,11 +35,6 @@
             margin-bottom: 10px;
         }
 
-        .subtitle {
-            color: #aaaaaa;
-            margin-bottom: 30px;
-        }
-
         .navigation {
             display: flex;
             gap: 0;
@@ -260,34 +255,6 @@
             padding: 12px;
         }
 
-        .image-card-name {
-            font-size: 14px;
-            color: #ffffff;
-            margin-bottom: 8px;
-            word-break: break-all;
-        }
-
-        .image-card-size {
-            font-size: 12px;
-            color: #888888;
-            margin-bottom: 12px;
-        }
-
-        .delete-button {
-            background: #f44336;
-            color: white;
-            padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            width: 100%;
-        }
-
-        .delete-button:hover {
-            background: #d32f2f;
-        }
-
         .message {
             padding: 12px;
             border-radius: 4px;
@@ -309,103 +276,6 @@
 
         .message.visible {
             display: block;
-        }
-
-        .links {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .links a {
-            color: #64b5f6;
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-        .links a:hover {
-            text-decoration: underline;
-        }
-
-
-        .remote-control {
-            background: #2a2a2a;
-            padding: 20px;
-            border-radius: 8px;
-            border: 2px solid #ff9800;
-            margin-bottom: 20px;
-        }
-
-        .remote-control h3 {
-            color: #ffb74d;
-            margin-bottom: 15px;
-            font-size: 16px;
-        }
-
-        .control-buttons {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 10px;
-        }
-
-        .control-button {
-            background: #ff9800;
-            color: white;
-            padding: 12px 16px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: background 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .control-button:hover {
-            background: #f57c00;
-        }
-
-        .control-button:active {
-            transform: scale(0.95);
-        }
-
-        .control-button.danger {
-            background: #f44336;
-        }
-
-        .control-button.danger:hover {
-            background: #d32f2f;
-        }
-
-        .control-button.success {
-            background: #4CAF50;
-        }
-
-        .control-button.success:hover {
-            background: #45a049;
-        }
-
-        .control-button-wrapper {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .led-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #ccc;
-            transition: background 0.3s;
-        }
-
-        .led-indicator.active {
-            background: #2196F3;
-            box-shadow: 0 0 8px #2196F3;
         }
 
         .time-period-card {
@@ -480,18 +350,6 @@
             color: #1565c0;
             border-radius: 3px;
             font-size: 11px;
-        }
-
-        .theme-selector {
-            margin-top: 8px;
-        }
-
-        .theme-selector select {
-            padding: 4px 8px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            font-size: 12px;
-            width: 100%;
         }
 
         /* Crop Modal */
@@ -573,17 +431,6 @@
 
         .crop-button.tertiary:hover {
             background: #616161;
-        }
-
-        .crop-image-button {
-            background: #2196F3;
-            color: white;
-            padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-right: 8px;
         }
 
         /* Action menu styles */
@@ -708,9 +555,6 @@
             border-radius: 0 0 4px 4px;
         }
 
-        .crop-image-button:hover {
-            background: #1976D2;
-        }
     </style>
 </head>
 <body>
@@ -968,58 +812,6 @@
                 closeAllMenus();
             }
         });
-
-        // Track current playback state
-        let isPlaying = true; // Assume playing by default
-
-        // Update LED indicators
-        function updateLEDs() {
-            document.getElementById('led-play').classList.toggle('active', isPlaying);
-            document.getElementById('led-pause').classList.toggle('active', !isPlaying);
-        }
-
-        // Flash LED briefly for action buttons
-        function flashLED(ledId) {
-            const led = document.getElementById(ledId);
-            led.classList.add('active');
-            setTimeout(() => {
-                led.classList.remove('active');
-            }, 500);
-        }
-
-        // Send remote control command
-        function sendCommand(command) {
-            try {
-                // Send command via WebSocket
-                socket.emit('send_command', { command });
-
-                // Update LED indicators based on command
-                switch(command) {
-                    case 'play':
-                        isPlaying = true;
-                        updateLEDs();
-                        break;
-                    case 'pause':
-                        isPlaying = false;
-                        updateLEDs();
-                        break;
-                    case 'prev':
-                        flashLED('led-prev');
-                        break;
-                    case 'next':
-                        flashLED('led-next');
-                        break;
-                    case 'reload':
-                        isPlaying = true; // Reload resumes playback
-                        updateLEDs();
-                        flashLED('led-reload');
-                        break;
-                }
-            } catch (error) {
-                console.error('Error sending command:', error);
-                showMessage('Error sending command', 'error');
-            }
-        }
 
         // Jump to specific image in kiosk display
         async function jumpToImage(imageName) {
@@ -2322,36 +2114,6 @@
             createBtn.style.display = 'block';
         }
 
-        async function saveThemeInterval(themeName) {
-            const inputElement = document.getElementById(`interval-${themeName}`);
-            const intervalMinutes = parseFloat(inputElement.value);
-
-            if (!intervalMinutes || intervalMinutes < 1) {
-                showMessage('Invalid interval value', 'error');
-                return;
-            }
-
-            const intervalSeconds = Math.round(intervalMinutes * 60);
-
-            try {
-                const response = await fetch(`/api/themes/${encodeURIComponent(themeName)}/interval`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ interval: intervalSeconds })
-                });
-
-                if (response.ok) {
-                    availableThemes[themeName].interval = intervalSeconds;
-                    showMessage(`Interval updated for theme "${themeName}"`, 'success');
-                } else {
-                    showMessage('Error updating theme interval', 'error');
-                }
-            } catch (error) {
-                console.error('Error updating theme interval:', error);
-                showMessage('Error updating theme interval', 'error');
-            }
-        }
-
         async function saveThemeIntervalFromInput(themeName, inputElement, buttonElement) {
             const intervalMinutes = parseFloat(inputElement.value);
 
@@ -2819,24 +2581,6 @@
         // Track shuffle_id to detect when kiosk reshuffles
         let previousShuffleId = null;
 
-        // Check if shuffle_id has changed (kiosk reshuffled)
-        async function checkShuffleIdChanged() {
-            try {
-                const response = await fetch('/api/settings');
-                const settings = await response.json();
-                const currentShuffleId = settings.shuffle_id;
-
-                if (previousShuffleId !== null && previousShuffleId !== currentShuffleId) {
-                    console.log(`Shuffle ID changed: ${previousShuffleId} -> ${currentShuffleId}. Reloading images...`);
-                    await loadImages(); // Reload current images with new order
-                }
-
-                previousShuffleId = currentShuffleId;
-            } catch (error) {
-                console.error('Error checking shuffle_id:', error);
-            }
-        }
-
         // WebSocket event handlers for real-time updates
         socket.on('connect', () => {
             console.log('WebSocket connected');
@@ -2900,56 +2644,6 @@
         // ====================================================================
 
         let currentPlayingVideoId = null;
-
-        async function loadVideos() {
-            try {
-                const response = await fetch('/api/videos');
-                const videos = await response.json();
-
-                const grid = document.getElementById('video-grid');
-
-                if (videos.length === 0) {
-                    grid.innerHTML = '<p style="color: #999;">No videos added yet</p>';
-                    return;
-                }
-
-                grid.innerHTML = '';
-                videos.forEach(video => {
-                    const card = document.createElement('div');
-                    card.className = 'image-card';
-                    card.style.cursor = 'pointer';
-                    card.id = `video-card-${video.id}`;
-
-                    const isPlaying = currentPlayingVideoId === video.id;
-
-                    card.innerHTML = `
-                        <div style="width: 200px; height: 150px; background: #2a2a2a; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
-                            <img id="video-thumb-${video.id}"
-                                 src="/thumbnails/${video.id}.png"
-                                 style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;"
-                                 onerror="this.style.display='none'">
-                            <div id="video-icon-${video.id}" style="font-size: 48px; position: relative; z-index: 1; text-shadow: 0 0 10px rgba(0,0,0,0.8);">${isPlaying ? '⏹' : '▶'}</div>
-                            <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); padding: 4px 8px; font-size: 10px; text-align: center; z-index: 2;">
-                                ${(video.tags && video.tags.length > 0) ? video.tags.join(', ') : '<span style="color: #666;">No tags</span>'}
-                            </div>
-                        </div>
-                        <div style="padding: 8px; display: flex; gap: 8px;">
-                            <button
-                                id="play-btn-${video.id}"
-                                onclick="toggleVideo('${video.id}')"
-                                style="flex: 1; padding: 6px; background: ${isPlaying ? '#ff9800' : '#4CAF50'}; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                ${isPlaying ? 'Stop' : 'Play'}
-                            </button>
-                            <button onclick="deleteVideo('${video.id}')" style="padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
-                        </div>
-                    `;
-
-                    grid.appendChild(card);
-                });
-            } catch (error) {
-                console.error('Error loading videos:', error);
-            }
-        }
 
         async function addVideo() {
             const urlInput = document.getElementById('video-url-input');
