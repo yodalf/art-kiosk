@@ -10,7 +10,7 @@ import time
 import os
 import random
 from typing import List, Dict, Tuple, Optional
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 import re
 from datetime import datetime
 from pathlib import Path
@@ -226,18 +226,7 @@ class PaintingSearcher:
         
         try:
             api_url = "https://api.artic.edu/api/v1/artworks/search"
-            params = {
-                'q': query,
-                'query': {
-                    'term': {
-                        'classification_titles': 'painting'
-                    }
-                },
-                'fields': 'id,title,artist_display,date_display,image_id,dimensions',
-                'limit': limit
-            }
-            
-            response = requests.get(api_url, params={'q': query, 'limit': limit, 
+            response = requests.get(api_url, params={'q': query, 'limit': limit,
                                                     'fields': 'id,title,artist_display,date_display,image_id,dimensions'},
                                    timeout=10)
             
@@ -443,7 +432,7 @@ class PaintingSearcher:
 
                                 result = {
                                     'title': title.replace('File:', '').replace('.jpg', '').replace('.png', ''),
-                                    'artist': artist[:100] if len(artist) > 100 else artist,
+                                    'artist': artist[:100],
                                     'date': metadata.get('DateTimeOriginal', {}).get('value', 'Unknown'),
                                     'source': 'Wikimedia Commons',
                                     'image_url': image_info['url'],
@@ -709,19 +698,15 @@ class PaintingSearcher:
                     # Item passed all checks - extract and save
                     aspect_ratio, match_score = self.get_aspect_ratio_match(width, height)
 
-                    # Extract metadata
-                    title_list = obj.get('title', ['Untitled'])
-                    title = title_list[0] if isinstance(title_list, list) else title_list
-
-                    creator_list = obj.get('dcCreator', ['Unknown'])
-                    creator = creator_list[0] if isinstance(creator_list, list) else creator_list
-
-                    year_list = obj.get('year', ['Unknown'])
-                    year = year_list[0] if isinstance(year_list, list) else year_list
+                    # Extract metadata (Europeana fields can be lists or strings)
+                    first = lambda v, d='Unknown': v[0] if isinstance(v, list) and v else (v or d)
+                    title = first(obj.get('title'), 'Untitled')
+                    creator = first(obj.get('dcCreator'))
+                    year = first(obj.get('year'))
 
                     result = {
-                        'title': title[:100] if len(title) > 100 else title,
-                        'artist': creator[:100] if len(creator) > 100 else creator,
+                        'title': title[:100],
+                        'artist': creator[:100],
                         'date': str(year),
                         'source': 'Europeana',
                         'image_url': edm_is_shown_by,
@@ -833,7 +818,7 @@ class PaintingSearcher:
                     # Get artist from people array
                     artist = 'Unknown'
                     people = record.get('people', [])
-                    if people and len(people) > 0:
+                    if people:
                         artist = people[0].get('name', 'Unknown')
 
                     # Get date
@@ -846,8 +831,8 @@ class PaintingSearcher:
                     museum_url = record.get('url', '')
 
                     result = {
-                        'title': title[:100] if len(title) > 100 else title,
-                        'artist': artist[:100] if len(artist) > 100 else artist,
+                        'title': title[:100],
+                        'artist': artist[:100],
                         'date': str(date),
                         'source': 'Harvard Art Museums',
                         'image_url': image_url,
@@ -981,7 +966,6 @@ class PaintingSearcher:
                     # Extract domain as "artist/source"
                     artist = 'Google Images'
                     if page_url:
-                        from urllib.parse import urlparse
                         domain = urlparse(page_url).netloc
                         artist = domain.replace('www.', '')
 
@@ -989,8 +973,8 @@ class PaintingSearcher:
                     image_url = item.get('link', '')
 
                     result = {
-                        'title': title[:100] if len(title) > 100 else title,
-                        'artist': artist[:100] if len(artist) > 100 else artist,
+                        'title': title[:100],
+                        'artist': artist[:100],
                         'date': 'Unknown',
                         'source': 'Google Images',
                         'image_url': image_url,
