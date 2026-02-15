@@ -84,20 +84,25 @@ def test_kiosk_image_parameter_lookup(api_client, isolated_test_data, page):
     # Navigate to kiosk and inject a test to check the lookup
     page.set_viewport_size({"width": 2560, "height": 2880})
     page.goto(f"{api_client.base_url}/view?image={target_image}")
-    page.wait_for_selector('.slide', timeout=10000)
-    time.sleep(1)
 
-    # Check what's in the images array and whether our target is there
+    # Wait for slides to be created (images loaded and rendered)
+    page.wait_for_selector('.slide', timeout=10000)
+
+    # Wait until at least one slide has an img with a src (images fully loaded)
+    page.wait_for_selector('.slide img[src]', timeout=10000)
+
+    # Check the DOM for slides containing our target image
     lookup_result = page.evaluate(f"""
         () => {{
             const targetImage = "{target_image}";
-            const imageList = window.images || [];
-            const foundIndex = imageList.findIndex(img => img.name === targetImage);
+            const slides = document.querySelectorAll('.slide img[src]');
+            const slideNames = Array.from(slides).map(img => img.src.split('/').pop());
+            const foundIndex = slideNames.indexOf(targetImage);
 
             return {{
                 targetImage: targetImage,
-                imageCount: imageList.length,
-                imageNames: imageList.slice(0, 5).map(img => img.name),
+                slideCount: slides.length,
+                slideNames: slideNames.slice(0, 5),
                 foundIndex: foundIndex,
                 urlParam: new URLSearchParams(window.location.search).get('image')
             }};
@@ -106,10 +111,10 @@ def test_kiosk_image_parameter_lookup(api_client, isolated_test_data, page):
 
     print(f"Lookup result: {lookup_result}")
 
-    # Verify the image was found
+    # Verify the image was found in the rendered slides
     assert lookup_result['foundIndex'] != -1, (
-        f"Image '{target_image}' not found in kiosk image list! "
-        f"Images: {lookup_result['imageNames']}"
+        f"Image '{target_image}' not found in kiosk slides! "
+        f"Slides: {lookup_result['slideNames']}"
     )
 
     # Verify the URL parameter was received correctly

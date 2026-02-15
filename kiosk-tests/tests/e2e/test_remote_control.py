@@ -126,20 +126,26 @@ def test_req_remote_006_jump_command(kiosk_page, api_client, image_uploader):
     # Upload a test image
     filename = image_uploader.upload_test_image()
 
-    # Reload kiosk to get new image
+    # Reload kiosk to get new image and wait for image list to include it
     api_client.post('/api/control/send', json={'command': 'reload'})
-    time.sleep(1)
+    time.sleep(2)
 
     # Jump to it
     api_client.post('/api/control/send', json={
         'command': 'jump',
         'image_name': filename
     })
-    time.sleep(1)
 
-    # Verify we're on that image
-    active_img = kiosk_page.locator('.slide.active img')
-    src = active_img.get_attribute('src')
+    # Poll until the active slide shows the expected image (up to 5s)
+    deadline = time.time() + 5
+    src = ''
+    while time.time() < deadline:
+        time.sleep(0.5)
+        active_img = kiosk_page.locator('.slide.active img')
+        src = active_img.get_attribute('src') or ''
+        if filename in src:
+            break
+
     assert filename in src
 
 
