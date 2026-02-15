@@ -842,8 +842,8 @@
         // Load and display images
         async function loadImages() {
             try {
-                // When viewing "All Images" theme, show all images including disabled ones
-                const url = activeTheme === 'All Images' ? '/api/images' : '/api/images?enabled_only=true';
+                // When viewing "All Images" theme (and no day scheduling), show all images including disabled ones
+                const url = (activeTheme === 'All Images' && !daySchedulingEnabled) ? '/api/images' : '/api/images?enabled_only=true';
                 const response = await fetch(url);
                 const images = await response.json();
 
