@@ -446,16 +446,8 @@
 
                 if (cropData) {
                     debugLog(`Creating cropped slide for ${image.name}`, 'info');
-                    // Mark slide as having a crop
                     slide.classList.add('has-crop');
-                    // Create cropped image using a container
-                    const cropContainer = document.createElement('div');
-                    cropContainer.style.width = '100%';
-                    cropContainer.style.height = '100%';
-                    cropContainer.style.overflow = 'hidden';
-                    cropContainer.style.position = 'absolute';
-                    cropContainer.style.top = '0';
-                    cropContainer.style.left = '0';
+                    const cropContainer = createCropContainer();
 
                     const img = document.createElement('img');
                     img.src = image.url;
@@ -544,23 +536,17 @@
                 const offsetX = -cropX * scaleX;
                 const offsetY = -cropY * scaleY;
 
-                // No centering needed - crop should exactly match viewport dimensions
-                const centerX = 0;
-                const centerY = 0;
-
                 // Apply styles with !important to override any CSS
-                // First, explicitly remove any problematic CSS properties
                 img.style.removeProperty('width');
                 img.style.removeProperty('height');
 
-                // Now set our exact values
                 img.style.setProperty('position', 'absolute', 'important');
                 img.style.setProperty('width', `${scaledImgW}px`, 'important');
                 img.style.setProperty('height', `${scaledImgH}px`, 'important');
                 img.style.setProperty('min-width', `${scaledImgW}px`, 'important');
                 img.style.setProperty('min-height', `${scaledImgH}px`, 'important');
-                img.style.setProperty('left', `${offsetX + centerX}px`, 'important');
-                img.style.setProperty('top', `${offsetY + centerY}px`, 'important');
+                img.style.setProperty('left', `${offsetX}px`, 'important');
+                img.style.setProperty('top', `${offsetY}px`, 'important');
                 // DO NOT set object-fit to 'none' - it prevents scaling!
                 // We want the image to scale to our width/height, so use default or 'fill'
                 img.style.setProperty('object-fit', 'fill', 'important');
@@ -573,172 +559,7 @@
 
                 // Debug log - send to management interface
                 debugLog(`Crop applied to ${img.alt}:`, 'info');
-                debugLog(`  Container: ${container.clientWidth}x${container.clientHeight}`, 'info');
-                debugLog(`  Viewport: ${viewportW}x${viewportH} (aspect ${viewportAspect.toFixed(2)})`, 'info');
-                debugLog(`  Original Image: ${imgW}x${imgH}`, 'info');
-                debugLog(`  Crop Region: ${cropW.toFixed(0)}x${cropH.toFixed(0)} (aspect ${cropAspect.toFixed(2)})`, 'info');
-                debugLog(`  Crop Position in Original: x=${cropX.toFixed(0)}, y=${cropY.toFixed(0)}`, 'info');
-                debugLog(`  Scale X: ${scaleX.toFixed(2)}, Scale Y: ${scaleY.toFixed(2)} (non-uniform scaling)`, 'info');
-                debugLog(`  Scaled Image: ${scaledImgW.toFixed(0)}x${scaledImgH.toFixed(0)}`, 'info');
-                debugLog(`  Scaled Crop: ${scaledCropW.toFixed(0)}x${scaledCropH.toFixed(0)}`, 'info');
-                debugLog(`  Offset (from crop position): x=${offsetX.toFixed(0)}, y=${offsetY.toFixed(0)}`, 'info');
-                debugLog(`  Center adjustment: x=${centerX.toFixed(0)}, y=${centerY.toFixed(0)}`, 'info');
-                debugLog(`  Final Position: left=${(offsetX + centerX).toFixed(0)}px, top=${(offsetY + centerY).toFixed(0)}px`, 'info');
-
-                // Verify what was actually applied
-                debugLog(`  Applied CSS: width=${img.style.width}, height=${img.style.height}, left=${img.style.left}, top=${img.style.top}`, 'info');
-
-                // Check actual rendered size
-                setTimeout(() => {
-                    const renderedW = img.offsetWidth;
-                    const renderedH = img.offsetHeight;
-                    const computedStyle = window.getComputedStyle(img);
-                    debugLog(`  ACTUAL RENDERED: ${renderedW}x${renderedH}`, 'info');
-                    debugLog(`  COMPUTED STYLE: width=${computedStyle.width}, height=${computedStyle.height}`, 'info');
-
-                    // Check computed position
-                    const computedLeft = computedStyle.left;
-                    const computedTop = computedStyle.top;
-                    debugLog(`  COMPUTED POSITION: left=${computedLeft}, top=${computedTop}`, 'info');
-
-                    // Check bounding rect (actual position on screen)
-                    const rect = img.getBoundingClientRect();
-                    debugLog(`  BOUNDING RECT: x=${rect.x.toFixed(0)}, y=${rect.y.toFixed(0)}, width=${rect.width.toFixed(0)}, height=${rect.height.toFixed(0)}`, 'info');
-
-                    // Check container
-                    const containerRect = container.getBoundingClientRect();
-                    debugLog(`  CONTAINER RECT: x=${containerRect.x.toFixed(0)}, y=${containerRect.y.toFixed(0)}, width=${containerRect.width.toFixed(0)}, height=${containerRect.height.toFixed(0)}`, 'info');
-
-                    // Check if image is visible
-                    const containerStyle = window.getComputedStyle(container);
-                    debugLog(`  CONTAINER overflow=${containerStyle.overflow}, position=${containerStyle.position}`, 'info');
-
-                    // Check the slide parent
-                    const slide = container.parentElement;
-                    if (slide) {
-                        const slideRect = slide.getBoundingClientRect();
-                        const slideStyle = window.getComputedStyle(slide);
-                        debugLog(`  SLIDE RECT: x=${slideRect.x.toFixed(0)}, y=${slideRect.y.toFixed(0)}, width=${slideRect.width.toFixed(0)}, height=${slideRect.height.toFixed(0)}`, 'info');
-                        debugLog(`  SLIDE position=${slideStyle.position}, display=${slideStyle.display}, opacity=${slideStyle.opacity}`, 'info');
-                        debugLog(`  SLIDE has class 'active': ${slide.classList.contains('active')}`, 'info');
-                    }
-
-                    // Check slideshow container
-                    const slideshowContainer = document.getElementById('slideshow-container');
-                    if (slideshowContainer) {
-                        const scRect = slideshowContainer.getBoundingClientRect();
-                        debugLog(`  SLIDESHOW-CONTAINER RECT: x=${scRect.x.toFixed(0)}, y=${scRect.y.toFixed(0)}, width=${scRect.width.toFixed(0)}, height=${scRect.height.toFixed(0)}`, 'info');
-                    }
-
-                    // Check rendered size with tolerance (allow rounding differences)
-                    const tolerance = 20;
-                    const widthDiff = Math.abs(renderedW - Math.round(scaledImgW));
-                    const heightDiff = Math.abs(renderedH - Math.round(scaledImgH));
-                    if (widthDiff > tolerance || heightDiff > tolerance) {
-                        debugLog(`  ERROR: Rendered size doesn't match! Expected ${Math.round(scaledImgW)}x${Math.round(scaledImgH)}, diff: ${widthDiff}x${heightDiff}`, 'error');
-                    }
-                }, 100);
-
-                // Check if crop overflows or has black bars
-                const widthDiff = Math.round(viewportW - scaledCropW);
-                const heightDiff = Math.round(viewportH - scaledCropH);
-
-                if (scaledCropW > viewportW) {
-                    debugLog(`  Width: Crop OVERFLOWS by ${(scaledCropW - viewportW).toFixed(0)}px (${((scaledCropW - viewportW) / 2).toFixed(0)}px hidden on each side) - GOOD, fills width`, 'info');
-                } else if (widthDiff > 0) {
-                    debugLog(`  Width: BLACK BARS ${widthDiff}px total (${(widthDiff / 2).toFixed(0)}px on each side) - crop too narrow`, 'error');
-                } else {
-                    debugLog(`  Width: EXACT FIT - no black bars`, 'info');
-                }
-
-                if (scaledCropH > viewportH) {
-                    debugLog(`  Height: Crop OVERFLOWS by ${(scaledCropH - viewportH).toFixed(0)}px (${((scaledCropH - viewportH) / 2).toFixed(0)}px hidden on top/bottom) - GOOD, fills height`, 'info');
-                } else if (heightDiff > 0) {
-                    debugLog(`  Height: BLACK BARS ${heightDiff}px total (${(heightDiff / 2).toFixed(0)}px on top/bottom) - crop too short`, 'error');
-                } else {
-                    debugLog(`  Height: EXACT FIT - no black bars`, 'info');
-                }
-
-                // What we expect vs what we have
-                const expectedBlackBars = scaledCropW >= viewportW && scaledCropH >= viewportH ? 'NONE - crop should fill entire screen' :
-                                         scaledCropW >= viewportW ? 'Top/Bottom only' :
-                                         scaledCropH >= viewportH ? 'Left/Right only' : 'ERROR: Black bars on all sides!';
-                debugLog(`  EXPECTED: ${expectedBlackBars}`, 'info');
-
-                // Calculate what part of the scaled image is visible through the viewport
-                // When an image is positioned at top=-1704, pixels 1704 onwards are visible
-                const imgTopPos = offsetY + centerY;  // Actual top position of image
-                const imgLeftPos = offsetX + centerX;  // Actual left position of image
-
-                // Calculate visible region in scaled image coordinates
-                const visibleTop = imgTopPos < 0 ? -imgTopPos : 0;  // If image is shifted up, we see that many pixels down
-                const visibleBottom = visibleTop + viewportH;
-                const visibleLeft = imgLeftPos < 0 ? -imgLeftPos : 0;
-                const visibleRight = visibleLeft + viewportW;
-
-                debugLog(`  ===== DETAILED CROP ANALYSIS =====`, 'info');
-                debugLog(`  Image Position: left=${imgLeftPos.toFixed(0)}px, top=${imgTopPos.toFixed(0)}px`, 'info');
-                debugLog(`  Visible Region of ${scaledImgW.toFixed(0)}x${scaledImgH.toFixed(0)} scaled image:`, 'info');
-                debugLog(`    X: ${visibleLeft.toFixed(0)} to ${visibleRight.toFixed(0)} (width: ${(visibleRight - visibleLeft).toFixed(0)}px)`, 'info');
-                debugLog(`    Y: ${visibleTop.toFixed(0)} to ${visibleBottom.toFixed(0)} (height: ${(visibleBottom - visibleTop).toFixed(0)}px)`, 'info');
-
-                // Show expected crop region in scaled coordinates
-                const expectedCropTop = cropY * scale;
-                const expectedCropBottom = expectedCropTop + (cropH * scale);
-                const expectedCropLeft = cropX * scale;
-                const expectedCropRight = expectedCropLeft + (cropW * scale);
-
-                debugLog(`  Expected Crop Region in scaled image:`, 'info');
-                debugLog(`    X: ${expectedCropLeft.toFixed(0)} to ${expectedCropRight.toFixed(0)} (width: ${(expectedCropRight - expectedCropLeft).toFixed(0)}px)`, 'info');
-                debugLog(`    Y: ${expectedCropTop.toFixed(0)} to ${expectedCropBottom.toFixed(0)} (height: ${(expectedCropBottom - expectedCropTop).toFixed(0)}px)`, 'info');
-
-                // Check if visible matches expected (tolerance: 20px for minor rounding differences)
-                const tolerance = 20;
-                const topDiff = Math.abs(visibleTop - expectedCropTop);
-                const bottomDiff = Math.abs(visibleBottom - expectedCropBottom);
-                const leftDiff = Math.abs(visibleLeft - expectedCropLeft);
-                const rightDiff = Math.abs(visibleRight - expectedCropRight);
-
-                // Determine which differences are EXPECTED overflows vs actual errors
-                // Bottom overflow is expected when crop is taller than viewport (we show from top)
-                const isBottomOverflowExpected = (visibleBottom < expectedCropBottom) && (scaledCropH > viewportH);
-                // Right overflow is expected when crop is wider than viewport (we show from left)
-                const isRightOverflowExpected = (visibleRight < expectedCropRight) && (scaledCropW > viewportW);
-                // Top/left mismatches are actual errors (we should always align to top-left of crop)
-                const hasTopError = topDiff > tolerance;
-                const hasLeftError = leftDiff > tolerance;
-                const hasBottomError = (bottomDiff > tolerance) && !isBottomOverflowExpected;
-                const hasRightError = (rightDiff > tolerance) && !isRightOverflowExpected;
-
-                if (hasTopError || hasBottomError || hasLeftError || hasRightError) {
-                    debugLog(`  ❌ MISMATCH DETECTED:`, 'error');
-                    if (hasTopError) debugLog(`    Top: visible ${visibleTop.toFixed(0)} vs expected ${expectedCropTop.toFixed(0)} (diff: ${topDiff.toFixed(0)}px)`, 'error');
-                    if (hasBottomError) debugLog(`    Bottom: visible ${visibleBottom.toFixed(0)} vs expected ${expectedCropBottom.toFixed(0)} (diff: ${bottomDiff.toFixed(0)}px)`, 'error');
-                    if (hasLeftError) debugLog(`    Left: visible ${visibleLeft.toFixed(0)} vs expected ${expectedCropLeft.toFixed(0)} (diff: ${leftDiff.toFixed(0)}px)`, 'error');
-                    if (hasRightError) debugLog(`    Right: visible ${visibleRight.toFixed(0)} vs expected ${expectedCropRight.toFixed(0)} (diff: ${rightDiff.toFixed(0)}px)`, 'error');
-
-                    debugLog(`  🔍 DIAGNOSIS: We are showing the WRONG part of the image!`, 'error');
-                    if (visibleTop > expectedCropTop) {
-                        debugLog(`    The image needs to be shifted DOWN by ${(visibleTop - expectedCropTop).toFixed(0)}px`, 'error');
-                    } else if (visibleTop < expectedCropTop) {
-                        debugLog(`    The image needs to be shifted UP by ${(expectedCropTop - visibleTop).toFixed(0)}px`, 'error');
-                    }
-                } else {
-                    // Check for expected overflows and report them as OK
-                    let overflowMessages = [];
-                    if (isBottomOverflowExpected) {
-                        overflowMessages.push(`bottom overflow: ${bottomDiff.toFixed(0)}px hidden (expected)`);
-                    }
-                    if (isRightOverflowExpected) {
-                        overflowMessages.push(`right overflow: ${rightDiff.toFixed(0)}px hidden (expected)`);
-                    }
-
-                    if (overflowMessages.length > 0) {
-                        debugLog(`  ✅ MATCH: Crop correctly aligned to top-left, ${overflowMessages.join(', ')}`, 'info');
-                    } else {
-                        debugLog(`  ✅ MATCH: Visible region matches expected crop region (within ${tolerance}px tolerance)!`, 'info');
-                    }
-                }
+                debugLog(`  Crop: ${cropW.toFixed(0)}x${cropH.toFixed(0)} at (${cropX.toFixed(0)},${cropY.toFixed(0)}), scale ${scaleX.toFixed(2)}x${scaleY.toFixed(2)}, offset (${offsetX.toFixed(0)},${offsetY.toFixed(0)})`, 'info');
             };
 
             // Apply immediately if already loaded, otherwise wait
@@ -748,6 +569,44 @@
             } else {
                 debugLog(`Image ${img.alt} not loaded yet, waiting for onload`, 'info');
                 img.onload = applyStyles;
+            }
+        }
+
+        // Remove extra image overlay and restore current slide
+        function removeExtraOverlay() {
+            const overlay = document.querySelector('.extra-image-overlay');
+            if (!overlay) return;
+            overlay.remove();
+            const slide = document.querySelector(`.slide[data-index="${currentIndex}"]`)
+                       || document.querySelector('.slide:not(.extra-image-overlay)');
+            if (slide) {
+                slide.style.opacity = '1';
+                slide.style.pointerEvents = 'auto';
+            }
+        }
+
+        // Create a fullscreen crop container element
+        function createCropContainer() {
+            const c = document.createElement('div');
+            c.style.width = '100%';
+            c.style.height = '100%';
+            c.style.overflow = 'hidden';
+            c.style.position = 'absolute';
+            c.style.top = '0';
+            c.style.left = '0';
+            return c;
+        }
+
+        // Reapply crop to a slide's image (needed when showing slides)
+        function reapplySlideCrop(slide) {
+            if (!slide) return;
+            const cropContainer = slide.querySelector('div[style*="overflow: hidden"]');
+            if (!cropContainer) return;
+            const img = cropContainer.querySelector('img');
+            const cropData = imageCrops[img.alt];
+            if (cropData) {
+                debugLog(`Reapplying crop for ${img.alt} when showing slide`, 'info');
+                applyCrop(img, cropContainer, cropData);
             }
         }
 
@@ -816,27 +675,13 @@
                     slides[index].classList.add('active');
                     currentIndex = index;
 
-                    // Report current image to server
                     if (images[index]) {
                         reportCurrentImage(images[index].name);
                     }
-
-                    // Check if this slide has a cropped image and reapply crop
-                    const cropContainer = slides[index].querySelector('div[style*="overflow: hidden"]');
-                    if (cropContainer) {
-                        const img = cropContainer.querySelector('img');
-                        const imageName = img.alt;
-                        const cropData = imageCrops[imageName];
-
-                        if (cropData) {
-                            debugLog(`Reapplying crop for ${imageName} when showing slide`, 'info');
-                            applyCrop(img, cropContainer, cropData);
-                        }
-                    }
+                    reapplySlideCrop(slides[index]);
                 }
             } else {
                 // Normal transition: use CSS classes with opacity transition
-                // Clear any inline styles first
                 slides.forEach(slide => {
                     slide.style.transition = '';
                     slide.style.display = '';
@@ -844,28 +689,14 @@
                     slide.classList.remove('active');
                 });
 
-                // Show current slide
                 if (slides[index]) {
                     slides[index].classList.add('active');
                     currentIndex = index;
 
-                    // Report current image to server
                     if (images[index]) {
                         reportCurrentImage(images[index].name);
                     }
-
-                    // Check if this slide has a cropped image and reapply crop
-                    const cropContainer = slides[index].querySelector('div[style*="overflow: hidden"]');
-                    if (cropContainer) {
-                        const img = cropContainer.querySelector('img');
-                        const imageName = img.alt;
-                        const cropData = imageCrops[imageName];
-
-                        if (cropData) {
-                            debugLog(`Reapplying crop for ${imageName} when showing slide`, 'info');
-                            applyCrop(img, cropContainer, cropData);
-                        }
-                    }
+                    reapplySlideCrop(slides[index]);
                 }
             }
         }
@@ -1027,14 +858,7 @@
                     debugLog(`Applying crop to extra image: ${imageName}`, 'info');
                     extraSlide.classList.add('has-crop');
 
-                    // Create cropped image using a container (same as regular slides)
-                    const cropContainer = document.createElement('div');
-                    cropContainer.style.width = '100%';
-                    cropContainer.style.height = '100%';
-                    cropContainer.style.overflow = 'hidden';
-                    cropContainer.style.position = 'absolute';
-                    cropContainer.style.top = '0';
-                    cropContainer.style.left = '0';
+                    const cropContainer = createCropContainer();
 
                     const img = document.createElement('img');
                     img.src = `/extra-images/${encodeURIComponent(imageName)}`;
@@ -1127,45 +951,16 @@
                     }
                     break;
                 case 'play':
-                    // Remove extra image overlay if present
-                    const extraOverlay = document.querySelector('.extra-image-overlay');
-                    if (extraOverlay) {
-                        extraOverlay.remove();
-                        // Show the current slide
-                        const currentSlide = document.querySelector(`.slide[data-index="${currentIndex}"]`);
-                        if (currentSlide) {
-                            currentSlide.style.opacity = '1';
-                            currentSlide.style.pointerEvents = 'auto';
-                        }
-                    }
+                    removeExtraOverlay();
                     isPaused = false;
                     startSlideshow();
                     break;
                 case 'reload':
-                    isPaused = false; // Resume playback on reload
+                    isPaused = false;
                     await reloadSlideshow();
                     break;
                 case 'resume_from_extra':
-                    // Remove extra image overlay if present
-                    const extraOverlay2 = document.querySelector('.extra-image-overlay');
-                    if (extraOverlay2) {
-                        extraOverlay2.remove();
-                    }
-
-                    // Show the current slide
-                    const currentSlide2 = document.querySelector(`.slide[data-index="${currentIndex}"]`);
-                    if (currentSlide2) {
-                        currentSlide2.style.opacity = '1';
-                        currentSlide2.style.pointerEvents = 'auto';
-                    } else {
-                        // Try to show any slide as fallback
-                        const anySlide = document.querySelector('.slide:not(.extra-image-overlay)');
-                        if (anySlide) {
-                            anySlide.style.opacity = '1';
-                            anySlide.style.pointerEvents = 'auto';
-                        }
-                    }
-
+                    removeExtraOverlay();
                     isPaused = false;
                     startSlideshow();
                     break;
@@ -1211,22 +1006,7 @@
         }
 
         function playVideoWithMpv(url, title) {
-            // Log the video play request to the server
-            fetch('/api/debug/log', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: `Video playback requested: ${title} - ${url}`,
-                    level: 'info'
-                })
-            });
-
-            // Launch mpv in fullscreen
-            // Note: This will only work if the kiosk page has permission to execute commands
-            // In practice, this needs to be handled by the parent process or a system service
-            const mpvCommand = `mpv --fullscreen --no-terminal "${url}"`;
-
-            // Send command to backend to execute (requires backend support)
+            debugLog(`Video playback requested: ${title} - ${url}`, 'info');
             fetch('/api/videos/execute-mpv', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
