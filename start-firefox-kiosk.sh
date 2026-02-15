@@ -2,15 +2,14 @@
 # Firefox Kiosk Startup Script
 # Ensures clean Firefox profile with kiosk-optimized defaults
 
-PROFILE_DIR="$HOME/.mozilla/firefox/kiosk-profile"
-PROFILE_INI="$HOME/.mozilla/firefox/profiles.ini"
-
 # Remove old Firefox profile to prevent corruption issues
 echo "Cleaning old Firefox profile..."
 rm -rf "$HOME/.mozilla/firefox"
 
-# Create Firefox directories
-mkdir -p "$HOME/.mozilla/firefox"
+# Create fresh Firefox profile directory and configuration
+PROFILE_DIR="$HOME/.mozilla/firefox/kiosk-profile"
+PROFILE_INI="$HOME/.mozilla/firefox/profiles.ini"
+mkdir -p "$PROFILE_DIR"
 
 # Create profiles.ini
 cat > "$PROFILE_INI" << 'EOF'
@@ -24,9 +23,6 @@ IsRelative=1
 Path=kiosk-profile
 Default=1
 EOF
-
-# Create the profile directory
-mkdir -p "$PROFILE_DIR"
 
 # Create prefs.js with kiosk-optimized settings
 cat > "$PROFILE_DIR/prefs.js" << 'EOF'

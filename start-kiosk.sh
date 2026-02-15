@@ -8,15 +8,10 @@ export DISPLAY=:0
 # Change to the script directory
 cd "$(dirname "$0")"
 
-# Kill any existing Firefox instances
-pkill -f "firefox.*kiosk" 2>/dev/null
-pkill firefox 2>/dev/null
-
-# Kill any existing unclutter processes
-pkill unclutter 2>/dev/null
-
-# Kill any existing Flask server processes for this kiosk
-pkill -f "python.*app.py" 2>/dev/null
+# Kill any existing kiosk-related processes
+for pattern in "firefox.*kiosk" firefox unclutter "python.*app.py"; do
+    pkill -f "$pattern" 2>/dev/null
+done
 
 # Kill any process using port 80
 if command -v fuser &> /dev/null; then
