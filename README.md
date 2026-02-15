@@ -86,7 +86,7 @@ sudo ./install-autostart.sh
 ## Requirements
 
 ### Hardware
-- Raspberry Pi 4 (recommended) or compatible
+- Raspberry Pi 4 or 5 (recommended) or compatible
 - Monitor: 2560x2880 portrait orientation
 - Network connection (WiFi or Ethernet)
 
@@ -110,6 +110,7 @@ pip install yt-dlp
 |---------|---------|---------|
 | Flask | 3.0.0 | Web framework |
 | flask-socketio | 5.3.6 | Real-time WebSocket |
+| python-socketio | 5.11.1 | Socket.IO server |
 | Werkzeug | 3.0.1 | WSGI utilities |
 | requests | 2.31.0 | HTTP client |
 | Pillow | >=10.0.0 | Image processing |
@@ -593,11 +594,12 @@ password=<your-password>
 |----------|-------------|
 | [README.md](README.md) | This file - user guide |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Technical architecture |
-| [REQUIREMENTS.md](REQUIREMENTS.md) | Feature requirements |
+| [REQUIREMENTS.md](REQUIREMENTS.md) | Feature requirements (147 testable items) |
 | [TEST.md](TEST.md) | Test documentation |
 | [TEST_MODE.md](TEST_MODE.md) | Test mode API |
-| [QUICKSTART.md](QUICKSTART.md) | Quick start guide |
+| [QUICKSTART.md](QUICKSTART.md) | Quick start guide for Raspberry Pi |
 | [CLAUDE.md](CLAUDE.md) | Developer instructions |
+| kiosk-tests/docs/ | Generated PDF user guides (EN + FR) |
 
 ---
 
@@ -621,10 +623,14 @@ kiosk_images/
 │   └── loading.html           # Video loading
 │
 ├── images/                    # Image storage (gitignored)
-├── EXTRA_IMAGES/              # Staging folder
+├── EXTRA_IMAGES/              # Staging folder for imports
 ├── thumbnails/                # Video thumbnails
 ├── backups/                   # Backup archives
+│
 ├── settings.json              # Configuration (gitignored)
+├── sources_config.json        # Museum API source config
+├── api_keys.json              # Museum API keys (gitignored)
+├── device.txt                 # Pi deploy credentials (gitignored)
 │
 ├── kiosk-display.service      # Flask systemd service
 ├── kiosk-firefox.service      # Firefox systemd service
@@ -634,12 +640,14 @@ kiosk_images/
 ├── start-firefox-kiosk.sh     # Firefox launcher
 ├── stop-kiosk.sh              # Stop script
 │
-├── kiosk-tests/               # Test suite
+├── kiosk-tests/               # Test suite (119 tests)
 │   ├── tests/
-│   │   ├── unit/
-│   │   ├── integration/
-│   │   └── e2e/
-│   └── conftest.py
+│   │   ├── unit/             # 14 unit tests
+│   │   ├── integration/      # 55 integration tests
+│   │   └── e2e/              # 50 E2E tests
+│   ├── conftest.py           # Test fixtures
+│   ├── docs/                 # Generated PDF guides
+│   └── doc_screenshots/      # UI screenshots
 │
 └── venv/                      # Python environment (gitignored)
 ```
