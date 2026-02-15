@@ -35,11 +35,6 @@
             margin-bottom: 10px;
         }
 
-        .subtitle {
-            color: #aaaaaa;
-            margin-bottom: 30px;
-        }
-
         .navigation {
             display: flex;
             gap: 0;
@@ -275,7 +270,8 @@
         .submenu-item {
             padding: 10px 15px;
             cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
+            color: #ffffff;
+            border-bottom: 1px solid #3a3a3a;
         }
 
         .submenu-item:last-child {
@@ -283,7 +279,7 @@
         }
 
         .submenu-item:hover {
-            background: #f5f5f5;
+            background: #3a3a3a;
         }
 
         /* Crop modal styles */
@@ -679,14 +675,6 @@
                 console.error('Delete error:', error);
                 showMessage('Error deleting image', 'error');
             }
-        }
-
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
         }
 
         // Theme management

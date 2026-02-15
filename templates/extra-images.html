@@ -35,11 +35,6 @@
             margin-bottom: 10px;
         }
 
-        .subtitle {
-            color: #aaaaaa;
-            margin-bottom: 30px;
-        }
-
         .navigation {
             display: flex;
             gap: 0;
@@ -88,48 +83,6 @@
             padding-bottom: 10px;
         }
 
-        .settings-form {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .settings-form label {
-            font-weight: 500;
-            color: #cccccc;
-        }
-
-        .settings-form input[type="number"] {
-            padding: 8px 12px;
-            border: 1px solid #444444;
-            border-radius: 4px;
-            font-size: 14px;
-            width: 100px;
-            background: #2a2a2a;
-            color: #ffffff;
-        }
-
-        .settings-form input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-        }
-
-        .settings-form button {
-            background: #2196F3;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .settings-form button:hover {
-            background: #1976D2;
-        }
-
         .image-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -146,10 +99,6 @@
             position: relative;
         }
 
-        .image-card.active {
-            border: 3px solid #FF9800;
-        }
-
         /* Keep image area clipped to rounded corners */
         .image-card > img,
         .image-card > div[style*="overflow: hidden"] {
@@ -160,20 +109,6 @@
         .image-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        .image-card.disabled {
-            border: 1px solid #444444;
-        }
-
-        .image-card.disabled img {
-            filter: grayscale(100%);
-            opacity: 0.5;
-        }
-
-        .image-card.disabled .card-info,
-        .image-card.disabled .image-tags {
-            opacity: 0.5;
         }
 
         .image-card img {
@@ -193,86 +128,6 @@
         /* Hover effect for crop containers */
         .image-card > div[style*="overflow: hidden"]:hover img {
             filter: brightness(1.1);
-        }
-
-        /* Blue LED indicator for currently displayed image */
-        .current-image-led {
-            position: absolute;
-            bottom: 8px;
-            right: 8px;
-            width: 12px;
-            height: 12px;
-            background: #2196F3;
-            border-radius: 50%;
-            box-shadow: 0 0 8px rgba(33, 150, 243, 0.8), 0 0 16px rgba(33, 150, 243, 0.4);
-            z-index: 10;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            pointer-events: none;
-        }
-
-        .current-image-led.active {
-            opacity: 1;
-        }
-
-        .image-checkbox-container {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(26, 26, 26, 0.9);
-            padding: 8px;
-            border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            z-index: 10;
-        }
-
-        .image-checkbox-container label {
-            font-size: 12px;
-            font-weight: 500;
-            color: #ffffff;
-            cursor: pointer;
-            margin: 0;
-        }
-
-        .image-checkbox-container input[type="checkbox"] {
-            cursor: pointer;
-            width: 16px;
-            height: 16px;
-        }
-
-        .image-card-info {
-            padding: 12px;
-        }
-
-        .image-card-name {
-            font-size: 14px;
-            color: #ffffff;
-            margin-bottom: 8px;
-            word-break: break-all;
-        }
-
-        .image-card-size {
-            font-size: 12px;
-            color: #888888;
-            margin-bottom: 12px;
-        }
-
-        .delete-button {
-            background: #f44336;
-            color: white;
-            padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            width: 100%;
-        }
-
-        .delete-button:hover {
-            background: #d32f2f;
         }
 
         .message {
@@ -296,268 +151,6 @@
 
         .message.visible {
             display: block;
-        }
-
-        .links {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .links a {
-            color: #64b5f6;
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-        .links a:hover {
-            text-decoration: underline;
-        }
-
-
-        .remote-control {
-            background: #2a2a2a;
-            padding: 20px;
-            border-radius: 8px;
-            border: 2px solid #ff9800;
-            margin-bottom: 20px;
-        }
-
-        .remote-control h3 {
-            color: #ffb74d;
-            margin-bottom: 15px;
-            font-size: 16px;
-        }
-
-        .control-buttons {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 10px;
-        }
-
-        .control-button {
-            background: #ff9800;
-            color: white;
-            padding: 12px 16px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: background 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .control-button:hover {
-            background: #f57c00;
-        }
-
-        .control-button:active {
-            transform: scale(0.95);
-        }
-
-        .control-button.danger {
-            background: #f44336;
-        }
-
-        .control-button.danger:hover {
-            background: #d32f2f;
-        }
-
-        .control-button.success {
-            background: #4CAF50;
-        }
-
-        .control-button.success:hover {
-            background: #45a049;
-        }
-
-        .control-button-wrapper {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .led-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #ccc;
-            transition: background 0.3s;
-        }
-
-        .led-indicator.active {
-            background: #2196F3;
-            box-shadow: 0 0 8px #2196F3;
-        }
-
-        .debug-toggle-button {
-            background: #9e9e9e;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: background 0.3s;
-        }
-
-        .debug-toggle-button:hover {
-            background: #757575;
-        }
-
-        .debug-toggle-button.active {
-            background: #4CAF50;
-        }
-
-        .debug-toggle-button.active:hover {
-            background: #45a049;
-        }
-
-        .debug-panel {
-            background: #2a2a2a;
-            border: 2px solid #444444;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .debug-panel h3 {
-            color: #ffffff;
-            margin-bottom: 15px;
-            font-size: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .debug-console {
-            background: #263238;
-            color: #aed581;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            padding: 15px;
-            border-radius: 4px;
-            height: 1000px;
-            overflow-y: auto;
-            margin-top: 10px;
-        }
-
-        .debug-console-line {
-            margin-bottom: 4px;
-            word-wrap: break-word;
-        }
-
-        .debug-console-line.error {
-            color: #ef5350;
-        }
-
-        .debug-console-line.info {
-            color: #81c784;
-        }
-
-        .debug-timestamp {
-            color: #78909c;
-            margin-right: 8px;
-        }
-
-        .debug-controls {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .debug-button {
-            background: #757575;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-
-        .debug-button:hover {
-            background: #616161;
-        }
-
-        .debug-panel.disabled {
-            opacity: 0.5;
-            pointer-events: none;
-        }
-
-        .theme-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            background: #1e3a5f;
-            border: 1px solid #2196F3;
-            border-radius: 4px;
-            font-size: 14px;
-            color: #64b5f6;
-        }
-
-        .theme-badge.active {
-            background: #2196F3;
-            color: white;
-            border: 3px solid #FF9800;
-        }
-
-        .theme-badge .theme-name {
-            cursor: pointer;
-            font-weight: 500;
-        }
-
-        .theme-badge .theme-name:hover {
-            text-decoration: underline;
-        }
-
-        .theme-badge button {
-            background: #f44336;
-            color: white;
-            border: none;
-            border-radius: 3px;
-            padding: 2px 6px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-
-        .theme-badge button:hover {
-            background: #d32f2f;
-        }
-
-        .image-themes {
-            margin-top: 8px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-        }
-
-        .image-theme-tag {
-            display: inline-block;
-            padding: 3px 8px;
-            background: #e3f2fd;
-            color: #1565c0;
-            border-radius: 3px;
-            font-size: 11px;
-        }
-
-        .theme-selector {
-            margin-top: 8px;
-        }
-
-        .theme-selector select {
-            padding: 4px 8px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            font-size: 12px;
-            width: 100%;
         }
 
         /* Crop Modal */
@@ -664,20 +257,6 @@
         .card-btn.delete { background: #f44336; }
         .card-btn.delete:hover { background: #d32f2f; }
 
-        .crop-image-button {
-            background: #2196F3;
-            color: white;
-            padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-right: 8px;
-        }
-
-        .crop-image-button:hover {
-            background: #1976D2;
-        }
     </style>
 </head>
 <body>
@@ -733,11 +312,8 @@
         // Resume slideshow when leaving extra images page
         function resumeSlideshow(event, targetUrl) {
             event.preventDefault();
-            console.log('Resuming slideshow, sending resume_from_extra command');
             try {
-                // Send resume command to restore slideshow
                 socket.emit('send_command', { command: 'resume_from_extra' });
-                console.log('Command sent, navigating to:', targetUrl);
 
                 // Wait a bit for the command to be sent, then navigate
                 setTimeout(() => {
@@ -985,17 +561,6 @@
             }
         }
 
-        // Toggle image enabled state (not used for extra images, but kept for compatibility)
-        async function toggleImageEnabled(filename, enabled, cardElement) {
-            // Extra images don't have enabled/disabled state
-            // Just update visual state locally
-            if (enabled) {
-                cardElement.classList.remove('disabled');
-            } else {
-                cardElement.classList.add('disabled');
-            }
-        }
-
         // Show message
         function showMessage(text, type) {
             const message = document.getElementById('message');
@@ -1005,36 +570,6 @@
             setTimeout(() => {
                 message.classList.remove('visible');
             }, 3000);
-        }
-
-        // Theme management - only needed for loading available themes for tag display
-        let availableThemes = {};
-
-        async function loadThemes() {
-            try {
-                const response = await fetch('/api/themes');
-                const data = await response.json();
-                availableThemes = data.themes;
-            } catch (error) {
-                console.error('Error loading themes:', error);
-            }
-        }
-
-        async function updateImageThemes(imageName, themes) {
-            try {
-                const response = await fetch(`/api/extra-images/${encodeURIComponent(imageName)}/themes`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ themes })
-                });
-
-                if (!response.ok) {
-                    showMessage('Error updating image themes', 'error');
-                }
-            } catch (error) {
-                console.error('Error updating image themes:', error);
-                showMessage('Error updating image themes', 'error');
-            }
         }
 
         // Crop functionality
@@ -1111,11 +646,7 @@
         }
 
         async function saveCrop() {
-            console.log('saveCrop called, currentCropImage:', currentCropImage);
-            if (!currentCropper || !currentCropImage) {
-                console.log('Missing cropper or image name, returning');
-                return;
-            }
+            if (!currentCropper || !currentCropImage) return;
 
             // Get crop data
             const cropData = currentCropper.getData();
@@ -1141,8 +672,6 @@
                 }
                 settings.image_crops[currentCropImage] = cropInfo;
 
-                // Save settings
-                console.log('Saving settings with crop for:', currentCropImage);
                 const response = await fetch('/api/settings', {
                     method: 'POST',
                     headers: {
@@ -1151,7 +680,6 @@
                     body: JSON.stringify(settings)
                 });
 
-                console.log('Save response ok:', response.ok);
                 if (response.ok) {
                     showMessage('Crop saved successfully!', 'success');
 
@@ -1159,11 +687,8 @@
                     const savedImageName = currentCropImage;
                     closeCropModal();
 
-                    // Immediately refresh the extra image on the kiosk to show the new crop
-                    // Use a small delay to ensure settings are propagated
-                    console.log('Sending refresh_extra_crop command for:', savedImageName);
+                    // Refresh the extra image on the kiosk to show the new crop
                     setTimeout(() => {
-                        console.log('Emitting refresh_extra_crop command');
                         socket.emit('send_command', { command: 'refresh_extra_crop', image_name: savedImageName });
                     }, 100);
                 } else {
@@ -1211,32 +736,16 @@
         }
 
         // WebSocket event handlers for real-time updates
-        socket.on('connect', () => {
-            console.log('WebSocket connected');
-        });
-
-        socket.on('disconnect', () => {
-            console.log('WebSocket disconnected');
-        });
-
         socket.on('reconnect', () => {
-            console.log('WebSocket reconnected');
-            // Reload page state after reconnection
-            initializePage();
+            loadImages();
         });
 
         socket.on('image_list_changed', () => {
-            console.log('Image list changed via WebSocket');
             loadImages();
         });
 
         // Load data on page load
-        async function initializePage() {
-            await loadThemes(); // Load themes for tag display
-            await loadImages();
-        }
-
-        initializePage();
+        loadImages();
     </script>
 
     <!-- Crop Modal -->

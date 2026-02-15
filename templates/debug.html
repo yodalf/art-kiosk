@@ -32,11 +32,6 @@
             margin-bottom: 10px;
         }
 
-        .subtitle {
-            color: #aaaaaa;
-            margin-bottom: 30px;
-        }
-
         .navigation {
             display: flex;
             gap: 0;
@@ -202,6 +197,20 @@
         // Initialize Socket.IO connection
         const socket = io();
 
+        // Create a debug line element from a message object
+        function createDebugLine(msg) {
+            const line = document.createElement('div');
+            line.className = `debug-console-line ${msg.level}`;
+
+            const timestampSpan = document.createElement('span');
+            timestampSpan.className = 'debug-timestamp';
+            timestampSpan.textContent = `[${new Date(msg.timestamp * 1000).toLocaleTimeString()}]`;
+
+            line.appendChild(timestampSpan);
+            line.appendChild(document.createTextNode(msg.message));
+            return line;
+        }
+
         // Refresh debug console with latest messages
         async function refreshDebugConsole() {
             try {
@@ -216,20 +225,8 @@
                     return;
                 }
 
-                // Display ALL messages (up to 500 kept by backend)
                 messages.forEach(msg => {
-                    const line = document.createElement('div');
-                    line.className = `debug-console-line ${msg.level}`;
-
-                    const timestamp = new Date(msg.timestamp * 1000).toLocaleTimeString();
-                    const timestampSpan = document.createElement('span');
-                    timestampSpan.className = 'debug-timestamp';
-                    timestampSpan.textContent = `[${timestamp}]`;
-
-                    line.appendChild(timestampSpan);
-                    line.appendChild(document.createTextNode(msg.message));
-
-                    console.appendChild(line);
+                    console.appendChild(createDebugLine(msg));
                 });
 
                 // Calculate scroll position to show only last 20 lines
@@ -270,29 +267,14 @@
                 const text = Array.from(lines).map(line => line.textContent).join('\n');
 
                 // Try modern clipboard API first, fallback to textarea method
-                let success = false;
-
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                     try {
                         await navigator.clipboard.writeText(text);
-                        success = true;
                     } catch (e) {
-                        // Clipboard API failed, use fallback
-                        console.log('Clipboard API failed, using fallback');
+                        copyViaTextarea(text);
                     }
-                }
-
-                // Fallback method using textarea (works on HTTP)
-                if (!success) {
-                    const textarea = document.createElement('textarea');
-                    textarea.value = text;
-                    textarea.style.position = 'fixed';
-                    textarea.style.opacity = '0';
-                    document.body.appendChild(textarea);
-                    textarea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textarea);
-                    success = true;
+                } else {
+                    copyViaTextarea(text);
                 }
 
                 // Visual feedback - change button appearance
@@ -326,23 +308,11 @@
         function appendDebugMessage(msg) {
             const consoleEl = document.getElementById('debug-console');
 
-            // Clear placeholder text if this is the first message
             if (consoleEl.textContent.includes('No debug messages yet')) {
                 consoleEl.innerHTML = '';
             }
 
-            const line = document.createElement('div');
-            line.className = `debug-console-line ${msg.level}`;
-
-            const timestamp = new Date(msg.timestamp * 1000).toLocaleTimeString();
-            const timestampSpan = document.createElement('span');
-            timestampSpan.className = 'debug-timestamp';
-            timestampSpan.textContent = `[${timestamp}]`;
-
-            line.appendChild(timestampSpan);
-            line.appendChild(document.createTextNode(msg.message));
-
-            consoleEl.appendChild(line);
+            consoleEl.appendChild(createDebugLine(msg));
 
             // Limit to 500 lines in UI (matching backend limit) - remove oldest if we exceed
             const lines = consoleEl.querySelectorAll('.debug-console-line');
@@ -365,18 +335,20 @@
             }, 3000);
         }
 
+        // Clipboard fallback for HTTP contexts
+        function copyViaTextarea(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+        }
+
         // WebSocket event handlers for real-time updates
-        socket.on('connect', () => {
-            console.log('WebSocket connected');
-        });
-
-        socket.on('disconnect', () => {
-            console.log('WebSocket disconnected');
-        });
-
         socket.on('reconnect', () => {
-            console.log('WebSocket reconnected');
-            // Reload debug messages after reconnection
             refreshDebugConsole();
         });
 

@@ -32,11 +32,6 @@
             margin-bottom: 10px;
         }
 
-        .subtitle {
-            color: #aaaaaa;
-            margin-bottom: 30px;
-        }
-
         .navigation {
             display: flex;
             gap: 0;
@@ -71,22 +66,6 @@
         .nav-link.view-kiosk:hover {
             color: #66BB6A;
             background: transparent;
-        }
-
-        .back-link {
-            display: inline-block;
-            color: #2196F3;
-            text-decoration: none;
-            margin-bottom: 20px;
-            padding: 8px 16px;
-            border: 1px solid #2196F3;
-            border-radius: 4px;
-            transition: all 0.3s;
-        }
-
-        .back-link:hover {
-            background: #2196F3;
-            color: white;
         }
 
         .search-section {
@@ -423,20 +402,6 @@
             margin-bottom: 20px;
         }
 
-        .loading-spinner {
-            border: 4px solid #333333;
-            border-top: 4px solid #2196F3;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 40px auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
     </style>
 </head>
 <body>
@@ -525,13 +490,7 @@
         const resultsCount = document.getElementById('results-count');
         const emptyState = document.getElementById('empty-state');
         const progressPane = document.getElementById('progress-pane');
-        const progressLine1 = document.getElementById('progress-line-1');
-        const progressLine2 = document.getElementById('progress-line-2');
-        const progressLine3 = document.getElementById('progress-line-3');
-        const progressLine4 = document.getElementById('progress-line-4');
-        const progressLine5 = document.getElementById('progress-line-5');
-        const progressLine6 = document.getElementById('progress-line-6');
-        const progressLine7 = document.getElementById('progress-line-7');
+        const progressLines = Array.from({length: 7}, (_, i) => document.getElementById(`progress-line-${i + 1}`));
 
         let searchInProgress = false;
         let progressMessages = [];
@@ -548,48 +507,31 @@
                 progressMessages.shift();
             }
 
-            progressLine1.textContent = progressMessages[0] || '';
-            progressLine2.textContent = progressMessages[1] || '';
-            progressLine3.textContent = progressMessages[2] || '';
-            progressLine4.textContent = progressMessages[3] || '';
-            progressLine5.textContent = progressMessages[4] || '';
-            progressLine6.textContent = progressMessages[5] || '';
-            progressLine7.textContent = progressMessages[6] || '';
-
-            // Highlight the most recent line
-            [progressLine1, progressLine2, progressLine3, progressLine4, progressLine5, progressLine6, progressLine7].forEach(line => {
-                line.classList.remove('highlight');
+            progressLines.forEach((line, i) => {
+                line.textContent = progressMessages[i] || '';
+                line.classList.toggle('highlight', i === progressMessages.length - 1);
             });
+        }
 
-            const lastLineIndex = progressMessages.length;
-            if (lastLineIndex === 1) progressLine1.classList.add('highlight');
-            if (lastLineIndex === 2) progressLine2.classList.add('highlight');
-            if (lastLineIndex === 3) progressLine3.classList.add('highlight');
-            if (lastLineIndex === 4) progressLine4.classList.add('highlight');
-            if (lastLineIndex === 5) progressLine5.classList.add('highlight');
-            if (lastLineIndex === 6) progressLine6.classList.add('highlight');
-            if (lastLineIndex === 7) progressLine7.classList.add('highlight');
+        function resetSearchButton() {
+            searchInProgress = false;
+            searchBtn.disabled = false;
+            searchBtn.textContent = '🔍 Search Museums';
+            searchBtn.classList.remove('cancel-mode');
+            searchBtn.type = 'submit';
+            setTimeout(() => { progressPane.classList.remove('show'); }, 3000);
         }
 
         // Handle search button click (handles both search and cancel)
         searchBtn.addEventListener('click', (e) => {
             if (searchInProgress) {
-                // Cancel the search
                 e.preventDefault();
                 socket.disconnect();
                 socket.connect();
-                searchInProgress = false;
-                searchBtn.disabled = false;
-                searchBtn.textContent = '🔍 Search Museums';
-                searchBtn.classList.remove('cancel-mode');
-                searchBtn.type = 'submit';
+                resetSearchButton();
                 updateProgress('❌ Search cancelled by user');
                 showStatus('Search cancelled', 'error');
-                setTimeout(() => {
-                    progressPane.classList.remove('show');
-                }, 3000);
             }
-            // Otherwise let the form submit naturally
         });
 
         // WebSocket event handlers
@@ -598,34 +540,16 @@
         });
 
         socket.on('search_complete', (data) => {
-            searchInProgress = false;
-            searchBtn.disabled = false;
-            searchBtn.textContent = '🔍 Search Museums';
-            searchBtn.classList.remove('cancel-mode');
-            searchBtn.type = 'submit';
-
+            resetSearchButton();
             displayResults(data.results);
             showStatus(`Found ${data.results.length} high-resolution artworks`, 'success');
-
-            setTimeout(() => {
-                progressPane.classList.remove('show');
-            }, 3000);
         });
 
         socket.on('search_error', (data) => {
-            searchInProgress = false;
-            searchBtn.disabled = false;
-            searchBtn.textContent = '🔍 Search Museums';
-            searchBtn.classList.remove('cancel-mode');
-            searchBtn.type = 'submit';
-
+            resetSearchButton();
             showStatus('Search failed: ' + data.error, 'error');
             resultsSection.style.display = 'none';
             emptyState.style.display = 'block';
-
-            setTimeout(() => {
-                progressPane.classList.remove('show');
-            }, 3000);
         });
 
         // Handle form submission
@@ -664,24 +588,6 @@
                     statusMessage.style.display = 'none';
                 }
             }, 5000);
-        }
-
-        function displayResults(results) {
-            resultsGrid.innerHTML = '';
-            resultsCount.textContent = `${results.length} images found`;
-
-            if (results.length === 0) {
-                resultsSection.style.display = 'none';
-                emptyState.style.display = 'block';
-                return;
-            }
-
-            results.forEach((result, index) => {
-                const card = createResultCard(result, index);
-                resultsGrid.appendChild(card);
-            });
-
-            resultsSection.style.display = 'block';
         }
 
         function createResultCard(result, index) {

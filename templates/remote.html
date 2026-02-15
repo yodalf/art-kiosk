@@ -32,11 +32,6 @@
             margin-bottom: 10px;
         }
 
-        .subtitle {
-            color: #aaaaaa;
-            margin-bottom: 30px;
-        }
-
         .navigation {
             display: flex;
             gap: 0;
@@ -208,42 +203,19 @@
         // Initialize Socket.IO connection
         const socket = io();
 
-        socket.on('connect', () => {
-            console.log('Connected to server via WebSocket');
-        });
-
-        socket.on('disconnect', () => {
-            console.log('Disconnected from server');
-        });
-
-        // Listen for remote command broadcasts (to update LED indicators)
         socket.on('remote_command', (data) => {
-            console.log('Remote command broadcasted:', data);
             updateLEDs(data.command);
         });
 
-        // Send remote control command
         function sendCommand(command) {
-            console.log('Sending command:', command);
             socket.emit('send_command', { command: command });
             updateLEDs(command);
         }
 
-        // Track current play/pause state
-        let currentPlayState = 'play'; // Default to play
-
-        // Update LED indicators
         function updateLEDs(command) {
-            // Handle play/pause state changes
             if (command === 'play' || command === 'pause') {
-                currentPlayState = command;
-
-                // Clear play/pause LEDs
-                document.getElementById('led-play').classList.remove('active');
-                document.getElementById('led-pause').classList.remove('active');
-
-                // Set the appropriate play/pause LED
-                document.getElementById('led-' + command).classList.add('active');
+                document.getElementById('led-play').classList.toggle('active', command === 'play');
+                document.getElementById('led-pause').classList.toggle('active', command === 'pause');
             } else {
                 // For other commands (reload, prev, next), briefly blink the LED
                 const led = document.getElementById('led-' + command);
@@ -258,26 +230,8 @@
             }
         }
 
-        // Initialize LED state on page load
-        function initializeLEDs() {
-            // Default to play state
-            document.getElementById('led-play').classList.add('active');
-        }
-
-        // Call initialization when page loads
-        initializeLEDs();
-
-        // Show message
-        function showMessage(msg, type) {
-            const messageDiv = document.getElementById('message');
-            messageDiv.textContent = msg;
-            messageDiv.className = 'message ' + type;
-            messageDiv.style.display = 'block';
-
-            setTimeout(() => {
-                messageDiv.style.display = 'none';
-            }, 3000);
-        }
+        // Initialize LED state
+        document.getElementById('led-play').classList.add('active');
     </script>
 </body>
 </html>
