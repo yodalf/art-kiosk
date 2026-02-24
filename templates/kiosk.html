@@ -306,7 +306,16 @@
                 if (newTimePeriod !== previousTimePeriod && previousTimePeriod !== null) {
                     debugLog(`Time period changed! ${previousTimePeriod} -> ${newTimePeriod}`, 'info');
                     previousTimePeriod = newTimePeriod;
-                    shuffleChanged = true; // Treat as shuffle change to get new images
+                    // Reshuffle server-side so the new period gets a fresh image order
+                    try {
+                        await fetch('/api/kiosk/reshuffle', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                    } catch (e) {
+                        debugLog(`Reshuffle request failed: ${e.message}`, 'error');
+                    }
+                    shuffleChanged = true;
                     needsReload = true;
                 } else if (previousTimePeriod === null) {
                     // Initialize on first check
