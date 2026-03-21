@@ -38,7 +38,6 @@ user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);
 user_pref("datareporting.policy.dataSubmissionPolicyBypassNotification", true);
 user_pref("browser.download.panel.shown", true);
 user_pref("browser.download.useDownloadDir", true);
-user_pref("security.sandbox.content.level", 0);
 user_pref("browser.cache.disk.enable", false);
 user_pref("browser.cache.memory.enable", true);
 user_pref("browser.cache.memory.capacity", 65536);
